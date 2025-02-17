@@ -60,9 +60,15 @@ pub fn init_db(logger: impl Logger) -> Result<()> {
 }
 
 #[emacs::module(name = "org-roam-utils")]
-pub fn init(env: &Env) -> Result<()> {
+pub fn init(_: &Env) -> Result<()> {
+    Ok(())
+}
+
+//TODO: use path.
+#[defun]
+pub fn prepare(logger: &Env, path: String) -> Result<()> {
     if DB.lock().unwrap().is_none() {
-        return init_db(env);
+        return init_db(logger);
     }
 
     Ok(())
