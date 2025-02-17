@@ -1,0 +1,35 @@
+#+title: org-roam-rs
+
+This projects consists of two libraries:
+- =org-roam-rs=: this is the elisp part of the package.
+- =org-roam-utils=: this is the rust part of the packages, which will
+  get loaded by emacs.
+
+The names are subject to change.
+
+* Setup
+All files required by emacs can be built using make:
+
+#+begin_src sh
+make all
+#+end_src
+
+After loading the package, we first have to initialize the rust data
+structures:
+
+#+begin_src elisp
+(org-roam-rs-init)
+#+end_src
+
+Then the database can be constructed. This may take some time.
+
+#+begin_src elisp
+(org-roam-rs-migrate)
+#+end_src
+
+* Usage
+An alternative to the =org-roam-node-find= is provided with
+=org-roam-rs-helm-node-find=.
+
+Currently only a helm backend is provided, which can be used with the
+command =M-x org-roam-rs-company=, or by enabling the =org-roam-rs-mode=.
