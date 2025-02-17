@@ -21,7 +21,7 @@ fn main() -> ExitCode {
         .log("Successfully initalized the logger.")
         .unwrap();
 
-    add_files(path, &logger);
+    //add_files(path, &logger);
 
     ExitCode::SUCCESS
 }
@@ -53,7 +53,7 @@ fn process_entry(entry: DirEntry, logger: impl Logger + Copy) {
         let elem = ast.document().children(&ast).next().unwrap();
         let title = &elem.title(&ast).raw;
 
-        add_node(title.to_string(), id.to_string(), String::default()).unwrap();
+        // add_node(title.to_string(), id.to_string(), String::default()).unwrap();
 
         return;
     }

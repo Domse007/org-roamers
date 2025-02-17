@@ -1,20 +1,27 @@
 use emacs::{Env, Result};
 
+#[macro_export]
+macro_rules! log {
+    ($log:ident, $($arg:tt)*) => {{
+        let _ = $log.log(format!($($arg)*));
+    }}
+}
+
 pub trait Logger {
-    fn log(&self, message: impl ToString)-> Result<()>;
+    fn log(&self, message: impl ToString) -> Result<()>;
 }
 
 impl Logger for &Env {
-    fn log(&self, message: impl ToString) -> Result<()>{
-	self.message(message.to_string()).map(|_| ())
+    fn log(&self, message: impl ToString) -> Result<()> {
+        self.message(message.to_string()).map(|_| ())
     }
 }
 
 pub struct StdOutLogger;
 
 impl Logger for &StdOutLogger {
-    fn log(&self, message: impl ToString) -> Result<()>{
-	println!("{}", message.to_string());
-	Result::Ok(())
+    fn log(&self, message: impl ToString) -> Result<()> {
+        println!("{}", message.to_string());
+        Result::Ok(())
     }
 }
