@@ -7,6 +7,8 @@ use serde::Serialize;
 use tantivy::collector::TopDocs;
 use tantivy::query::QueryParser;
 
+use std::path::{self, Path};
+use std::fs;
 use std::sync::{Mutex, OnceLock};
 
 use emacs::{defun, Env, Result};
@@ -25,8 +27,11 @@ const INDEX_WRITER_SIZE: usize = 50_000_000;
 
 static DB: Mutex<Option<Global>> = Mutex::new(None);
 
-pub fn init_db(logger: impl Logger) -> Result<()> {
-    let index_path = TempDir::new()?;
+pub fn init_db(logger: impl Logger, path: Option<&Path>) -> Result<()> {
+    let index_path =  match path {
+        Some(path) => TempDir::new_in(path),
+        None => TempDir::new(),
+    }?;
 
     log!(
         logger,
@@ -65,10 +70,23 @@ pub fn init(_: &Env) -> Result<()> {
 }
 
 //TODO: use path.
-#[defun]
+//#[defun]
 pub fn prepare(logger: &Env, path: String) -> Result<()> {
+    let path = Path::new(&path);
+
+    let path = if path.is_file() {
+        None
+    } else if !path.exists() {
+        match fs::create_dir(path) {
+            Ok(_) => Some(path),
+            Err(_) => None,
+        }
+    } else {
+        None
+    };
+
     if DB.lock().unwrap().is_none() {
-        return init_db(logger);
+        return init_db(logger, path);
     }
 
     Ok(())
