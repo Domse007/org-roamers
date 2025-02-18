@@ -1,3 +1,67 @@
+;;; org-roam-rs.el --- org-roam enhancements
+
+;; Copyright (C) 2017 Keller Dominik
+
+;; Author: Keller Dominik <example@example.com>
+;; URL: https://example.com/package-name.el
+;; Version: 0.1-pre
+;; Package-Requires: ((emacs "27.1")(org-roam "2.2.2"))
+;; Keywords: org-roam org
+
+;; This file is not part of GNU Emacs.
+
+;; This program is free software; you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+;;; Commentary:
+;; This package tries to enhance org-roam, while also speed up org-roam by
+;; omitting the list runtime and do most of the work in rust.
+
+;;;; Installation
+;;;;; MELPA
+;; If you installed from MELPA, you're done.
+;;;;; Git
+;; If you installed through git, you first must build the rust core. Install the
+;; rust toolchain and for convenience make. Then simply execute *make all* to
+;; build all required files.
+
+;;;;; Manual
+;; Install these required packages:
+;; + org-roam
+
+;; Then put this file in your load-path, and put this in your init
+;; file:
+
+;; (require 'package-name)
+
+;;;; Usage
+;; Run the following commands:
+;; `org-roam-rs-init': Initialize the package (emacs and rust side)
+;; `org-roam-rs-migrate': To sync the org-roam sqlite db and tantivy.
+;;
+;; To actually use the package use:
+;; `org-roam-rs-helm-node-find' to find and open a node.
+
+;;;; Credits
+;; This package would not have been possible without the following
+;; packages: org-roam[1].
+;;
+;;  [1] https://github.com/org-roam/org-roam
+
+;;; Code:
+
+;;;; Requirements
+
 (require 'org-roam)
 (require 'org-roam-node)
 (require 'org-roam-utils "./org-roam-rs.so")
@@ -6,6 +70,8 @@
   "An abstraction layer over org-roam to improve performance."
   :group 'org
   :prefix "org-roam-rs-")
+
+;;;; Customization
 
 (defcustom org-roam-rs-num-candidates 10
   "The number of results the db should return to emacs."
@@ -22,6 +88,9 @@
   :type 'string
   :group 'org-roam-rs)
 
+;;;; Functions
+
+;;;###autoload
 (defun org-roam-rs-init ()
   "Initialize all dbs and prepare system."
   (module-load (expand-file-name "org-roam-rs.so"))
@@ -105,4 +174,6 @@ title, id, body."
 		     :match-dynamic t)
 	  :buffer "*helm org-roam-rs*"))))
 
+
 (provide 'org-roam-rs)
+;;; package-name.el ends here
