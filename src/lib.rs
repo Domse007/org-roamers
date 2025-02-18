@@ -7,9 +7,9 @@ use serde::Serialize;
 use tantivy::collector::TopDocs;
 use tantivy::query::QueryParser;
 
-use std::path::{self, Path};
+use std::path::{Path};
 use std::fs;
-use std::sync::{Mutex, OnceLock};
+use std::sync::Mutex;
 
 use emacs::{defun, Env, Result};
 use tantivy::{doc, Index, IndexWriter};

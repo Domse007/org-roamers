@@ -1,9 +1,8 @@
 use std::{env, process::ExitCode};
 
-use emacs::Env;
-use org_roam_rs::{add_node, init_db, log, Logger, StdOutLogger};
+use org_roam_rs::{init_db, log, Logger, StdOutLogger};
 use orgize::Org;
-use std::fs::{self, DirEntry, FileType};
+use std::fs::{self, DirEntry};
 use std::path::Path;
 
 fn main() -> ExitCode {
