@@ -1,7 +1,7 @@
 use std::{env, process::ExitCode};
 
 use emacs::Env;
-use org_roam_rs::{add_node, init_db, Logger, StdOutLogger};
+use org_roam_rs::{add_node, init_db, log, Logger, StdOutLogger};
 use orgize::Org;
 use std::fs::{self, DirEntry, FileType};
 use std::path::Path;
@@ -10,16 +10,12 @@ fn main() -> ExitCode {
     let path = env::var("DB").unwrap();
     let logger = StdOutLogger;
 
-    (&logger)
-        .log(format!("Using {path} for indexing."))
-        .unwrap();
+    log!(logger, "Using {} for indexing.", path);
 
     // init like emacs would.
-    init_db(&logger).unwrap();
+    init_db(&logger, None).unwrap();
 
-    (&logger)
-        .log("Successfully initalized the logger.")
-        .unwrap();
+    log!(logger, "Successfully initalized the logger.");
 
     //add_files(path, &logger);
 
@@ -39,7 +35,7 @@ fn add_files<P: AsRef<Path>>(path: P, logger: impl Logger + Copy) {
 fn process_entry(entry: DirEntry, logger: impl Logger + Copy) {
     let t = entry.file_type().unwrap();
 
-    logger.log(format!("Processing {entry:?} {t:?}"));
+    log!(logger, "Processing {:?} {:?}", entry, t);
 
     if t.is_dir() {
         return add_files(entry.path(), logger);
@@ -58,7 +54,5 @@ fn process_entry(entry: DirEntry, logger: impl Logger + Copy) {
         return;
     }
 
-    logger
-        .log("Could not process thing: {t} :: {entry}")
-        .unwrap();
+    log!(logger, "Could not process thing: {:?} :: {:?}", t, entry);
 }

@@ -25,3 +25,9 @@ impl Logger for &StdOutLogger {
         Result::Ok(())
     }
 }
+
+impl Logger for StdOutLogger {
+    fn log(&self, message: impl ToString) -> Result<()> {
+        (&self).log(message)
+    }
+}
