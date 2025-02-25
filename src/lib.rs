@@ -7,6 +7,7 @@ pub use logger::{Logger, StdOutLogger};
 use serde::Serialize;
 use tantivy::collector::TopDocs;
 use tantivy::query::QueryParser;
+use tempfile::TempDir;
 
 use std::fs;
 use std::path::Path;
@@ -15,11 +16,9 @@ use std::sync::Mutex;
 use emacs::{defun, Env, Result};
 use tantivy::{doc, Index, IndexWriter};
 use tantivy::{schema::*, DocAddress, Score};
-use tempfile::TempDir;
 
 struct Global {
     schema: Schema,
-    tempdir: TempDir,
     index_writer: IndexWriter,
     index: Index,
 }
@@ -55,7 +54,6 @@ pub fn init_db(logger: impl Logger, path: Option<&Path>) -> Result<()> {
     let db = &DB;
     let mut access = db.lock().unwrap();
     *access = Some(Global {
-        tempdir: index_path,
         index_writer,
         index,
         schema,

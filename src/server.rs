@@ -1,11 +1,9 @@
-use std::fs::File;
-use std::io::Write;
 use std::sync::mpsc::Sender;
-use std::sync::{Arc, Mutex};
-use std::thread::{self, JoinHandle};
+use std::sync::Mutex;
+use std::thread::JoinHandle;
 
 use emacs::defun;
-use emacs::{Env, Error, Result};
+use emacs::Result;
 use orgize::Org;
 use rouille::{router, Response, Server};
 use tantivy::collector::TopDocs;
@@ -13,7 +11,7 @@ use tantivy::query::QueryParser;
 use tantivy::schema::Value;
 use tantivy::TantivyDocument;
 
-use crate::{log, Logger, DB};
+use crate::DB;
 
 static WEBSERVER: Mutex<Option<(JoinHandle<()>, Sender<()>)>> = Mutex::new(None);
 
@@ -24,17 +22,14 @@ fn start_server(url: String) -> Result<()> {
     }
 
     let server = Server::new(url, move |request| {
-        let mut file = File::create("/home/dominik/Code/Web/org-roam-rs/foo.txt").unwrap();
         router!(request,
             (GET) (/)  => {
                 Response::html("<body><h1>Hello, World!</h1></body>")
             },
             (GET) (/org) => {
                 match request.get_param("title") {
-                    Some(title) => get_org_as_html(&mut file, title),
-                    None => {
-            Response::empty_404()
-            },
+                    Some(title) => get_org_as_html(title),
+                    None => Response::empty_404(),
                 }
             },
             _ => Response::empty_404()
@@ -67,7 +62,7 @@ fn stop_server() -> Result<()> {
     Ok(())
 }
 
-fn get_org_as_html(file: &mut File, name: String) -> Response {
+fn get_org_as_html(name: String) -> Response {
     let db = &DB;
     let mut db = db.lock().unwrap();
     let db = db.as_mut().unwrap();
@@ -99,7 +94,7 @@ fn get_org_as_html(file: &mut File, name: String) -> Response {
 
     let mut html = Vec::new();
 
-    Org::parse(body).write_html(&mut html);
+    Org::parse(body).write_html(&mut html).unwrap();
 
     Response::html(String::from_utf8(html).unwrap())
 }
