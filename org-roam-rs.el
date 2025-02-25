@@ -64,7 +64,11 @@
 
 (require 'org-roam)
 (require 'org-roam-node)
-(require 'org-roam-utils "./org-roam-rs.so")
+(require 'org-roam-utils (expand-file-name "./org-roam-rs.so"))
+
+(unless (json-available-p)
+  (user-error "org-roam-rs-helm needs JSON support in Emacs;
+ please rebuild it using `--with-json'"))
 
 (defgroup org-roam-rs nil
   "An abstraction layer over org-roam to improve performance."
@@ -112,9 +116,10 @@ This is stolen from org-roam-ui."
   (dolist (node (org-roam-node-list))
     (let* ((title (org-roam-node-title node))
 	   (id (org-roam-node-id node))
+	   (file (org-roam-node-file node))
 	   ;; TODO: extract body
 	   (body (org-roam-rs--get-text id)))
-      (org-roam-utils-add-node title id body))))
+      (org-roam-utils-add-node title id body file))))
 
 (defun org-roam-rs--get-candidates (input &optional num-candidates)
   "Get's completion candidates. It returns a list of hash-tabes with fields
@@ -138,41 +143,45 @@ title, id, body."
   (interactive (list 'interactive))
   (cl-case command
     (interactive (company-begin-backend 'org-roam-rs-company))
-    (prefix (thing-at-point 'word))
-    (candidates (org-roam-rs--get-candidates arg 10))
+    (prefix (list (company-grab-word) (company-grab-word-suffix)))
+    (candidates (let ((candidates (org-roam-rs--get-candidates arg 10)))
+		  (message "Got %s candidates with %s." (length candidates) arg)
+
+		  (if (string-empty-p arg)
+		      candidates
+		    (company-substitute-prefix
+		     arg
+		     (all-completions arg candidates)))
+
+		  ))
+    (ignore-case t)
     (sorted t)
     (no-cache t)))
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-(require 'helm)
-
-(unless (json-available-p)
-  (user-error "org-roam-rs-helm needs JSON support in Emacs;
- please rebuild it using `--with-json'"))
-
-(defun org-roam-rs--helm-get-candidates ()
-  (let* ((input helm-pattern)
-	 (result (org-roam-rs--get-candidates
+(defun org-roam-rs--completing-read-get-candidates (input _func _flag)
+  (let* ((result (org-roam-rs--get-candidates
 		  input
 		  org-roam-rs-num-candidates)))
+    (message "num res: %s" (length result))
     (mapcar (lambda (node) (gethash "title" node)) result)))
 
-(defun org-roam-rs--helm-format-candidate (node)
-  node)
-
-(defun org-roam-rs-helm-node-find ()
+(defun org-roam-rs-node-find ()
+  "A faster more flexible alternative to `org-roam-node-find'"
   (interactive)
-  (org-roam-node-open
-   (org-roam-node-from-title-or-alias
-    (helm :sources (helm-build-sync-source "Org-roam-rs"
-		     :candidates #'org-roam-rs--helm-get-candidates
-		     :candidate-transformer #'org-roam-rs--helm-format-candidate
-		     :fuzzy-match t
-		     :match-dynamic t)
-	  :buffer "*helm org-roam-rs*"))))
+  (completing-read "Node: "
+		   #'org-roam-rs--completing-read-get-candidates))
+
+
+;; (defun org-roam-rs-helm-node-find ()
+;;   (interactive)
+;;   (org-roam-node-open
+;;    (org-roam-node-from-title-or-alias
+;;     (helm :sources (helm-build-sync-source "Org-roam-rs"
+;; 		     :candidates #'org-roam-rs--helm-get-candidates
+;; 		     :candidate-transformer #'org-roam-rs--helm-format-candidate
+;; 		     :fuzzy-match t
+;; 		     :match-dynamic t)
+;; 	  :buffer "*helm org-roam-rs*"))))
 
 
 (provide 'org-roam-rs)
