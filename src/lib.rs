@@ -1,4 +1,5 @@
 mod logger;
+mod server;
 
 emacs::plugin_is_GPL_compatible!();
 
@@ -7,8 +8,8 @@ use serde::Serialize;
 use tantivy::collector::TopDocs;
 use tantivy::query::QueryParser;
 
-use std::path::{Path};
 use std::fs;
+use std::path::Path;
 use std::sync::Mutex;
 
 use emacs::{defun, Env, Result};
@@ -28,7 +29,7 @@ const INDEX_WRITER_SIZE: usize = 50_000_000;
 static DB: Mutex<Option<Global>> = Mutex::new(None);
 
 pub fn init_db(logger: impl Logger, path: Option<&Path>) -> Result<()> {
-    let index_path =  match path {
+    let index_path = match path {
         Some(path) => TempDir::new_in(path),
         None => TempDir::new(),
     }?;
@@ -42,7 +43,8 @@ pub fn init_db(logger: impl Logger, path: Option<&Path>) -> Result<()> {
     let mut schema_builder = Schema::builder();
     schema_builder.add_text_field("title", TEXT | STORED);
     schema_builder.add_text_field("id", TEXT | STORED);
-    schema_builder.add_text_field("body", TEXT);
+    schema_builder.add_text_field("body", TEXT | STORED);
+    schema_builder.add_text_field("file", TEXT | STORED);
 
     let schema = schema_builder.build();
 
@@ -70,7 +72,7 @@ pub fn init(_: &Env) -> Result<()> {
 }
 
 //TODO: use path.
-//#[defun]
+#[defun]
 pub fn prepare(logger: &Env, path: String) -> Result<()> {
     let path = Path::new(&path);
 
@@ -93,7 +95,7 @@ pub fn prepare(logger: &Env, path: String) -> Result<()> {
 }
 
 #[defun]
-pub fn add_node(logger: &Env, title: String, id: String, body: String) -> Result<()> {
+pub fn add_node(logger: &Env, title: String, id: String, body: String, file: String) -> Result<()> {
     let db = &DB;
     let mut db = db.lock().unwrap();
     let db = db.as_mut().unwrap();
@@ -101,11 +103,13 @@ pub fn add_node(logger: &Env, title: String, id: String, body: String) -> Result
     let title_field = db.schema.get_field("title").unwrap();
     let id_field = db.schema.get_field("id").unwrap();
     let body_field = db.schema.get_field("body").unwrap();
+    let file_field = db.schema.get_field("file").unwrap();
 
     let mut document = TantivyDocument::new();
     document.add_text(title_field, title.as_str());
     document.add_text(id_field, id);
     document.add_text(body_field, body);
+    document.add_text(file_field, file);
 
     db.index_writer.add_document(document)?;
 
