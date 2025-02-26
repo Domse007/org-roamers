@@ -18,6 +18,7 @@ use tantivy::{doc, Index, IndexWriter};
 use tantivy::{schema::*, DocAddress, Score};
 
 struct Global {
+    _tempdir: TempDir,
     schema: Schema,
     index_writer: IndexWriter,
     index: Index,
@@ -28,6 +29,8 @@ const INDEX_WRITER_SIZE: usize = 50_000_000;
 static DB: Mutex<Option<Global>> = Mutex::new(None);
 
 pub fn init_db(logger: impl Logger, path: Option<&Path>) -> Result<()> {
+    log!(logger, "{}", std::env::current_dir().unwrap().display());
+
     let index_path = match path {
         Some(path) => TempDir::new_in(path),
         None => TempDir::new(),
@@ -54,6 +57,7 @@ pub fn init_db(logger: impl Logger, path: Option<&Path>) -> Result<()> {
     let db = &DB;
     let mut access = db.lock().unwrap();
     *access = Some(Global {
+        _tempdir: index_path,
         index_writer,
         index,
         schema,
@@ -131,6 +135,16 @@ pub struct GetNodesResultWrapper {
 
 #[defun]
 pub fn get_nodes(_logger: &Env, search: String, num_results: usize) -> Result<String> {
+    let results = get_nodes_internal(_logger, search, num_results)?;
+
+    Ok(serde_json::to_string(&results)?)
+}
+
+fn get_nodes_internal(
+    _logger: impl Logger,
+    search: String,
+    num_results: usize,
+) -> Result<GetNodesResultWrapper> {
     let db = &DB;
     let mut db = db.lock().unwrap();
     let db = db.as_mut().unwrap();
@@ -170,5 +184,5 @@ pub fn get_nodes(_logger: &Env, search: String, num_results: usize) -> Result<St
         results.push(GetNodesResult { id, title })
     }
 
-    Ok(serde_json::to_string(&GetNodesResultWrapper { results })?)
+    Ok(GetNodesResultWrapper { results })
 }

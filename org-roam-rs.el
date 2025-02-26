@@ -92,6 +92,11 @@
   :type 'string
   :group 'org-roam-rs)
 
+(defcustom org-roam-rs-server-url "localhost:5000"
+  "The url where the server is started."
+  :type 'string
+  :group 'org-roam-rs)
+
 ;;;; Functions
 
 ;;;###autoload
@@ -183,6 +188,16 @@ title, id, body."
 ;; 		     :match-dynamic t)
 ;; 	  :buffer "*helm org-roam-rs*"))))
 
+;;; Section server
+
+(defconst org-roam-rs-server-root-dir
+  (expand-file-name "web/" default-directory)
+  "Path to web directory relative to this file.")
+
+(defun org-roam-rs-server-start ()
+  (interactive)
+  (org-roam-utils-server-start-server org-roam-rs-server-url
+				      org-roam-rs-server-root-dir))
 
 (provide 'org-roam-rs)
 ;;; package-name.el ends here

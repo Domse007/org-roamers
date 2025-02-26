@@ -13,9 +13,9 @@ endif
 .PHONY: all
 all:
 	@$(ECHO) Building org-roam-rs
-	$(CARGO) build --release
+	$(CARGO) build
 	@$(ECHO) Finishing up org-roam-rs.$(LIB_EXTENSION)
-	$(CP) target/release/liborg_roam_rs.$(LIB_EXTENSION) org-roam-rs.$(LIB_EXTENSION)
+	$(CP) target/debug/liborg_roam_rs.$(LIB_EXTENSION) org-roam-rs.$(LIB_EXTENSION)
 	# $(STRIP) org-roam-rs.$(LIB_EXTENSION)
 
 .PHONY: clean
