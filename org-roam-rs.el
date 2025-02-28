@@ -103,7 +103,8 @@
 (defun org-roam-rs-init ()
   "Initialize all dbs and prepare system."
   (module-load (expand-file-name "org-roam-rs.so"))
-  (org-roam-utils-prepare org-roam-rs-db-directory))
+  (org-roam-utils-prepare org-roam-rs-db-directory
+			  org-roam-db-location))
 
 (defun org-roam-rs--get-text (id)
   "Retrieve the text from org-node ID.

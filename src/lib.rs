@@ -1,10 +1,12 @@
 mod logger;
 mod server;
+mod sqlite;
 
 emacs::plugin_is_GPL_compatible!();
 
 pub use logger::{Logger, StdOutLogger};
 use serde::Serialize;
+use sqlite::SqliteConnection;
 use tantivy::collector::TopDocs;
 use tantivy::query::QueryParser;
 use tempfile::TempDir;
@@ -14,7 +16,7 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use emacs::{defun, Env, Result};
-use tantivy::{doc, Index, IndexWriter};
+use tantivy::{doc, schema, Index, IndexWriter};
 use tantivy::{schema::*, DocAddress, Score};
 
 struct Global {
@@ -22,13 +24,18 @@ struct Global {
     schema: Schema,
     index_writer: IndexWriter,
     index: Index,
+
+    sqlite: SqliteConnection,
 }
 
 const INDEX_WRITER_SIZE: usize = 50_000_000;
 
 static DB: Mutex<Option<Global>> = Mutex::new(None);
 
-pub fn init_db(logger: impl Logger, path: Option<&Path>) -> Result<()> {
+pub fn init_tantivy(
+    logger: impl Logger,
+    path: Option<&Path>,
+) -> Result<(TempDir, Schema, IndexWriter, Index)> {
     log!(logger, "{}", std::env::current_dir().unwrap().display());
 
     let index_path = match path {
@@ -54,18 +61,9 @@ pub fn init_db(logger: impl Logger, path: Option<&Path>) -> Result<()> {
 
     let index_writer: IndexWriter = index.writer(INDEX_WRITER_SIZE)?;
 
-    let db = &DB;
-    let mut access = db.lock().unwrap();
-    *access = Some(Global {
-        _tempdir: index_path,
-        index_writer,
-        index,
-        schema,
-    });
-
     log!(logger, "Finished initializing DB.");
 
-    Ok(())
+    Ok((index_path, schema, index_writer, index))
 }
 
 #[emacs::module(name = "org-roam-utils")]
@@ -75,7 +73,7 @@ pub fn init(_: &Env) -> Result<()> {
 
 //TODO: use path.
 #[defun]
-pub fn prepare(logger: &Env, path: String) -> Result<()> {
+pub fn prepare(logger: &Env, path: String, sqlite_db_path: String) -> emacs::Result<()> {
     let path = Path::new(&path);
 
     let path = if path.is_file() {
@@ -90,7 +88,33 @@ pub fn prepare(logger: &Env, path: String) -> Result<()> {
     };
 
     if DB.lock().unwrap().is_none() {
-        return init_db(logger, path);
+        let (tempdir, schema, indexwriter, index) = match init_tantivy(logger, path) {
+            Ok(env) => env,
+            Err(err) => {
+                return Err(emacs::Error::msg(format!(
+                    "ERROR: could not initialize tantivy: {:?}",
+                    err
+                )))
+            }
+        };
+        let sqlite_con = match SqliteConnection::init(sqlite_db_path) {
+            Some(con) => con,
+            None => {
+                return Err(emacs::Error::msg(
+                    "ERROR: could not initialize the sqlite connection",
+                ))
+            }
+        };
+
+        let db = &DB;
+        let mut access = db.lock().unwrap();
+        *access = Some(Global {
+            _tempdir: tempdir,
+            index_writer: indexwriter,
+            index,
+            schema,
+            sqlite: sqlite_con,
+        });
     }
 
     Ok(())

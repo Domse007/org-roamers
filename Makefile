@@ -17,6 +17,9 @@ all:
 	@$(ECHO) Finishing up org-roam-rs.$(LIB_EXTENSION)
 	$(CP) target/debug/liborg_roam_rs.$(LIB_EXTENSION) org-roam-rs.$(LIB_EXTENSION)
 	# $(STRIP) org-roam-rs.$(LIB_EXTENSION)
+	$(MAKE) -c web2
+	$(RM) -r web/
+	$(CP) web2/dist/ web/ -r
 
 .PHONY: clean
 clean:

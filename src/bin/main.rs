@@ -1,6 +1,6 @@
 use std::{env, process::ExitCode};
 
-use org_roam_rs::{init_db, log, Logger, StdOutLogger};
+use org_roam_rs::{init_tantivy, log, Logger, StdOutLogger};
 use orgize::Org;
 use std::fs::{self, DirEntry};
 use std::path::Path;
@@ -12,7 +12,7 @@ fn main() -> ExitCode {
     log!(logger, "Using {} for indexing.", path);
 
     // init like emacs would.
-    init_db(&logger, None).unwrap();
+    init_tantivy(&logger, None).unwrap();
 
     log!(logger, "Successfully initalized the logger.");
 

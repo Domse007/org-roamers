@@ -11,6 +11,7 @@ use emacs::defun;
 use emacs::Result;
 use orgize::Org;
 use rouille::{router, Response, Server};
+use serde::Serialize;
 use tantivy::collector::TopDocs;
 use tantivy::query::QueryParser;
 use tantivy::schema::Value;
@@ -32,7 +33,7 @@ fn start_server(url: String, root: String) -> Result<()> {
     let server = Server::new(url, move |request| {
         router!(request,
             (GET) (/)  => {
-                default_route_content(root)
+                default_route_content(root, None)
             },
             (GET) (/org) => {
                 match request.get_param("title") {
@@ -46,7 +47,10 @@ fn start_server(url: String, root: String) -> Result<()> {
                     None => Response::empty_404(),
                 }
             },
-            _ => Response::empty_404()
+            (GET) (/graph) => {
+                get_graph_data()
+            },
+            _ => default_route_content(root, Some(request.url()))
         )
     })
     .unwrap();
@@ -76,23 +80,29 @@ fn stop_server() -> Result<()> {
     Ok(())
 }
 
-fn default_route_content(root: &str) -> Response {
+fn default_route_content(root: &str, url: Option<String>) -> Response {
     let mut path = PathBuf::from(root);
-    path.push("index.html");
-    
-    let mut content = String::new();
 
-    let mut file = match File::open(path.as_path()) {
+    match url {
+        Some(url) => path.push(url.strip_prefix("/").unwrap()),
+        None => path.push("index.html"),
+    }
+
+    let mime = match path.extension() {
+        Some(extension) => match extension.to_str().unwrap() {
+            "html" => "text/html",
+            "js" => "text/javascript",
+            _ => return Response::empty_404(),
+        },
+        _ => return Response::empty_404(),
+    };
+
+    let file = match File::open(path) {
         Ok(file) => file,
         Err(_) => return Response::empty_404(),
     };
 
-    match file.read_to_string(&mut content) {
-        Ok(_) => {}
-        Err(_) => return Response::empty_404(),
-    }
-
-    Response::html(content)
+    Response::from_file(mime, file)
 }
 
 fn get_org_as_html(name: String) -> Response {
@@ -144,26 +154,36 @@ fn get_org_as_html(name: String) -> Response {
 fn search(query: String) -> Response {
     let logger = crate::logger::StdOutLogger;
     let result = match get_nodes_internal(logger, query, 10) {
-        Ok(result )=> result,
+        Ok(result) => result,
         Err(_) => return Response::empty_404(),
     };
     let json = match serde_json::to_string(&result) {
         Ok(json) => json,
         Err(_) => return Response::empty_404(),
     };
-    
+
     Response::json(&json)
 }
 
-// struct GraphData {
-//     nodes: Vec<String>,
-//     edges: Vec<(String, String)>,
-// }
+#[derive(Serialize)]
+struct GraphData {
+    nodes: Vec<String>,
+    edges: Vec<(String, String)>,
+}
 
-// fn get_graph_data() -> Response {
-//     let db = &DB;
-//     let mut db = db.get_mut().unwrap();
-//     let db = db.as_mut().unwrap();
+fn get_graph_data() -> Response {
+    let db = &DB;
+    let mut db = db.lock().unwrap();
+    let db = db.as_mut().unwrap();
 
-//     Response::empty_404()
-// }
+    let nodes = db
+        .sqlite
+        .get_all_nodes()
+        .into_iter()
+        .map(|e| e.1)
+        .collect::<Vec<String>>();
+
+    let edges = db.sqlite.get_all_links();
+
+    Response::json(&serde_json::to_string(&GraphData { nodes, edges }).unwrap())
+}
