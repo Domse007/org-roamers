@@ -1,4 +1,7 @@
-import { syntaxHighlight } from 'katex'
+import './style.css'
+
+import renderMathInElement from 'katex/dist/contrib/auto-render';
+
 import hljs from 'highlight.js';
 import Graph from "graphology";
 import forceAtlas2 from "graphology-layout-forceatlas2";
@@ -37,16 +40,15 @@ export const syntaxHighlightSite = () => {
   Array.from(document.getElementsByClassName("src"))
     .forEach((item) => {
       hljs.highlightElement(item)
-    }); 
+    });
+  hljs.highlightAll();
 }
 
 export const preview = (name) => {
   fetch(`/org?title=${name}`)
     .then((response) => {
-      console.log(response);
       return response.text();
     }).then((html) => {
-      console.log(html);
       document.getElementById('org-preview').innerHTML = html;
       renderMathInElement(document.getElementById('org-preview'));
       syntaxHighlightSite();
@@ -88,7 +90,7 @@ const search = async (query) => {
   return res;
 }
 
-const searchInput = document.getElementById('search-input');
+let searchInput = document.getElementById('search-input');
 let searchSuggestion = document.getElementById('search-suggestion-wrapper');
 
 const InputHandler = (event) => {
@@ -96,9 +98,18 @@ const InputHandler = (event) => {
   searchSuggestion.innerHTML = "";
   search(query).then((res) => {
     res["results"].forEach((e) => {
-      searchSuggestion.innerHTML += `<div onclick="preview('${e.title}')" style="padding: 5px; cursor: pointer;" onmouseout="this.style.background='gray';" onmouseover="this.style.background='lightgray';">${e.title}</div>`;
+      searchSuggestion.innerHTML += `<div class="suggestion" style="padding: 5px; cursor: pointer;" onmouseout="this.style.background='gray';" onmouseover="this.style.background='lightgray';">${e.title}</div>`;
     })
+    updateSuggestions();
   })
+};
+
+const updateSuggestions = () => {
+  Array.from(document.getElementsByClassName("suggestion")).forEach((e) => {
+    e.onclick = () => {
+      preview(e.textContent);
+    };
+  });
 };
 
 export function setupSearchBarEventListener() {

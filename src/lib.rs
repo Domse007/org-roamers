@@ -1,4 +1,5 @@
 mod logger;
+mod migrate;
 mod server;
 mod sqlite;
 
@@ -126,6 +127,17 @@ pub fn add_node(logger: &Env, title: String, id: String, body: String, file: Str
     let mut db = db.lock().unwrap();
     let db = db.as_mut().unwrap();
 
+    add_node_internal(&logger, db, title, id, body, file)
+}
+
+fn add_node_internal(
+    logger: &impl Logger,
+    db: &mut Global,
+    title: String,
+    id: String,
+    body: String,
+    file: String,
+) -> Result<()> {
     let title_field = db.schema.get_field("title").unwrap();
     let id_field = db.schema.get_field("id").unwrap();
     let body_field = db.schema.get_field("body").unwrap();

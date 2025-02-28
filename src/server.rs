@@ -92,6 +92,7 @@ fn default_route_content(root: &str, url: Option<String>) -> Response {
         Some(extension) => match extension.to_str().unwrap() {
             "html" => "text/html",
             "js" => "text/javascript",
+            "css" => "text/css",
             _ => return Response::empty_404(),
         },
         _ => return Response::empty_404(),
@@ -178,9 +179,9 @@ fn get_graph_data() -> Response {
 
     let nodes = db
         .sqlite
-        .get_all_nodes()
+        .get_all_nodes(["title", "id"])
         .into_iter()
-        .map(|e| e.1)
+        .map(|e| e[1].to_string())
         .collect::<Vec<String>>();
 
     let edges = db.sqlite.get_all_links();
