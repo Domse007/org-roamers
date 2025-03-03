@@ -24,9 +24,7 @@ pub fn get_nodes_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<Extrac
     get_nodes_from_document(document)
 }
 
-pub fn get_nodes_from_document(
-    document: Document,
-) -> anyhow::Result<Vec<ExtractedNode>> {
+pub fn get_nodes_from_document(document: Document) -> anyhow::Result<Vec<ExtractedNode>> {
     let mut nodes = Vec::new();
 
     // parsing #+title

@@ -38,7 +38,7 @@ pub struct Embedding {
     data: Vec<f32>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct NodeFromOrg {
     pub(crate) uuid: String,
     pub(crate) title: String,
@@ -95,7 +95,7 @@ pub enum LinkDest {
     Other(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Timestamps {
     ctime: String,
     mtime: Vec<String>,
