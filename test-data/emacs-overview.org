@@ -1,0 +1,16 @@
+:PROPERTIES:
+:ID:       9f8a7c1b-4d23-4d9e-ae9b-6f5e3c6b9e9f
+:END:
+#+title: Emacs Overview
+
+Emacs is an extensible, customizable, free/libre text editor. It is known for its powerful editing capabilities, Lisp-based scripting, and vast ecosystem of packages.
+
+** Features
+- Highly customizable with Emacs Lisp
+- Modes for different programming languages
+- Org mode for note-taking and task management
+- Integration with version control systems
+
+** Related Notes
+- [[id:3c2b7d6e-7f45-4b8f-a1c6-2d1e5f3a7c9d][Configuring Emacs]]
+- [[id:5a8c7d3e-6f21-4c9d-b3a2-9f8e1d2c7b4e][Emacs Package Management]]

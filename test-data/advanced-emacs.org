@@ -1,0 +1,20 @@
+:PROPERTIES:
+:ID:       7d9f1e2b-4c8d-47b3-a6e2-1d4c5f2a8e3c
+:END:
+#+title: Advanced Emacs Customization
+
+For power users, Emacs customization can include advanced keybindings, performance tuning, and UI enhancements.
+
+** Custom Keybindings
+#+begin_src emacs-lisp
+(global-set-key (kbd "C-c C-c") 'compile)
+#+end_src
+
+** Performance Tweaks
+#+begin_src emacs-lisp
+(setq gc-cons-threshold 100000000)
+#+end_src
+
+** Related Notes
+- [[id:3c2b7d6e-7f45-4b8f-a1c6-2d1e5f3a7c9d][Configuring Emacs]]
+- [[id:5a8c7d3e-6f21-4c9d-b3a2-9f8e1d2c7b4e][Emacs Package Management]]
