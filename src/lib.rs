@@ -1,8 +1,9 @@
+pub mod datamodel;
 mod logger;
 mod migrate;
+mod org;
 mod server;
-pub mod datamodel;
-mod sqlite;
+pub mod sqlite;
 
 emacs::plugin_is_GPL_compatible!();
 

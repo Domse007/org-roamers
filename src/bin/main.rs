@@ -41,16 +41,16 @@ fn process_entry(entry: DirEntry, logger: impl Logger + Copy) {
     }
 
     if t.is_file() && entry.path().extension().unwrap() == "org" {
-        let file = fs::read_to_string(entry.path()).unwrap();
-        let ast = Org::parse_string(file);
+        // let file = fs::read_to_string(entry.path()).unwrap();
+        // let ast = Org::parse(file);
 
-        let id = ast.document().section_node().unwrap();
-        let elem = ast.document().children(&ast).next().unwrap();
-        let title = &elem.title(&ast).raw;
+        // let id = ast.document().section_node().unwrap();
+        // let elem = ast.document().children(&ast).next().unwrap();
+        // let title = &elem.title(&ast).raw;
 
-        // add_node(title.to_string(), id.to_string(), String::default()).unwrap();
+        // // add_node(title.to_string(), id.to_string(), String::default()).unwrap();
 
-        return;
+        // return;
     }
 
     log!(logger, "Could not process thing: {:?} :: {:?}", t, entry);

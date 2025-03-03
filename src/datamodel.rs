@@ -40,17 +40,16 @@ pub struct Embedding {
 
 #[derive(Debug, Clone)]
 pub struct NodeFromOrg {
-    uuid: String,
-    title: String,
-    content: String,
-    file: u64,
-    level: u64,
-    olp: Vec<String>,
-    tags: Vec<String>,
-    aliases: Vec<String>,
-    timestamps: Timestamps,
-    links: Vec<(String, String)>,
-
+    pub(crate) uuid: String,
+    pub(crate) title: String,
+    pub(crate) content: String,
+    pub(crate) file: String,
+    pub(crate) level: u64,
+    pub(crate) olp: Vec<String>,
+    pub(crate) tags: Vec<String>,
+    pub(crate) aliases: Vec<String>,
+    pub(crate) timestamps: Timestamps,
+    pub(crate) links: Vec<(String, String)>,
 }
 
 #[derive(Debug, Clone)]
@@ -93,13 +92,19 @@ pub struct Link {
 pub enum LinkDest {
     File(String),
     Node(u64),
-    Other(String)
+    Other(String),
 }
 
 #[derive(Debug, Clone)]
 pub struct Timestamps {
     ctime: String,
-    mtime: Vec<String>
+    mtime: Vec<String>,
+}
+
+impl Timestamps {
+    pub fn new(ctime: String, mtime: Vec<String>) -> Self {
+        Self { ctime, mtime }
+    }
 }
 
 #[derive(Debug, Clone)]

@@ -145,11 +145,9 @@ fn get_org_as_html(name: String) -> Response {
         .as_str()
         .unwrap();
 
-    let mut html = Vec::new();
+    let mut html = Org::parse(body).to_html();
 
-    Org::parse(body).write_html(&mut html).unwrap();
-
-    Response::html(String::from_utf8(html).unwrap())
+    Response::html(String::from_utf8(html.into_bytes()).unwrap())
 }
 
 fn search(query: String) -> Response {

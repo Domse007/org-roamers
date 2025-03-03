@@ -2,7 +2,10 @@ use std::{mem::MaybeUninit, path::Path};
 
 use rusqlite::Connection;
 
-use crate::Logger;
+use crate::{
+    datamodel::{NodeFromOrg, Timestamps},
+    Logger,
+};
 
 pub struct SqliteConnection {
     connection: Connection,
@@ -69,5 +72,44 @@ impl SqliteConnection {
             .unwrap()
             .map(|e| e.unwrap())
             .collect()
+    }
+
+    /// Parse nodes from org-roam database and turn them into `NodeFromOrg` to
+    /// embed them into the databases of org-roamers.
+    ///
+    /// # Future
+    /// Depending on the future of this project, it might be beneficial to
+    /// remove this function (or the entire file).
+    pub fn nodes_from_org(&mut self) -> Vec<NodeFromOrg> {
+        self.get_all_nodes(["id", "title", "file", "level", "olp", "tags"])
+            .into_iter()
+            .map(|[uuid, title, file, level, olp, tags]| {
+                let content = String::new();
+                let aliases = Vec::new();
+                let ctime = String::new();
+                let mtime = Vec::new();
+                let timestamps = Timestamps::new(ctime, mtime);
+                let links = Vec::new();
+                let level = level.parse::<u64>().unwrap_or(0);
+                let tags = tags.split(',').map(ToString::to_string).collect();
+                let olp = Self::parse_olp(olp);
+                NodeFromOrg {
+                    uuid,
+                    title,
+                    content,
+                    file,
+                    level,
+                    olp,
+                    tags,
+                    aliases,
+                    timestamps,
+                    links,
+                }
+            })
+            .collect()
+    }
+
+    fn parse_olp(olp: String) -> Vec<String> {
+        todo!()
     }
 }
