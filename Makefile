@@ -11,18 +11,20 @@ else
 endif
 
 .PHONY: all
-all: website
-	@$(ECHO) Building org-roam-rs
-	$(CARGO) build
-	@$(ECHO) Finishing up org-roam-rs.$(LIB_EXTENSION)
-	$(CP) target/debug/liborg_roam_rs.$(LIB_EXTENSION) org-roam-rs.$(LIB_EXTENSION)
-	# $(STRIP) org-roam-rs.$(LIB_EXTENSION)
+all: website native
 
 .PHONY: website
 website:
 	$(MAKE) -C web2
 	$(RM) -r web/
 	$(CP) web2/dist/ web/ -r
+
+.PHONY: native
+native:
+	@$(ECHO) Building org-roam-rs
+	$(CARGO) build
+	@$(ECHO) Finishing up org-roam-rs.$(LIB_EXTENSION)
+	$(CP) target/debug/liborg_roam_rs.$(LIB_EXTENSION) org-roam-rs.$(LIB_EXTENSION)
 
 .PHONY: clean
 clean:
