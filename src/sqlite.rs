@@ -71,7 +71,7 @@ impl SqliteConnection {
         stmnt
             .query_map([], |row| {
                 let mut curr: [String; PARAMS] = [const { String::new() }; PARAMS];
-                for i in 0..PARAMS - 1 {
+                for i in 0..PARAMS {
                     curr[i] = row.get(i).unwrap();
                 }
                 Ok(curr)

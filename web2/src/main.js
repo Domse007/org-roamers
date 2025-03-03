@@ -3,8 +3,8 @@ import './style.css'
 import renderMathInElement from 'katex/dist/contrib/auto-render';
 
 import hljs from 'highlight.js';
-import Graph from "graphology";
-import forceAtlas2 from "graphology-layout-forceatlas2";
+import MultiGraph from "graphology";
+// import forceAtlas2 from "graphology-layout-forceatlas2";
 // TODO:
 import FA2Layout from "graphology-layout-forceatlas2/worker";
 import Sigma from "sigma";
@@ -55,8 +55,11 @@ export const preview = (name) => {
     });	  
 };
 
+const randomNumber = (min, max) => Math.random() * (max - min) + min;
+
 // Create a graphology graph
-const graph = new Graph();
+const graph = new MultiGraph();
+
 
 const updateGraph = () => {
   fetch(`/graph`)
@@ -64,22 +67,27 @@ const updateGraph = () => {
     .then((text) => JSON.parse(text))
     .then((json) => {
       json["nodes"].forEach((node) => {
-	graph.addNode(node, { label: node, x: temp, y: 0, size: 10, color: "blue"});
-      })
+	graph.addNode(node, {
+          label: node,
+          x: randomNumber(1, 100),
+          y: randomNumber(1, 100),
+          size: 10,
+          color: "blue"
+        });
+      });
+      json["edges"].forEach((edge) => {
+        graph.addEdge(edge[0], edge[1]);
+      });
       setupGraph()
     })
 }
 
 export function setupGraph() {
-  const positions = forceAtlas2(graph, {
-    iterations: 50,
-    settings: {
-      gravity: 10
-    }
+  const layout = new FA2Layout(graph, {
+    settings: {gravity: 0}
   });
-
-  forceAtlas2.assign(graph);
-
+  
+  layout.start();
   const sigmaInstance = new Sigma(graph, document.getElementById("graph"));
 }
 
@@ -130,4 +138,5 @@ document.addEventListener('DOMContentLoaded', function() {
   setupPreview()
   preview("Kreise");
   setupSearchBarEventListener();
+  updateGraph();
 });

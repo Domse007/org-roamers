@@ -177,9 +177,9 @@ fn get_graph_data() -> Response {
 
     let nodes = db
         .sqlite
-        .get_all_nodes(["title", "id"])
+        .get_all_nodes(["id"])
         .into_iter()
-        .map(|e| e[1].to_string())
+        .map(|e| e[0].to_string())
         .collect::<Vec<String>>();
 
     let edges = db.sqlite.get_all_links();
