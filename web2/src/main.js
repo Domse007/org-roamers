@@ -3,7 +3,7 @@ import './style.css'
 import renderMathInElement from 'katex/dist/contrib/auto-render';
 
 import hljs from 'highlight.js';
-import MultiGraph from "graphology";
+import { MultiGraph } from "graphology";
 // import forceAtlas2 from "graphology-layout-forceatlas2";
 // TODO:
 import FA2Layout from "graphology-layout-forceatlas2/worker";
@@ -60,7 +60,6 @@ const randomNumber = (min, max) => Math.random() * (max - min) + min;
 // Create a graphology graph
 const graph = new MultiGraph();
 
-
 const updateGraph = () => {
   fetch(`/graph`)
     .then((resp) => resp.json())
@@ -76,7 +75,11 @@ const updateGraph = () => {
         });
       });
       json["edges"].forEach((edge) => {
-        graph.addEdge(edge[0], edge[1]);
+        try {
+          graph.addEdge(edge[0], edge[1]);
+        } catch (error) {
+          console.log(`${edge[0]}->${edge[1]}: ${error}`);
+        }
       });
       setupGraph()
     })
