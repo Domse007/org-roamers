@@ -14,10 +14,14 @@ pub fn start(env: &Env, path: String) -> emacs::Result<()> {
     let mut db = db.lock().unwrap();
     let db = db.as_mut().unwrap();
 
-    start_internal(env,db, path.as_path()).map_err(|e| emacs::Error::msg(e.to_string()))
+    start_internal(env, db, path.as_path()).map_err(|e| emacs::Error::msg(e.to_string()))
 }
 
-pub fn start_internal(logger: impl Logger, db: &mut Global, path: &Path) -> Result<(), Box<dyn Error>> {
+pub fn start_internal(
+    logger: impl Logger,
+    db: &mut Global,
+    path: &Path,
+) -> Result<(), Box<dyn Error>> {
     let rows = db.sqlite.get_all_nodes(["title", "id", "file"]);
 
     for row in rows {

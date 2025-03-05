@@ -2,10 +2,7 @@ use std::{path::Path, str::Chars};
 
 use rusqlite::Connection;
 
-use crate::{
-    datamodel::{NodeFromOrg, Timestamps},
-    parser::Parser,
-};
+use crate::database::datamodel::{NodeFromOrg, Timestamps};
 
 #[derive(thiserror::Error, Debug)]
 pub enum OlpError {
@@ -149,6 +146,8 @@ impl SqliteConnection {
             aliases,
             timestamps,
             links,
+            // TODO: Handle references
+            refs: Vec::new(),
         }
     }
 

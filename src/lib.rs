@@ -1,4 +1,3 @@
-pub mod datamodel;
 mod logger;
 mod migrate;
 mod org;
@@ -6,6 +5,7 @@ mod server;
 mod latex;
 pub mod parser;
 pub mod sqlite;
+pub mod database;
 
 emacs::plugin_is_GPL_compatible!();
 
