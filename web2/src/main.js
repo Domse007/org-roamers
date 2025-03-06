@@ -6,6 +6,7 @@ import hljs from 'highlight.js';
 import { MultiGraph } from "graphology";
 // import forceAtlas2 from "graphology-layout-forceatlas2";
 // TODO:
+import forceAtlas2 from 'graphology-layout-forceatlas2';
 import FA2Layout from "graphology-layout-forceatlas2/worker";
 import Sigma from "sigma";
 
@@ -66,8 +67,8 @@ const updateGraph = () => {
     .then((text) => JSON.parse(text))
     .then((json) => {
       json["nodes"].forEach((node) => {
-	graph.addNode(node, {
-          label: node,
+	graph.addNode(node[0], {
+          label: node[1],
           x: randomNumber(1, 100),
           y: randomNumber(1, 100),
           size: 10,
@@ -86,12 +87,19 @@ const updateGraph = () => {
 }
 
 export function setupGraph() {
+  const settings = forceAtlas2.inferSettings(graph);
   const layout = new FA2Layout(graph, {
-    settings: {gravity: 0}
+    settings: settings
   });
   
   layout.start();
-  const sigmaInstance = new Sigma(graph, document.getElementById("graph"));
+  const sigma = new Sigma(graph, document.getElementById("graph"));
+
+  sigma.on("downNode", (e) => {
+    const node = e.node;
+    console.log(node);
+    preview(node);
+  });
 }
 
 const search = async (query) => {

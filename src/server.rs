@@ -166,7 +166,7 @@ fn search(query: String) -> Response {
 
 #[derive(Serialize)]
 struct GraphData {
-    nodes: Vec<String>,
+    nodes: Vec<(String, String)>,
     edges: Vec<(String, String)>,
 }
 
@@ -177,10 +177,10 @@ fn get_graph_data() -> Response {
 
     let nodes = db
         .sqlite
-        .get_all_nodes(["id"])
+        .get_all_nodes(["id", "title"])
         .into_iter()
-        .map(|e| e[0].to_string())
-        .collect::<Vec<String>>();
+        .map(|e| (e[0].to_string(), e[1].to_string()))
+        .collect::<Vec<(String, String)>>();
 
     let edges = db.sqlite.get_all_links();
 
