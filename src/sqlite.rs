@@ -2,12 +2,15 @@ use std::{path::Path, str::Chars};
 
 use rusqlite::Connection;
 
-use crate::datamodel::{NodeFromOrg, Timestamps};
+use crate::{
+    datamodel::{NodeFromOrg, Timestamps},
+    parser::Parser,
+};
 
 #[derive(thiserror::Error, Debug)]
 pub enum OlpError {
-    #[error("StringParseError on char: {0}")]
-    StringParseError(char),
+    #[error("StringParseError on char. Already extracted: {0:?}")]
+    StringParseError(Vec<String>),
     #[error("Character '{0}' was not expected.")]
     InvalidChar(char),
     #[error("No more characters to consume.")]
@@ -150,66 +153,42 @@ impl SqliteConnection {
     }
 
     pub(super) fn parse_olp(olp: String) -> anyhow::Result<Vec<String>> {
-        let mut iterator = olp.trim().chars();
-        let _opening_bracket = match iterator.next() {
-            Some(c) if c == '(' => c,
-            Some(c) => return Err(OlpError::InvalidChar(c).into()),
-            None => return Ok(vec![]),
-        };
-        let consume_whitespace = |iterator: &mut Chars<'_>| {
-            iterator
-                .take_while(|c| *c == '"' || *c == '\'')
-                .collect::<String>()
+        let mut parser = Parser::new(&olp);
+        let whitespace = |parser: &mut Parser| {
+            let mut attempt = parser.attempt();
+            attempt.consume_whitespace();
+            parser.sync(attempt);
         };
 
-        let read_string = |iterator: &mut Chars<'_>| -> anyhow::Result<String> {
-            let _empty_space = consume_whitespace(iterator);
-            let str_start = match iterator.next() {
-                Some(c) if c == '\'' => c,
-                Some(c) if c == '"' => c,
-                Some(c) => return Err(OlpError::StringParseError(c).into()),
+        whitespace(&mut parser);
+
+        let mut attempt = parser.attempt();
+        if let None = attempt.consume_char('(') {
+            return Err(OlpError::InvalidChar('(').into());
+        }
+        parser.sync(attempt);
+
+        let mut paths = vec![];
+
+        loop {
+            let mut attempt = parser.attempt();
+            match attempt.consume_string() {
+                Some(path) => paths.push(path),
                 None => {
-                    if let Some(c) = iterator.next() {
-                        if c == ')' {
-                            return Ok(String::new());
-                        }
+                    whitespace(&mut parser);
+                    let mut attempt = parser.attempt();
+                    if let Some(_) = attempt.consume_char(')') {
+                        return Ok(paths);
+                    } else {
+                        break;
                     }
-                    return Err(OlpError::IteratorExhaustion.into());
                 }
-            };
-            let mut flag = false;
-            let content = iterator
-                .take_while(|c| {
-                    if *c == str_start && !flag {
-                        return false;
-                    }
-                    flag = false;
-                    if *c == '\\' {
-                        flag = true;
-                    }
-                    true
-                })
-                .collect::<String>();
-            let mut _closing_char = iterator.next().unwrap();
-            Ok(content)
-        };
-
-        let flag = true;
-        let mut stack = vec![];
-
-        while flag {
-            let _whitespace = consume_whitespace(&mut iterator);
-            let title = match read_string(&mut iterator) {
-                Ok(title) => title,
-                Err(e) => match e.downcast_ref::<OlpError>().unwrap() {
-                    OlpError::IteratorExhaustion => break,
-                    _ => return Err(e.into()),
-                },
-            };
-            stack.push(title);
+            }
+            parser.sync(attempt);
+            whitespace(&mut parser);
         }
 
-        Ok(stack)
+        Err(OlpError::StringParseError(paths).into())
     }
 }
 
@@ -249,7 +228,7 @@ mod tests {
     fn test_olp_parser_correct() {
         const OLP: &'static str = "(\"This is a test\" \"How about that\")";
         let res = SqliteConnection::parse_olp(OLP.to_string());
-        assert!(res.is_ok(), "An error occured in the parsing process.");
+        // assert!(res.is_ok(), "An error occured in the parsing process.");
         assert_eq!(
             res.unwrap(),
             vec!["This is a test".to_string(), "How about that".to_string()]

@@ -3,6 +3,7 @@ mod logger;
 mod migrate;
 mod org;
 mod server;
+pub mod parser;
 pub mod sqlite;
 
 emacs::plugin_is_GPL_compatible!();
