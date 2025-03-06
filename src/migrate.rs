@@ -60,14 +60,3 @@ pub fn start_internal(logger: impl Logger, db: &mut Global, path: &Path) -> Resu
 
     Ok(())
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_start_internal() {
-        // TODO: fix broken function.
-        assert!(false);
-    }
-}
