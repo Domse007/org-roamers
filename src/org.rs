@@ -1,7 +1,7 @@
 use std::{fs::File, io::Read, path::Path};
 
 use orgize::{
-    ast::{Document, Headline},
+    ast::{Document, Headline, Keyword},
     Org,
 };
 
@@ -48,6 +48,7 @@ pub fn get_nodes_from_document(document: Document) -> anyhow::Result<Vec<NodeFro
         if let Some(properties) = document.properties() {
             if let Some(id) = properties.get("ID") {
                 parent = Some(id.to_string());
+                let tags = get_tags_from_keywords(document.keywords());
                 let id = id.to_string();
                 let content = document.raw();
                 let mut node = NodeFromOrg::default();
@@ -55,6 +56,7 @@ pub fn get_nodes_from_document(document: Document) -> anyhow::Result<Vec<NodeFro
                 node.uuid = id;
                 node.content = content;
                 node.level = 0;
+                node.tags = tags;
                 nodes.push(node);
             }
         }
@@ -70,6 +72,11 @@ pub fn get_nodes_from_document(document: Document) -> anyhow::Result<Vec<NodeFro
         if let Some(properties) = headline.properties() {
             if let Some(id) = properties.get("ID") {
                 let my_parent = parent.clone();
+                let tags = headline
+                    .tags()
+                    .map(|t| t.to_string())
+                    .filter(|t| !t.trim().is_empty())
+                    .collect();
 
                 let id = id.to_string();
                 // TODO: this is wrong.
@@ -96,6 +103,7 @@ pub fn get_nodes_from_document(document: Document) -> anyhow::Result<Vec<NodeFro
                 node.content = content;
                 node.level = level;
                 node.parent = my_parent;
+                node.tags = tags;
 
                 nodes.push(node);
             }
@@ -110,12 +118,25 @@ pub fn get_nodes_from_document(document: Document) -> anyhow::Result<Vec<NodeFro
     Ok(nodes)
 }
 
-pub fn get_latex_header<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<String>> {
-    let org = get_orgize(path)?;
-    get_latex_hader_from_document(org.document())
+fn get_tags_from_keywords(iter: impl Iterator<Item = Keyword>) -> Vec<String> {
+    iter.filter(|kw| kw.key().to_lowercase().as_str() == "filetags")
+        .map(|kw| kw.value())
+        .map(|tags| {
+            tags.split(':')
+                .map(|e| e.to_string())
+                .filter(|t| !t.trim().is_empty())
+                .collect::<Vec<String>>()
+        })
+        .flatten()
+        .collect()
 }
 
-pub fn get_latex_hader_from_document(document: Document) -> anyhow::Result<Vec<String>> {
+pub fn get_latex_header<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<String>> {
+    let org = get_orgize(path)?;
+    get_latex_header_from_document(org.document())
+}
+
+pub fn get_latex_header_from_document(document: Document) -> anyhow::Result<Vec<String>> {
     let mut headers = vec![];
 
     for keyword in document.keywords() {
@@ -333,7 +354,7 @@ some text
 #+latex_header: \\usepackage[margin=3cm]{geometry}";
         let org = Org::parse(ORG);
         let document = org.document();
-        let res = get_latex_hader_from_document(document);
+        let res = get_latex_header_from_document(document);
         assert_eq!(
             res.unwrap(),
             vec![
@@ -342,6 +363,49 @@ some text
                 "\\setlength{\\abovedisplayskip}{0pt}",
                 "\\usepackage{parskip}",
                 "\\usepackage[margin=3cm]{geometry}"
+            ]
+        );
+    }
+
+    #[test]
+    fn test_get_tags() {
+        const ORG: &'static str = ":PROPERTIES:
+:ID:       e655725f-97db-4eec-925a-b80d66ad97e8
+:END:
+#+title: Test
+#+filetags: :test1:test2:test3:
+* other :test1:test2:
+:PROPERTIES:
+:ID:       e655725f-97db-4eec-925a-b80d66ad97e9
+:END:";
+        let org = Org::parse(ORG);
+        let document = org.document();
+        let res = get_nodes_from_document(document);
+        assert_eq!(
+            res.unwrap(),
+            vec![
+                NodeFromOrg {
+                    uuid: "e655725f-97db-4eec-925a-b80d66ad97e8".to_string(),
+                    title: "Test".to_string(),
+                    content: ORG.to_string(),
+                    level: 0,
+                    parent: None,
+                    tags: vec![
+                        "test1".to_string(),
+                        "test2".to_string(),
+                        "test3".to_string()
+                    ],
+                    ..Default::default()
+                },
+                NodeFromOrg {
+                    uuid: "e655725f-97db-4eec-925a-b80d66ad97e9".to_string(),
+                    title: "other ".to_string(),
+                    content: String::new(),
+                    level: 1,
+                    parent: Some("e655725f-97db-4eec-925a-b80d66ad97e8".to_string()),
+                    tags: vec!["test1".to_string(), "test2".to_string()],
+                    ..Default::default()
+                },
             ]
         );
     }
