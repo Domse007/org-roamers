@@ -49,10 +49,6 @@ pub fn get_nodes_from_document(document: Document) -> anyhow::Result<Vec<NodeFro
             if let Some(id) = properties.get("ID") {
                 parent = Some(id.to_string());
                 let id = id.to_string();
-                // let content = match document.section() {
-                //     Some(section) => section.raw(),
-                //     None => String::new(),
-                // };
                 let content = document.raw();
                 let mut node = NodeFromOrg::default();
                 node.title = title;
@@ -131,7 +127,6 @@ pub fn get_latex_hader_from_document(document: Document) -> anyhow::Result<Vec<S
     Ok(headers)
 }
 
-#[cfg(feature = "abc")]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -155,19 +150,21 @@ some text
         assert_eq!(
             res,
             vec![
-                ExtractedNode {
+                NodeFromOrg {
                     title: "Hello World".to_string(),
                     parent: None,
-                    id: "e655725f-97db-4eec-925a-b80d66ad97e8".to_string(),
+                    uuid: "e655725f-97db-4eec-925a-b80d66ad97e8".to_string(),
                     content: ORG.to_string(),
                     level: 0,
+                    ..Default::default()
                 },
-                ExtractedNode {
+                NodeFromOrg {
                     title: "testing".to_string(),
                     parent: Some("e655725f-97db-4eec-925a-b80d66ad97e8".to_string()),
-                    id: "e6557233-97db-4eec-925a-b80d66ad97e8".to_string(),
+                    uuid: "e6557233-97db-4eec-925a-b80d66ad97e8".to_string(),
                     content: "some text\n".to_string(),
                     level: 1,
+                    ..Default::default()
                 }
             ]
         );
@@ -198,26 +195,29 @@ some text
         assert_eq!(
             res,
             vec![
-                ExtractedNode {
+                NodeFromOrg {
                     title: "testing".to_string(),
                     parent: None,
-                    id: "e6557233-97db-4eec-925a-b80d66ad97e8".to_string(),
+                    uuid: "e6557233-97db-4eec-925a-b80d66ad97e8".to_string(),
                     content: "some text\n".to_string(),
                     level: 1,
+                    ..Default::default()
                 },
-		ExtractedNode {
+                NodeFromOrg {
                     title: "Hello World".to_string(),
-                    id: "e655725f-97db-4eec-925a-b80d66ad97e8".to_string(),
+                    uuid: "e655725f-97db-4eec-925a-b80d66ad97e8".to_string(),
                     parent: None,
                     content: "Welcome\n** Hello\n:PROPERTIES:\n:ID:       e655725d-97db-4eec-925a-b80d66ad97e8\n:END:\nWelcome\n".to_string(),
                     level: 1,
+                    ..Default::default()
                 },
-                ExtractedNode {
+                NodeFromOrg {
                     title: "Hello".to_string(),
                     parent: Some("e655725f-97db-4eec-925a-b80d66ad97e8".to_string()),
-                    id: "e655725d-97db-4eec-925a-b80d66ad97e8".to_string(),
+                    uuid: "e655725d-97db-4eec-925a-b80d66ad97e8".to_string(),
                     content: "Welcome\n".to_string(),
                     level: 2,
+                    ..Default::default()
                 },
             ]
         );
@@ -246,31 +246,34 @@ some text
         let document = org.document();
         let res = get_nodes_from_document(document).unwrap();
         assert_eq!(
-	    res,
-	    vec![
-		ExtractedNode {
-		    title: "Hello World".to_string(),
+            res,
+            vec![
+                NodeFromOrg {
+                    title: "Hello World".to_string(),
                     parent: None,
-		    id: "e655725f-97db-4eec-925a-b80d66ad97e8".to_string(),
-		    content: "Welcome\n** Hello\n:PROPERTIES:\n:ID:       e655725d-97db-4eec-925a-b80d66ad97e8\n:END:\nWelcome\n*** testing\n:PROPERTIES:\n:ID:       e6557233-97db-4eec-925a-b80d66ad97e8\n:END:\nsome text\n".to_string(),
-		    level: 1,
-		},
-		ExtractedNode {
-		    title: "Hello".to_string(),
+                    uuid: "e655725f-97db-4eec-925a-b80d66ad97e8".to_string(),
+                    content: "Welcome\n** Hello\n:PROPERTIES:\n:ID:       e655725d-97db-4eec-925a-b80d66ad97e8\n:END:\nWelcome\n*** testing\n:PROPERTIES:\n:ID:       e6557233-97db-4eec-925a-b80d66ad97e8\n:END:\nsome text\n".to_string(),
+                    level: 1,
+                    ..Default::default()
+                },
+                NodeFromOrg {
+                    title: "Hello".to_string(),
                     parent: Some("e655725f-97db-4eec-925a-b80d66ad97e8".to_string()),
-		    id: "e655725d-97db-4eec-925a-b80d66ad97e8".to_string(),
-		    content: "Welcome\n*** testing\n:PROPERTIES:\n:ID:       e6557233-97db-4eec-925a-b80d66ad97e8\n:END:\nsome text\n".to_string(),
-		    level: 2
-		},
-		ExtractedNode {
-		    title: "testing".to_string(),
+                    uuid: "e655725d-97db-4eec-925a-b80d66ad97e8".to_string(),
+                    content: "Welcome\n*** testing\n:PROPERTIES:\n:ID:       e6557233-97db-4eec-925a-b80d66ad97e8\n:END:\nsome text\n".to_string(),
+                    level: 2,
+                    ..Default::default()
+                },
+                NodeFromOrg {
+                    title: "testing".to_string(),
                     parent: Some("e655725d-97db-4eec-925a-b80d66ad97e8".to_string()),
-		    id: "e6557233-97db-4eec-925a-b80d66ad97e8".to_string(),
-		    content: "some text\n".to_string(),
-		    level: 3
-		}
-	    ]
-	);
+                    uuid: "e6557233-97db-4eec-925a-b80d66ad97e8".to_string(),
+                    content: "some text\n".to_string(),
+                    level: 3,
+                    ..Default::default()
+                }
+            ]
+        );
     }
 
     #[test]
@@ -293,24 +296,26 @@ some text
         let document = org.document();
         let res = get_nodes_from_document(document).unwrap();
         assert_eq!(
-	    res,
-	    vec![
-		ExtractedNode {
-		    title: "Hello World".to_string(),
+            res,
+            vec![
+                NodeFromOrg {
+                    title: "Hello World".to_string(),
                     parent: None,
-		    id: "e655725f-97db-4eec-925a-b80d66ad97e8".to_string(),
-		    content: "Welcome\n** Hello\ntest\n*** testing\n:PROPERTIES:\n:ID:       e6557233-97db-4eec-925a-b80d66ad97e8\n:END:\nsome text\n".to_string(),
-		    level: 1,
-		},
-		ExtractedNode {
-		    title: "testing".to_string(),
+                    uuid: "e655725f-97db-4eec-925a-b80d66ad97e8".to_string(),
+                    content: "Welcome\n** Hello\ntest\n*** testing\n:PROPERTIES:\n:ID:       e6557233-97db-4eec-925a-b80d66ad97e8\n:END:\nsome text\n".to_string(),
+                    level: 1,
+                    ..Default::default()
+                },
+                NodeFromOrg {
+                    title: "testing".to_string(),
                     parent: Some("e655725f-97db-4eec-925a-b80d66ad97e8".to_string()),
-		    id: "e6557233-97db-4eec-925a-b80d66ad97e8".to_string(),
-		    content: "some text\n".to_string(),
-		    level: 3
-		}
-	    ]
-	);
+                    uuid: "e6557233-97db-4eec-925a-b80d66ad97e8".to_string(),
+                    content: "some text\n".to_string(),
+                    level: 3,
+                    ..Default::default()
+                }
+            ]
+        );
     }
 
     #[test]
