@@ -5,6 +5,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use tantivy::{schema::{Field, Schema}, Document, TantivyDocument};
 
 use crate::org::NodeFromOrg;
 
@@ -28,13 +29,21 @@ pub struct Node {
 }
 
 impl Node {
-    pub fn from_orgnode(id: Key, org: NodeFromOrg, tags: Vec<u64>, links: Vec<u64>, refrs: Vec<u64>, aliases: Vec<u64>, fileId: u64) -> Self {
+    pub fn from_orgnode(
+        id: Key,
+        org: NodeFromOrg,
+        tags: Vec<u64>,
+        links: Vec<u64>,
+        refrs: Vec<u64>,
+        aliases: Vec<u64>,
+        file_id: u64,
+    ) -> Self {
         Self {
             id,
             uuid: org.uuid,
             title: org.title,
             content: org.content,
-            file: fileId,
+            file: file_id,
             level: org.level,
             olp: org.olp,
             // TODO
@@ -42,8 +51,23 @@ impl Node {
             tags,
             links,
             refrs,
-            aliases
+            aliases,
         }
+    }
+
+    pub fn to_document(&self, schema: &Schema) -> Result<TantivyDocument> {
+        let id = schema.get_field("id")?;
+        let title = schema.get_field("title")?;
+        let content = schema.get_field("content")?;
+        let level = schema.get_field("level")?;
+
+        let mut doc = TantivyDocument::default();
+        doc.add_text(id, self.uuid.clone());
+        doc.add_text(title, self.title.clone());
+        doc.add_text(content, self.content.clone());
+        doc.add_u64(level, self.level);
+
+        Ok(doc)
     }
 }
 
@@ -58,7 +82,9 @@ pub struct Reference {
 impl Reference {
     pub fn new(id: Key, refref: String, reftype: String) -> Self {
         Self {
-            id, refref, reftype
+            id,
+            refref,
+            reftype,
         }
     }
 }
@@ -72,9 +98,7 @@ pub struct File {
 
 impl File {
     pub fn with_hash(id: Key, path: PathBuf, hash: String) -> Self {
-        Self {
-            id, path, hash
-        }
+        Self { id, path, hash }
     }
 }
 
@@ -86,9 +110,7 @@ pub struct Alias {
 
 impl Alias {
     pub fn new(id: Key, text: String) -> Self {
-        Self {
-            id, text
-        }
+        Self { id, text }
     }
 }
 
@@ -104,7 +126,9 @@ impl Link {
     // TODO: Other link types
     pub fn id_to_id(id: Key, src: Key, dst: Key) -> Self {
         Self {
-            id, src, destination: LinkDest::Node(dst)
+            id,
+            src,
+            destination: LinkDest::Node(dst),
         }
     }
 }
@@ -136,8 +160,6 @@ pub struct Tag {
 
 impl Tag {
     pub fn new(id: Key, content: String) -> Self {
-        Self {
-            id, content
-        }
+        Self { id, content }
     }
 }

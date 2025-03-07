@@ -1,11 +1,11 @@
 use std::{env, process::ExitCode};
 
+use anyhow::Result;
 use org_roamers::database::Database;
 use org_roamers::{init_tantivy, log, Logger, StdOutLogger};
 use orgize::Org;
 use std::fs::{self, DirEntry};
 use std::path::Path;
-use anyhow::Result;
 
 use std::hash::Hash;
 fn hash<T: Hash>(t: &T) -> u64 {

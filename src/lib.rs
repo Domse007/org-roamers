@@ -1,11 +1,11 @@
+pub mod database;
+mod latex;
 mod logger;
 mod migrate;
 pub mod org;
-mod server;
-mod latex;
 pub mod parser;
+mod server;
 pub mod sqlite;
-pub mod database;
 
 emacs::plugin_is_GPL_compatible!();
 
@@ -53,14 +53,6 @@ pub fn init_tantivy(
         "Creating a new temp dir in {:?}",
         index_path.path().as_os_str()
     );
-
-    let mut schema_builder = Schema::builder();
-    schema_builder.add_text_field("title", TEXT | STORED);
-    schema_builder.add_text_field("id", TEXT | STORED);
-    schema_builder.add_text_field("body", TEXT | STORED);
-    schema_builder.add_text_field("file", TEXT | STORED);
-
-    let schema = schema_builder.build();
 
     let index = Index::create_in_dir(&index_path, schema.clone())?;
 

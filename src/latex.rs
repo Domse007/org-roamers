@@ -1,8 +1,8 @@
 use std::{
+    fmt::Display,
     fs::File,
-    io::{Read, Write},
+    io::Write,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
 };
 
 use anyhow::bail;
