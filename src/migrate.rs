@@ -45,7 +45,7 @@ pub fn start_internal(
         let mut body = None;
 
         for node in nodes {
-            if node.id == id {
+            if node.uuid == id {
                 body = Some(node.content);
                 break;
             }

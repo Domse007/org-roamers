@@ -46,7 +46,7 @@ impl Store {
     // TODO: Path
     pub fn new() -> Result<Self> {
         let path = tempfile::tempdir()?;
-        let env = unsafe { EnvOpenOptions::new().open(path.path())? };
+        let env = unsafe { EnvOpenOptions::new().max_dbs(16).open(path.path())? };
 
         let mut wtx = env.write_txn()?;
         let nodes: NodeDB =

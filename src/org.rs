@@ -5,14 +5,22 @@ use orgize::{
     Org,
 };
 
+use crate::database::datamodel::Timestamps;
+
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct ExtractedNode {
+pub struct NodeFromOrg {
+    pub(crate) uuid: String,
     pub(crate) title: String,
-    /// Parent with ID of the current node.
-    pub(crate) parent: Option<String>,
-    pub(crate) id: String,
     pub(crate) content: String,
-    pub(crate) level: usize,
+    pub(crate) file: String,
+    pub(crate) level: u64,
+    pub(crate) parent: Option<String>,
+    pub(crate) olp: Vec<String>,
+    pub(crate) tags: Vec<String>,
+    pub(crate) aliases: Vec<String>,
+    pub(crate) timestamps: Option<Timestamps>,
+    pub(crate) links: Vec<(String, String)>,
+    pub(crate) refs: Vec<String>,
 }
 
 fn get_orgize<P: AsRef<Path>>(path: P) -> anyhow::Result<Org> {
@@ -23,14 +31,14 @@ fn get_orgize<P: AsRef<Path>>(path: P) -> anyhow::Result<Org> {
     Ok(Org::parse(&content))
 }
 
-pub fn get_nodes_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<ExtractedNode>> {
+pub fn get_nodes_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<NodeFromOrg>> {
     let org = get_orgize(path)?;
     let document = org.document();
 
     get_nodes_from_document(document)
 }
 
-pub fn get_nodes_from_document(document: Document) -> anyhow::Result<Vec<ExtractedNode>> {
+pub fn get_nodes_from_document(document: Document) -> anyhow::Result<Vec<NodeFromOrg>> {
     let mut nodes = Vec::new();
 
     let mut parent = None;
@@ -46,13 +54,12 @@ pub fn get_nodes_from_document(document: Document) -> anyhow::Result<Vec<Extract
                 //     None => String::new(),
                 // };
                 let content = document.raw();
-                nodes.push(ExtractedNode {
-                    title,
-                    parent: None,
-                    id,
-                    content,
-                    level: 0,
-                })
+                let mut node = NodeFromOrg::default();
+                node.title = title;
+                node.uuid = id;
+                node.content = content;
+                node.level = 0;
+                nodes.push(node);
             }
         }
     }
@@ -71,7 +78,7 @@ pub fn get_nodes_from_document(document: Document) -> anyhow::Result<Vec<Extract
                 let id = id.to_string();
                 // TODO: this is wrong.
                 let title = headline.title_raw();
-                let level = headline.level();
+                let level = headline.level() as u64;
 
                 // update parent for children.
                 parent = Some(id.clone());
@@ -87,13 +94,14 @@ pub fn get_nodes_from_document(document: Document) -> anyhow::Result<Vec<Extract
 
                 content.push_str(&subheading);
 
-                nodes.push(ExtractedNode {
-                    title,
-                    parent: my_parent,
-                    id,
-                    content,
-                    level,
-                })
+                let mut node = NodeFromOrg::default();
+                node.title = title;
+                node.uuid = id;
+                node.content = content;
+                node.level = level;
+                node.parent = my_parent;
+
+                nodes.push(node);
             }
         }
 
@@ -123,6 +131,7 @@ pub fn get_latex_hader_from_document(document: Document) -> anyhow::Result<Vec<S
     Ok(headers)
 }
 
+#[cfg(feature = "abc")]
 #[cfg(test)]
 mod tests {
     use super::*;

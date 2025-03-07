@@ -1,6 +1,6 @@
 mod logger;
 mod migrate;
-mod org;
+pub mod org;
 mod server;
 mod latex;
 pub mod parser;

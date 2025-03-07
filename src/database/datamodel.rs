@@ -6,22 +6,9 @@ use std::{collections::HashMap, path::PathBuf};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-pub type Key = u64;
+use crate::org::NodeFromOrg;
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct NodeFromOrg {
-    pub(crate) uuid: String,
-    pub(crate) title: String,
-    pub(crate) content: String,
-    pub(crate) file: String,
-    pub(crate) level: u64,
-    pub(crate) olp: Vec<String>,
-    pub(crate) tags: Vec<String>,
-    pub(crate) aliases: Vec<String>,
-    pub(crate) timestamps: Timestamps,
-    pub(crate) links: Vec<(String, String)>,
-    pub(crate) refs: Vec<String>,
-}
+pub type Key = u64;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Node {
@@ -35,7 +22,7 @@ pub struct Node {
     olp: Vec<String>,
     tags: Vec<Key>,
     aliases: Vec<Key>,
-    timestamps: Timestamps,
+    timestamps: Option<Timestamps>,
     links: Vec<Key>,
     refrs: Vec<Key>,
 }
@@ -50,7 +37,8 @@ impl Node {
             file: fileId,
             level: org.level,
             olp: org.olp,
-            timestamps: org.timestamps,
+            // TODO
+            timestamps: None,
             tags,
             links,
             refrs,

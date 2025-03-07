@@ -1,24 +1,46 @@
 use std::{env, process::ExitCode};
 
+use org_roamers::database::Database;
 use org_roamers::{init_tantivy, log, Logger, StdOutLogger};
 use orgize::Org;
 use std::fs::{self, DirEntry};
 use std::path::Path;
+use anyhow::Result;
 
-fn main() -> ExitCode {
-    let path = env::var("DB").unwrap();
+use std::hash::Hash;
+fn hash<T: Hash>(t: &T) -> u64 {
+    use std::hash::{DefaultHasher, Hasher};
+    let mut s = DefaultHasher::new();
+    t.hash(&mut s);
+    s.finish()
+}
+
+fn main() -> Result<ExitCode> {
     let logger = StdOutLogger;
 
-    log!(logger, "Using {} for indexing.", path);
+    let cont = org_roamers::org::get_nodes_from_file("test-data/emacs-overview.org")?;
+    let db = Database::new()?;
+    for node in cont {
+        println!("{:?}", node);
+        let _ = db.insert_node_deep(node, String::new())?;
+    }
 
     // init like emacs would.
     init_tantivy(&logger, None).unwrap();
 
     log!(logger, "Successfully initalized the logger.");
 
+    println!(" - - -- -  -- -  -");
+
+    //  9f8a7c1b-4d23-4d9e-ae9b-6f5e3c6b9e9f
+    let id = "9f8a7c1b-4d23-4d9e-ae9b-6f5e3c6b9e9f";
+    let key = hash(&id);
+    let node = db.get_node(key)?;
+    println!("FOUND NODE: {:?}", node);
+
     //add_files(path, &logger);
 
-    ExitCode::SUCCESS
+    Ok(ExitCode::SUCCESS)
 }
 
 fn add_files<P: AsRef<Path>>(path: P, logger: impl Logger + Copy) {

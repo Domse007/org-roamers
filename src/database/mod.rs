@@ -11,9 +11,12 @@ use store::Store;
 use anyhow::Result;
 use datamodel::*;
 
+use crate::org::NodeFromOrg;
+
 pub struct Database {
     store: Store,
 }
+
 fn hash<T: Hash>(t: &T) -> u64 {
     use std::hash::{DefaultHasher, Hash, Hasher};
     let mut s = DefaultHasher::new();

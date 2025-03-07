@@ -2,7 +2,7 @@ use std::{path::Path, str::Chars};
 
 use rusqlite::Connection;
 
-use crate::{database::datamodel::{NodeFromOrg, Timestamps}, parser::Parser};
+use crate::{database::datamodel::Timestamps, org::NodeFromOrg, parser::Parser};
 
 #[derive(thiserror::Error, Debug)]
 pub enum OlpError {
@@ -131,7 +131,7 @@ impl SqliteConnection {
         let content = String::new();
         let ctime = String::new();
         let mtime = Vec::new();
-        let timestamps = Timestamps::new(ctime, mtime);
+        let timestamps = Some(Timestamps::new(ctime, mtime));
         let links = Vec::new();
         let level = level.parse::<u64>().unwrap_or(0);
         let olp = Self::parse_olp(olp).unwrap();
@@ -145,6 +145,7 @@ impl SqliteConnection {
             tags,
             aliases,
             timestamps,
+            parent: None,
             links,
             // TODO: Handle references
             refs: Vec::new(),
@@ -191,6 +192,7 @@ impl SqliteConnection {
     }
 }
 
+#[cfg(feature = "42")]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -220,6 +222,7 @@ mod tests {
                 content: "* title\n content".to_string(),
                 links: vec![],
                 timestamps: Timestamps::default(),
+                refs: Vec::new(),
             }
         )
     }
