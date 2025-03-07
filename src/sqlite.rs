@@ -2,7 +2,7 @@ use std::{path::Path, str::Chars};
 
 use rusqlite::Connection;
 
-use crate::database::datamodel::{NodeFromOrg, Timestamps};
+use crate::{database::datamodel::{NodeFromOrg, Timestamps}, parser::Parser};
 
 #[derive(thiserror::Error, Debug)]
 pub enum OlpError {
