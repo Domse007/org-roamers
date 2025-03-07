@@ -1,6 +1,6 @@
 //! # Datastore
 
-use std::{fmt, marker::PhantomData};
+use std::{fmt, marker::PhantomData, path::PathBuf};
 
 use super::datamodel::{Alias, File, Link, Node, Reference, Tag};
 use anyhow::Result;
@@ -25,25 +25,18 @@ pub struct Store {
     references: RefDB,
 }
 
-struct DBWrapper<T>(PhantomData<T>);
-
-impl DBWrapper<Node> {
-    fn get_db(store: &Store) -> NodeDB {
-        store.nodes
-    }
-}
-
-impl DBWrapper<File> {
-    fn get_db(store: &Store) -> FileDB {
-        store.files
-    }
-}
-
 impl Store {
     // TODO: Path
-    pub fn new() -> Result<Self> {
-        let path = tempfile::tempdir()?;
-        let env = unsafe { EnvOpenOptions::new().max_dbs(16).open(path.path())? };
+    pub fn new(path: Option<PathBuf>) -> Result<Self> {
+        let path = match path {
+            Some(path) => path,
+            None => {
+                // This is probably very bad & unsafe (maybe?) but because mmap its also maybe fine
+                let temp = tempfile::tempdir()?;
+                temp.path().to_path_buf()
+            },
+        };
+        let env = unsafe { EnvOpenOptions::new().max_dbs(16).open(path)? };
 
         let mut wtx = env.write_txn()?;
         let nodes: NodeDB = env.create_database(&mut wtx, Some("nodes"))?;

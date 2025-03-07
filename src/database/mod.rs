@@ -6,16 +6,18 @@ pub mod embeddings;
 pub mod search;
 pub mod store;
 
-use std::hash::Hash;
+use std::{hash::Hash, path::PathBuf};
 
 use anyhow::Result;
 use datamodel::*;
+use search::Search;
 use store::Store;
 
 use crate::org::NodeFromOrg;
 
 pub struct Database {
     store: Store,
+    search: Search
 }
 
 fn hash<T: Hash>(t: &T) -> u64 {
@@ -26,9 +28,10 @@ fn hash<T: Hash>(t: &T) -> u64 {
 }
 
 impl Database {
-    pub fn new() -> Result<Self> {
+    pub fn new(path: Option<PathBuf>) -> Result<Self> {
         Ok(Self {
-            store: Store::new()?,
+            store: Store::new(path.clone())?,
+            search: Search::new(path)?,
         })
     }
 

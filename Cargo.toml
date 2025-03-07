@@ -9,6 +9,7 @@ crate-type = ["cdylib", "lib"]
 [dependencies]
 anyhow = "1.0.96"
 arroy = "0.5.0"
+axum = { version = "0.8.1", features = ["ws"] }
 emacs = "0.18.0"
 heed = "0.21.0"
 heed-types = "0.21.0"
@@ -21,7 +22,11 @@ serde_json = "1.0.138"
 tantivy = "0.22.0"
 tempfile = "3.14.0"
 thiserror = "2.0.12"
+tokio = { version = "1.44.0", features = ["full", "tracing"] }
+tokio-util = { version = "0.7.13", features = ["tracing"] }
 tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["serde"] }
+uuid = { version = "1.15.1", features = ["v4"] }
 
 [profile.dev]
 debug = 0
@@ -32,4 +37,4 @@ codegen-units = 1
 
 [[bin]]
 name = "org-roamers"
-path = "src/bin/main.rs"
+path = "src/main.rs"

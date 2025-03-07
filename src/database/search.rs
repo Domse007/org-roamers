@@ -24,7 +24,7 @@ pub struct Search {
 impl Search {
     pub fn new(path: Option<PathBuf>) -> Result<Self> {
         let mut schema = Schema::builder();
-        let id = schema.add_text_field("id", TEXT);
+        let _id = schema.add_text_field("id", TEXT);
         let title = schema.add_text_field("title", TEXT);
         let content = schema.add_text_field("content", TEXT);
         // TODO: include filepath in node?
