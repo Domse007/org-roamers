@@ -2,18 +2,18 @@
 <html style="overflow: hidden;">
   <head>
     <meta charset="UTF-8" />
-    <title>org-roam-rs</title>
+    <title>org-roamers</title>
     <script type="module" src="/src/main.js"></script>
   </head>
   
   <body style="overflow: hidden;">
-    <div id="search-wrapper" style="width: 40%; margin: 5px; margin-left: 30%; position: absolute; z-index: 100; padding: 5px; background-color: lightgray;">
+    <div id="search-wrapper" style="width: 40%; margin: 5px; margin-left: 30%; position: absolute; z-index: 100; padding: 5px;">
       <input id="search-input" placeholder="Search for nodes..." type="search" style="width: 100%">
-      <div id="search-suggestion-wrapper" style="background-color: gray;"></div>
+      <div id="search-suggestion-wrapper"></div>
     </div>
 
-    <div id="org-preview-wrapper" style="width: 30%; background-color: lightgray; right: 0px; top: 0px; position: absolute; z-index: 50; resize: horizontal; float: left;">
-      <div id="org-preview-dragging-area" style="width: 10px; height: 100vh; float: left; background-color: black; cursor: col-resize"></div>
+    <div id="org-preview-wrapper" style="width: 30%; right: 0px; top: 0px; position: absolute; z-index: 50; resize: horizontal; float: left;">
+      <div id="org-preview-dragging-area" style="width: 10px; height: 100vh; float: left; cursor: col-resize"></div>
       <div id="org-preview" style="min-height: 100vh; max-height: 100vh; overflow: scroll; padding: 10px; "></div>
     </div>
     

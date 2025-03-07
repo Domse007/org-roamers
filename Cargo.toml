@@ -1,5 +1,5 @@
 [package]
-name = "org-roam-rs"
+name = "org-roamers"
 version = "0.1.0"
 edition = "2021"
 
@@ -26,5 +26,5 @@ lto = true
 codegen-units = 1
 
 [[bin]]
-name = "org-roam-rs"
+name = "org-roamers"
 path = "src/bin/main.rs"

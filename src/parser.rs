@@ -5,7 +5,7 @@
 //!
 //! # Usage
 //! ```
-//! use org_roam_rs::parser::Parser;
+//! use org_roamers::parser::Parser;
 //!
 //! let mut parser = Parser::new("(\"Test\")");
 //!

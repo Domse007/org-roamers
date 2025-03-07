@@ -1,4 +1,4 @@
-;;; org-roam-rs.el --- org-roam enhancements
+;;; org-roamers.el --- org-roam enhancements
 
 ;; Copyright (C) 2017 Keller Dominik
 
@@ -46,11 +46,11 @@
 
 ;;;; Usage
 ;; Run the following commands:
-;; `org-roam-rs-init': Initialize the package (emacs and rust side)
-;; `org-roam-rs-migrate': To sync the org-roam sqlite db and tantivy.
+;; `org-roamers-init': Initialize the package (emacs and rust side)
+;; `org-roamers-migrate': To sync the org-roam sqlite db and tantivy.
 ;;
 ;; To actually use the package use:
-;; `org-roam-rs-helm-node-find' to find and open a node.
+;; `org-roamers-helm-node-find' to find and open a node.
 
 ;;;; Credits
 ;; This package would not have been possible without the following
@@ -64,49 +64,49 @@
 
 (require 'org-roam)
 (require 'org-roam-node)
-(require 'org-roam-utils (expand-file-name "./org-roam-rs.so"))
+(require 'org-roamers-utils (expand-file-name "./org-roamers-utils.so"))
 
 (unless (json-available-p)
-  (user-error "org-roam-rs-helm needs JSON support in Emacs;
+  (user-error "org-roamers-helm needs JSON support in Emacs;
  please rebuild it using `--with-json'"))
 
-(defgroup org-roam-rs nil
+(defgroup org-roamers nil
   "An abstraction layer over org-roam to improve performance."
   :group 'org
-  :prefix "org-roam-rs-")
+  :prefix "org-roamers-")
 
 ;;;; Customization
 
-(defcustom org-roam-rs-num-candidates 10
+(defcustom org-roamers-num-candidates 10
   "The number of results the db should return to emacs."
   :type 'number
-  :group 'org-roam-rs)
+  :group 'org-roamers)
 
 ;; TODO: is currently not passed to rust
-(defcustom org-roam-rs-db-directory
+(defcustom org-roamers-db-directory
   (if (equal system-type 'windows-nt)
       (let ((dir (getenv "Temp")))
 	(if dir dir (error "Could not get temp dir.")))
-    "/tmp/org-roam-rs/")
+    "/tmp/org-roamers/")
   "The location where the db is stored."
   :type 'string
-  :group 'org-roam-rs)
+  :group 'org-roamers)
 
-(defcustom org-roam-rs-server-url "localhost:5000"
+(defcustom org-roamers-server-url "localhost:5000"
   "The url where the server is started."
   :type 'string
-  :group 'org-roam-rs)
+  :group 'org-roamers)
 
 ;;;; Functions
 
 ;;;###autoload
-(defun org-roam-rs-init ()
+(defun org-roamers-init ()
   "Initialize all dbs and prepare system."
-  (module-load (expand-file-name "org-roam-rs.so"))
-  (org-roam-utils-prepare org-roam-rs-db-directory
-			  org-roam-db-location))
+  ;; (module-load (expand-file-name "org-roamers-utils.so"))
+  (org-roamers-utils-prepare org-roamers-db-directory
+			     org-roam-db-location))
 
-(defun org-roam-rs--get-text (id)
+(defun org-roamers--get-text (id)
   "Retrieve the text from org-node ID.
 This is stolen from org-roam-ui."
   (let* ((node (org-roam-populate (org-roam-node-create :id id)))
@@ -118,39 +118,39 @@ This is stolen from org-roam-ui."
         (org-narrow-to-element))
       (buffer-substring-no-properties (buffer-end -1) (buffer-end 1)))))
 
-(defun org-roam-rs-migrate ()
+(defun org-roamers-migrate ()
   (dolist (node (org-roam-node-list))
     (let* ((title (org-roam-node-title node))
 	   (id (org-roam-node-id node))
 	   (file (org-roam-node-file node))
 	   ;; TODO: extract body
-	   (body (org-roam-rs--get-text id)))
-      (org-roam-utils-add-node title id body file))))
+	   (body (org-roamers--get-text id)))
+      (org-roamers-utils-add-node title id body file))))
 
-(defun org-roam-rs--get-candidates (input &optional num-candidates)
+(defun org-roamers--get-candidates (input &optional num-candidates)
   "Get's completion candidates. It returns a list of hash-tabes with fields
 title, id, body."
   (let ((json (json-parse-string
-	       (org-roam-utils-get-nodes
+	       (org-roamers-utils-get-nodes
 		input
-		(or num-candidates org-roam-rs-num-candidates)))))
+		(or num-candidates org-roamers-num-candidates)))))
     (mapcar (lambda (node) node)
 	    (gethash "results" json))))
 
-(define-minor-mode org-roam-rs-mode
-  "Enable org-roam-rs enhances in current buffer."
-  :group 'org-roam-rs
-  (if org-roam-rs-mode
-      (push #'org-roam-rs-company company-backends)
-    (setq company-backends (remove 'org-roam-rs-company company-backends))))
+(define-minor-mode org-roamers-mode
+  "Enable org-roamers enhances in current buffer."
+  :group 'org-roamers
+  (if org-roamers-mode
+      (push #'org-roamers-company company-backends)
+    (setq company-backends (remove 'org-roamers-company company-backends))))
 
-(defun org-roam-rs-company (command &optional arg &rest rest)
-  "Company backend for org-roam-rs."
+(defun org-roamers-company (command &optional arg &rest rest)
+  "Company backend for org-roamers."
   (interactive (list 'interactive))
   (cl-case command
-    (interactive (company-begin-backend 'org-roam-rs-company))
+    (interactive (company-begin-backend 'org-roamers-company))
     (prefix (list (company-grab-word) (company-grab-word-suffix)))
-    (candidates (let ((candidates (org-roam-rs--get-candidates arg 10)))
+    (candidates (let ((candidates (org-roamers--get-candidates arg 10)))
 		  (message "Got %s candidates with %s." (length candidates) arg)
 
 		  (if (string-empty-p arg)
@@ -164,41 +164,41 @@ title, id, body."
     (sorted t)
     (no-cache t)))
 
-(defun org-roam-rs--completing-read-get-candidates (input _func _flag)
-  (let* ((result (org-roam-rs--get-candidates
+(defun org-roamers--completing-read-get-candidates (input _func _flag)
+  (let* ((result (org-roamers--get-candidates
 		  input
-		  org-roam-rs-num-candidates)))
+		  org-roamers-num-candidates)))
     (message "num res: %s" (length result))
     (mapcar (lambda (node) (gethash "title" node)) result)))
 
-(defun org-roam-rs-node-find ()
+(defun org-roamers-node-find ()
   "A faster more flexible alternative to `org-roam-node-find'"
   (interactive)
   (completing-read "Node: "
-		   #'org-roam-rs--completing-read-get-candidates))
+		   #'org-roamers--completing-read-get-candidates))
 
 
-;; (defun org-roam-rs-helm-node-find ()
+;; (defun org-roamers-helm-node-find ()
 ;;   (interactive)
 ;;   (org-roam-node-open
 ;;    (org-roam-node-from-title-or-alias
-;;     (helm :sources (helm-build-sync-source "Org-roam-rs"
-;; 		     :candidates #'org-roam-rs--helm-get-candidates
-;; 		     :candidate-transformer #'org-roam-rs--helm-format-candidate
+;;     (helm :sources (helm-build-sync-source "Org-roamers"
+;; 		     :candidates #'org-roamers--helm-get-candidates
+;; 		     :candidate-transformer #'org-roamers--helm-format-candidate
 ;; 		     :fuzzy-match t
 ;; 		     :match-dynamic t)
-;; 	  :buffer "*helm org-roam-rs*"))))
+;; 	  :buffer "*helm org-roamers*"))))
 
 ;;; Section server
 
-(defconst org-roam-rs-server-root-dir
+(defconst org-roamers-server-root-dir
   (expand-file-name "web/" default-directory)
   "Path to web directory relative to this file.")
 
-(defun org-roam-rs-server-start ()
+(defun org-roamers-server-start ()
   (interactive)
-  (org-roam-utils-server-start-server org-roam-rs-server-url
-				      org-roam-rs-server-root-dir))
+  (org-roamers-utils-server-start-server org-roamers-server-url
+					 org-roamers-server-root-dir))
 
-(provide 'org-roam-rs)
-;;; package-name.el ends here
+(provide 'org-roamers)
+;;; org-roamers.el ends here

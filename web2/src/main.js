@@ -62,6 +62,10 @@ const randomNumber = (min, max) => Math.random() * (max - min) + min;
 const graph = new MultiGraph();
 
 const updateGraph = () => {
+  const style = window.getComputedStyle(document.body);
+  const nodeColor = style.getPropertyValue('--highlight');
+  const edgeColor = style.getPropertyValue('--overlay');
+  
   fetch(`/graph`)
     .then((resp) => resp.json())
     .then((text) => JSON.parse(text))
@@ -72,12 +76,12 @@ const updateGraph = () => {
           x: randomNumber(1, 100),
           y: randomNumber(1, 100),
           size: 10,
-          color: "blue"
+          color: nodeColor,
         });
       });
       json["edges"].forEach((edge) => {
         try {
-          graph.addEdge(edge[0], edge[1]);
+          graph.addEdge(edge[0], edge[1], { color: edgeColor });
         } catch (error) {
           console.log(`${edge[0]}->${edge[1]}: ${error}`);
         }
@@ -117,7 +121,7 @@ const InputHandler = (event) => {
   searchSuggestion.innerHTML = "";
   search(query).then((res) => {
     res["results"].forEach((e) => {
-      searchSuggestion.innerHTML += `<div class="suggestion" style="padding: 5px; cursor: pointer;" onmouseout="this.style.background='gray';" onmouseover="this.style.background='lightgray';">${e.title}</div>`;
+      searchSuggestion.innerHTML += `<div class="suggestion" style="padding: 5px; cursor: pointer;">${e.title}</div>`;
     })
     updateSuggestions();
   })

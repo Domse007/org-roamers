@@ -15,12 +15,16 @@ pub struct ExtractedNode {
     pub(crate) level: usize,
 }
 
-pub fn get_nodes_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<ExtractedNode>> {
+fn get_orgize<P: AsRef<Path>>(path: P) -> anyhow::Result<Org> {
     let mut content = String::new();
     let mut file = File::open(path)?;
     file.read_to_string(&mut content)?;
 
-    let org = Org::parse(&content);
+    Ok(Org::parse(&content))
+}
+
+pub fn get_nodes_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<ExtractedNode>> {
+    let org = get_orgize(path)?;
     let document = org.document();
 
     get_nodes_from_document(document)
@@ -63,7 +67,7 @@ pub fn get_nodes_from_document(document: Document) -> anyhow::Result<Vec<Extract
         if let Some(properties) = headline.properties() {
             if let Some(id) = properties.get("ID") {
                 let my_parent = parent.clone();
-                
+
                 let id = id.to_string();
                 // TODO: this is wrong.
                 let title = headline.title_raw();
@@ -100,6 +104,23 @@ pub fn get_nodes_from_document(document: Document) -> anyhow::Result<Vec<Extract
     }
 
     Ok(nodes)
+}
+
+pub fn get_latex_header<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<String>> {
+    let org = get_orgize(path)?;
+    get_latex_hader_from_document(org.document())
+}
+
+pub fn get_latex_hader_from_document(document: Document) -> anyhow::Result<Vec<String>> {
+    let mut headers = vec![];
+
+    for keyword in document.keywords() {
+        if keyword.key().to_lowercase() == "latex_header" {
+            headers.push(keyword.value().trim().to_string());
+        }
+    }
+
+    Ok(headers)
 }
 
 #[cfg(test)]
@@ -283,4 +304,31 @@ some text
 	);
     }
 
+    #[test]
+    fn test_get_latex_header() {
+        const ORG: &'static str = "
+#+title: Test
+#+subtitle: test
+#+author: Joakim Brodén
+#+filetags: :test2:test1:
+#+options: date:nil author:t num:nil toc:nil
+#+latex_header: \\usepackage{mathtools}
+#+latex_header: \\setlength\\parindent{0pt}
+#+latex_header: \\setlength{\\abovedisplayskip}{0pt}
+#+latex_header: \\usepackage{parskip}
+#+latex_header: \\usepackage[margin=3cm]{geometry}";
+        let org = Org::parse(ORG);
+        let document = org.document();
+        let res = get_latex_hader_from_document(document);
+        assert_eq!(
+            res.unwrap(),
+            vec![
+                "\\usepackage{mathtools}",
+                "\\setlength\\parindent{0pt}",
+                "\\setlength{\\abovedisplayskip}{0pt}",
+                "\\usepackage{parskip}",
+                "\\usepackage[margin=3cm]{geometry}"
+            ]
+        );
+    }
 }

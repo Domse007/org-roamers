@@ -21,10 +21,10 @@ website:
 
 .PHONY: native
 native:
-	@$(ECHO) Building org-roam-rs
+	@$(ECHO) Building org-roamers
 	$(CARGO) build
-	@$(ECHO) Finishing up org-roam-rs.$(LIB_EXTENSION)
-	$(CP) target/debug/liborg_roam_rs.$(LIB_EXTENSION) org-roam-rs.$(LIB_EXTENSION)
+	@$(ECHO) Finishing up org-roamers.$(LIB_EXTENSION)
+	$(CP) target/debug/liborg_roamers.$(LIB_EXTENSION) org-roamers-utils.$(LIB_EXTENSION)
 
 .PHONY: clean
 clean:

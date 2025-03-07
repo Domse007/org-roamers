@@ -1,6 +1,6 @@
 use std::{env, process::ExitCode};
 
-use org_roam_rs::{init_tantivy, log, Logger, StdOutLogger};
+use org_roamers::{init_tantivy, log, Logger, StdOutLogger};
 use orgize::Org;
 use std::fs::{self, DirEntry};
 use std::path::Path;

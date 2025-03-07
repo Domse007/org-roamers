@@ -3,6 +3,7 @@ mod logger;
 mod migrate;
 mod org;
 mod server;
+mod latex;
 pub mod parser;
 pub mod sqlite;
 
@@ -70,7 +71,7 @@ pub fn init_tantivy(
     Ok((index_path, schema, index_writer, index))
 }
 
-#[emacs::module(name = "org-roam-utils")]
+#[emacs::module(name = "org-roamers-utils")]
 pub fn init(_: &Env) -> Result<()> {
     Ok(())
 }

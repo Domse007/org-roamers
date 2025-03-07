@@ -1,3 +1,62 @@
+/* Based on catpuccin frappé */
+:root {
+  --base: #303446;
+  --surface: #414559;
+  --overlay: #838ba7;
+  --text: #c6d0f5;
+  --highlight: #babbf1;
+  --highlight-2: #a6d189;
+  --warn: #e78284;
+  --font: Arial, Helvetica, sans-serif;
+}
+
+body {
+  background-color: var(--base);
+}
+
+a {
+  color: var(--highlight-2);
+}
+
+code {
+  color: var(--highlight-2);
+}
+
+#org-preview-wrapper {
+  background-color: var(--surface);
+  font-family: var(--font);
+}
+
+#org-preview-dragging-area {
+  background-color: var(--warn);
+}
+
+#org-preview {
+  color: var(--text);
+}
+
+h1, h2, h3, h4 {
+  color: var(--highlight-2);
+}
+
+#search-wrapper {
+  font-family: var(--font);
+  background-color: var(--overlay);
+}
+
+#search-suggestion-wrapper {
+  background-color: var(--surface);
+  color: var(--text);
+}
+
+.suggestion {
+  background-color: var(--base);
+}
+
+.suggestion:hover {
+  background-color: var(--surface);
+}
+
 .hljs-string,
 .hljs-section,
 .hljs-selector-class,
@@ -9,7 +68,7 @@
   color: green;
 }
 .src {
-  background-color: white;
+  background-color: var(--base);
   padding: 5px;
   border-radius: 5px;
 }
