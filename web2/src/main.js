@@ -155,3 +155,25 @@ document.addEventListener('DOMContentLoaded', function() {
   setupSearchBarEventListener();
   updateGraph();
 });
+
+const hiddenDiv = document.getElementById("search-wrapper");
+let isMouseOverDiv = false;
+
+// Show the div when mouse is at the top
+window.addEventListener("mousemove", function(event) {
+  if (event.clientY < 50 || isMouseOverDiv) {
+    hiddenDiv.style.top = "0"; // Slide in
+  } else {
+    hiddenDiv.style.top = "-100px"; // Slide out
+  }
+});
+
+// Prevent hiding when mouse is over the div
+hiddenDiv.addEventListener("mouseenter", function() {
+  isMouseOverDiv = true;
+});
+
+// Allow hiding when mouse leaves the div
+hiddenDiv.addEventListener("mouseleave", function() {
+  isMouseOverDiv = false;
+});

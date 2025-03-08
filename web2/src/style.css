@@ -48,6 +48,17 @@ h1, h2, h3, h4 {
 #search-wrapper {
   font-family: var(--font);
   background-color: var(--overlay);
+  border-radius: 5px;
+  top: -100px;
+  transition: top 0.3s ease-in-out;
+}
+
+#search-input {
+  border: 3px solid var(--highlight);
+  border-radius: 5px;
+  background-color: var(--surface);
+  color: var(--text);
+  padding: 5px;
 }
 
 #search-suggestion-wrapper {
