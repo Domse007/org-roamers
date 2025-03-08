@@ -1,8 +1,9 @@
 use std::{fs::File, io::Read, path::Path};
 
 use orgize::{
-    ast::{Document, Headline, Keyword},
-    Org,
+    ast::{Document, Headline, Keyword, Link},
+    export::{Container, Event, Traverser},
+    Org, SyntaxElement,
 };
 
 use crate::database::datamodel::Timestamps;
@@ -32,90 +33,156 @@ fn get_orgize<P: AsRef<Path>>(path: P) -> anyhow::Result<Org> {
 }
 
 pub fn get_nodes_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<NodeFromOrg>> {
-    let org = get_orgize(path)?;
-    let document = org.document();
+    let org = get_orgize(path.as_ref())?;
 
-    get_nodes_from_document(document)
+    get_nodes_from_document(org, path.as_ref().to_str().unwrap())
 }
 
-pub fn get_nodes_from_document(document: Document) -> anyhow::Result<Vec<NodeFromOrg>> {
-    let mut nodes = Vec::new();
+pub fn get_nodes_from_document(org: Org, file: &str) -> anyhow::Result<Vec<NodeFromOrg>> {
+    let mut traverser = RoamersTraverser::new(file.to_string());
+    org.traverse(&mut traverser);
+    Ok(traverser.nodes)
+}
 
-    let mut parent = None;
+#[derive(Default)]
+pub struct RoamersTraverser {
+    file: String,
+    nodes: Vec<NodeFromOrg>,
+    id_stack: Vec<(String, String)>,
+    olp: Vec<String>,
+}
 
-    // parsing #+title
-    if let Some(title) = document.title() {
-        if let Some(properties) = document.properties() {
-            if let Some(id) = properties.get("ID") {
-                parent = Some(id.to_string());
-                let tags = get_tags_from_keywords(document.keywords());
-                let id = id.to_string();
-                let content = document.raw();
-                let mut node = NodeFromOrg::default();
-                node.title = title;
-                node.uuid = id;
-                node.content = content;
-                node.level = 0;
-                node.tags = tags;
-                nodes.push(node);
-            }
+impl RoamersTraverser {
+    pub fn new(file: String) -> Self {
+        Self {
+            file,
+            ..Default::default()
         }
     }
 
-    // parsing headlines and recursively looking for nodes
-    let mut stack = document
-        .headlines()
-        .map(|h| (h, parent.clone()))
-        .collect::<Vec<(Headline, Option<String>)>>();
+    pub fn current_olp(&self) -> Vec<String> {
+        self.olp.clone()
+    }
+}
 
-    while let Some((headline, mut parent)) = stack.pop() {
-        if let Some(properties) = headline.properties() {
-            if let Some(id) = properties.get("ID") {
-                let my_parent = parent.clone();
-                let tags = headline
-                    .tags()
-                    .map(|t| t.to_string())
-                    .filter(|t| !t.trim().is_empty())
-                    .collect();
+impl Traverser for RoamersTraverser {
+    fn event(&mut self, event: orgize::export::Event, _ctx: &mut orgize::export::TraversalContext) {
+        match event {
+            Event::Enter(Container::Document(document)) => {
+                if let Some(properties) = document.properties() {
+                    if let Some(id) = properties.get("ID") {
+                        let title = document.title().unwrap_or_else(|| String::new());
+                        let tags = get_tags_from_keywords(document.keywords());
+                        let id = id.to_string();
+                        let content = document.raw();
+                        let mut node = NodeFromOrg::default();
+                        node.title = title.clone();
+                        node.uuid = id.clone();
+                        node.content = content;
+                        node.level = 0;
+                        node.tags = tags;
+                        node.file = self.file.to_string();
+                        self.nodes.push(node);
 
-                let id = id.to_string();
-                // TODO: this is wrong.
-                let title = headline.title_raw();
-                let level = headline.level() as u64;
-
-                // update parent for children.
-                parent = Some(id.clone());
-
-                let mut content = match headline.section() {
-                    Some(section) => section.raw(),
-                    None => String::new(),
-                };
-                let subheading = headline
-                    .headlines()
-                    .map(|headline| headline.raw())
-                    .collect::<String>();
-
-                content.push_str(&subheading);
-
-                let mut node = NodeFromOrg::default();
-                node.title = title;
-                node.uuid = id;
-                node.content = content;
-                node.level = level;
-                node.parent = my_parent;
-                node.tags = tags;
-
-                nodes.push(node);
+                        self.id_stack.push((title, id));
+                    }
+                }
+                if let Some(title) = document.title() {
+                    self.olp.push(title);
+                }
             }
-        }
+            Event::Leave(Container::Document(_)) => {
+                let _ = self.id_stack.pop();
+                let _ = self.olp.pop();
+            }
+            Event::Enter(Container::Headline(headline)) => {
+                if let Some(properties) = headline.properties() {
+                    if let Some(id) = properties.get("ID") {
+                        let my_parent = self.id_stack.last().map(|p| p.1.to_string());
 
-        // recursively add children to stack
-        for hl in headline.headlines() {
-            stack.push((hl, parent.clone()));
+                        let tags = headline
+                            .tags()
+                            .map(|t| t.to_string())
+                            .filter(|t| !t.trim().is_empty())
+                            .collect();
+
+                        let id = id.to_string();
+                        // TODO: this is wrong.
+                        let title = headline.title_raw();
+                        let level = headline.level() as u64;
+                        let olp = self.current_olp();
+
+                        // update parent for children.
+                        self.id_stack.push((title.clone(), id.clone()));
+
+                        let mut content = match headline.section() {
+                            Some(section) => section.raw(),
+                            None => String::new(),
+                        };
+                        let subheading = headline
+                            .headlines()
+                            .map(|headline| headline.raw())
+                            .collect::<String>();
+
+                        content.push_str(&subheading);
+
+                        let mut node = NodeFromOrg::default();
+                        node.title = title;
+                        node.uuid = id;
+                        node.content = content;
+                        node.level = level;
+                        node.parent = my_parent;
+                        node.tags = tags;
+                        node.file = self.file.to_string();
+                        node.olp = olp;
+
+                        self.nodes.push(node);
+                    }
+                }
+                self.olp.push(headline.title_raw());
+            }
+            Event::Leave(Container::Headline(headline)) => {
+                let _ = self.olp.pop();
+                if let Some(properties) = headline.properties() {
+                    if let Some(id) = properties.get("ID") {
+                        if let Some((_, id_from_stack)) = self.id_stack.last() {
+                            if id == *id_from_stack {
+                                let _ = self.id_stack.pop();
+                            }
+                        }
+                    }
+                }
+            }
+            Event::Enter(Container::Link(link)) => {
+                if let Some((id, description)) = parse_link(link) {
+                    if let Some(node) = self.nodes.last_mut() {
+                        node.links.push((id, description));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+fn parse_link(link: Link) -> Option<(String, String)> {
+    let path = link.path();
+
+    if let Some((t, id)) = path.split_once(':') {
+        if t.to_lowercase() == "id" {
+            let desc = link
+                .description()
+                .map(|s| match s {
+                    SyntaxElement::Node(node) => node.text().to_string(),
+                    SyntaxElement::Token(token) => token.text().to_string(),
+                })
+                .collect::<String>();
+
+            return Some((id.to_string(), desc));
         }
     }
 
-    Ok(nodes)
+    None
 }
 
 fn get_tags_from_keywords(iter: impl Iterator<Item = Keyword>) -> Vec<String> {
@@ -166,8 +233,7 @@ Welcome
 some text
 ";
         let org = Org::parse(ORG);
-        let document = org.document();
-        let res = get_nodes_from_document(document).unwrap();
+        let res = get_nodes_from_document(org, "").unwrap();
         assert_eq!(
             res,
             vec![
@@ -185,6 +251,7 @@ some text
                     uuid: "e6557233-97db-4eec-925a-b80d66ad97e8".to_string(),
                     content: "some text\n".to_string(),
                     level: 1,
+                    olp: vec!["Hello World".to_string()],
                     ..Default::default()
                 }
             ]
@@ -211,19 +278,10 @@ Welcome
 some text
 ";
         let org = Org::parse(ORG);
-        let document = org.document();
-        let res = get_nodes_from_document(document).unwrap();
+        let res = get_nodes_from_document(org, "").unwrap();
         assert_eq!(
             res,
             vec![
-                NodeFromOrg {
-                    title: "testing".to_string(),
-                    parent: None,
-                    uuid: "e6557233-97db-4eec-925a-b80d66ad97e8".to_string(),
-                    content: "some text\n".to_string(),
-                    level: 1,
-                    ..Default::default()
-                },
                 NodeFromOrg {
                     title: "Hello World".to_string(),
                     uuid: "e655725f-97db-4eec-925a-b80d66ad97e8".to_string(),
@@ -237,7 +295,16 @@ some text
                     parent: Some("e655725f-97db-4eec-925a-b80d66ad97e8".to_string()),
                     uuid: "e655725d-97db-4eec-925a-b80d66ad97e8".to_string(),
                     content: "Welcome\n".to_string(),
+                    olp: vec!["Hello World".to_string()],
                     level: 2,
+                    ..Default::default()
+                },
+                NodeFromOrg {
+                    title: "testing".to_string(),
+                    parent: None,
+                    uuid: "e6557233-97db-4eec-925a-b80d66ad97e8".to_string(),
+                    content: "some text\n".to_string(),
+                    level: 1,
                     ..Default::default()
                 },
             ]
@@ -264,8 +331,7 @@ Welcome
 some text
 ";
         let org = Org::parse(ORG);
-        let document = org.document();
-        let res = get_nodes_from_document(document).unwrap();
+        let res = get_nodes_from_document(org, "").unwrap();
         assert_eq!(
             res,
             vec![
@@ -282,6 +348,7 @@ some text
                     parent: Some("e655725f-97db-4eec-925a-b80d66ad97e8".to_string()),
                     uuid: "e655725d-97db-4eec-925a-b80d66ad97e8".to_string(),
                     content: "Welcome\n*** testing\n:PROPERTIES:\n:ID:       e6557233-97db-4eec-925a-b80d66ad97e8\n:END:\nsome text\n".to_string(),
+                    olp: vec!["Hello World".to_string()],
                     level: 2,
                     ..Default::default()
                 },
@@ -290,6 +357,7 @@ some text
                     parent: Some("e655725d-97db-4eec-925a-b80d66ad97e8".to_string()),
                     uuid: "e6557233-97db-4eec-925a-b80d66ad97e8".to_string(),
                     content: "some text\n".to_string(),
+                    olp: vec!["Hello World".to_string(), "Hello".to_string()],
                     level: 3,
                     ..Default::default()
                 }
@@ -314,8 +382,7 @@ test
 some text
 ";
         let org = Org::parse(ORG);
-        let document = org.document();
-        let res = get_nodes_from_document(document).unwrap();
+        let res = get_nodes_from_document(org, "").unwrap();
         assert_eq!(
             res,
             vec![
@@ -332,6 +399,7 @@ some text
                     parent: Some("e655725f-97db-4eec-925a-b80d66ad97e8".to_string()),
                     uuid: "e6557233-97db-4eec-925a-b80d66ad97e8".to_string(),
                     content: "some text\n".to_string(),
+                    olp: vec!["Hello World".to_string(), "Hello".to_string()],
                     level: 3,
                     ..Default::default()
                 }
@@ -379,8 +447,7 @@ some text
 :ID:       e655725f-97db-4eec-925a-b80d66ad97e9
 :END:";
         let org = Org::parse(ORG);
-        let document = org.document();
-        let res = get_nodes_from_document(document);
+        let res = get_nodes_from_document(org, "");
         assert_eq!(
             res.unwrap(),
             vec![
@@ -404,9 +471,52 @@ some text
                     level: 1,
                     parent: Some("e655725f-97db-4eec-925a-b80d66ad97e8".to_string()),
                     tags: vec!["test1".to_string(), "test2".to_string()],
+                    olp: vec!["Test".to_string()],
                     ..Default::default()
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn test_parse_links() {
+        const ORG: &'static str = ":PROPERTIES:
+:ID:       e655725f-97db-4eec-925a-b80d66ad97e8
+:END:
+#+title: Test
+* other
+:PROPERTIES:
+:ID:       e655725f-97db-4eec-925a-b80d66ad97e9
+:END:
+Linking to [[id:e655725f-97db-4eec-925a-b80d66ad97e8][Test]]";
+        let org = Org::parse(ORG);
+        let res = get_nodes_from_document(org, "").unwrap();
+        assert_eq!(res[0].links, vec![]);
+        assert_eq!(
+            res[1].links,
+            vec![(
+                "e655725f-97db-4eec-925a-b80d66ad97e8".to_string(),
+                "Test".to_string()
+            )]
+        );
+    }
+
+    #[test]
+    fn test_inherited_linking() {
+        const ORG: &'static str = ":PROPERTIES:
+:ID:       e655725f-97db-4eec-925a-b80d66ad97e8
+:END:
+#+title: Test
+* other
+Linking to [[id:e655725f-97db-4eec-925a-b80d66ad97e8][Test]]";
+        let org = Org::parse(ORG);
+        let res = get_nodes_from_document(org, "").unwrap();
+        assert_eq!(
+            res[0].links,
+            vec![(
+                "e655725f-97db-4eec-925a-b80d66ad97e8".to_string(),
+                "Test".to_string()
+            )]
         );
     }
 }
