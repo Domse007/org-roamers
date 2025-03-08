@@ -7,7 +7,13 @@
   --highlight: #babbf1;
   --highlight-2: #a6d189;
   --warn: #e78284;
+  --clickable: #8caaee;
   --font: Arial, Helvetica, sans-serif;
+  /* Code highlighting colors: */
+  --keyword: #e78284;
+  --string: var(--text);
+  --ident: #a6d189;
+  --comment: #626880;
 }
 
 body {
@@ -18,9 +24,9 @@ a {
   color: var(--highlight-2);
 }
 
-code {
-  color: var(--highlight-2);
-}
+/* code { */
+/*   color: var(--highlight-2); */
+/* } */
 
 #org-preview-wrapper {
   background-color: var(--surface);
@@ -28,7 +34,7 @@ code {
 }
 
 #org-preview-dragging-area {
-  background-color: var(--warn);
+  background-color: var(--clickable);
 }
 
 #org-preview {
@@ -57,18 +63,47 @@ h1, h2, h3, h4 {
   background-color: var(--surface);
 }
 
-.hljs-string,
+/* This is a bit hacky. */
+.katex-html {
+  display: none;
+  visibility: hidden;
+}
+
+pre:has(.hljs) {
+  background-color: var(--base);
+  padding: 5px;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.hljs-keyword {
+  color: var(--keyword) !important;
+}
+
+.hljs-string {
+  color: var(--string) !important;
+}
+
 .hljs-section,
 .hljs-selector-class,
 .hljs-template-variable,
 .hljs-deletion {
-  color: #800;
+  color: #800 !important;
 }
 .hljs-variable {
-  color: green;
+  color: var(--ident) !important;
 }
+
+.hljs-title {
+  color: var(--ident) !important;
+}
+
+.hljs-comment {
+  color: var(--comment) !important;
+}
+
 .src {
-  background-color: var(--base);
+  background-color: var(--base) !important;
   padding: 5px;
   border-radius: 5px;
 }
