@@ -9,6 +9,7 @@ import { MultiGraph } from "graphology";
 import forceAtlas2 from 'graphology-layout-forceatlas2';
 import FA2Layout from "graphology-layout-forceatlas2/worker";
 import Sigma from "sigma";
+import { NodeBorderProgram } from "@sigma/node-border";
 
 const MIN_SIZE = 200;
 const BORDER_SIZE = 10;
@@ -63,8 +64,9 @@ const graph = new MultiGraph();
 
 const updateGraph = () => {
   const style = window.getComputedStyle(document.body);
-  const nodeColor = style.getPropertyValue('--highlight');
+  const nodeColor = style.getPropertyValue('--node');
   const edgeColor = style.getPropertyValue('--overlay');
+  const nodeBorderColor = style.getPropertyValue('--node-border');
   
   fetch(`/graph`)
     .then((resp) => resp.json())
@@ -77,6 +79,7 @@ const updateGraph = () => {
           y: randomNumber(1, 100),
           size: 10,
           color: nodeColor,
+          borderColor: nodeBorderColor,
         });
       });
       json["edges"].forEach((edge) => {
@@ -97,7 +100,16 @@ export function setupGraph() {
   });
   
   layout.start();
-  const sigma = new Sigma(graph, document.getElementById("graph"));
+  let sigma = new Sigma(graph, document.getElementById("graph"), {
+    defaultNodeType: "bordered",
+    nodeProgramClasses: {
+      bordered: NodeBorderProgram,
+    },
+  });
+
+  const style = window.getComputedStyle(document.body);
+  const textColor = style.getPropertyValue('--text');
+  sigma.settings.labelColor = { color: textColor };
 
   sigma.on("downNode", (e) => {
     const node = e.node;

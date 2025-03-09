@@ -9,6 +9,8 @@
   --warn: #e78284;
   --clickable: #8caaee;
   --font: Arial, Helvetica, sans-serif;
+  --node: #ef9f76;
+  --node-border: #babbf1;
   /* Code highlighting colors: */
   --keyword: #e78284;
   --string: var(--text);
