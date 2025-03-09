@@ -75,13 +75,24 @@ impl Traverser for RoamersTraverser {
                         let tags = get_tags_from_keywords(document.keywords());
                         let id = id.to_string();
                         let content = document.raw();
-                        let mut node = NodeFromOrg::default();
-                        node.title = title.clone();
-                        node.uuid = id.clone();
-                        node.content = content;
-                        node.level = 0;
-                        node.tags = tags;
-                        node.file = self.file.to_string();
+                        let aliases = properties
+                            .get("ROAM_ALIASES")
+                            .map(parse_aliases)
+                            .unwrap_or_default();
+
+                        let node = NodeFromOrg {
+                            title: title.clone(),
+                            uuid: id.clone(),
+                            content,
+                            level: 0,
+                            tags,
+                            file: self.file.to_string(),
+                            aliases,
+                            parent: None,
+                            olp: vec![],
+                            ..Default::default()
+                        };
+
                         self.nodes.push(node);
 
                         self.id_stack.push((title, id));
@@ -99,6 +110,10 @@ impl Traverser for RoamersTraverser {
                 if let Some(properties) = headline.properties() {
                     if let Some(id) = properties.get("ID") {
                         let my_parent = self.id_stack.last().map(|p| p.1.to_string());
+                        let aliases = properties
+                            .get("ROAM_ALIASES")
+                            .map(parse_aliases)
+                            .unwrap_or_default();
 
                         let tags = headline
                             .tags()
@@ -126,15 +141,18 @@ impl Traverser for RoamersTraverser {
 
                         content.push_str(&subheading);
 
-                        let mut node = NodeFromOrg::default();
-                        node.title = title;
-                        node.uuid = id;
-                        node.content = content;
-                        node.level = level;
-                        node.parent = my_parent;
-                        node.tags = tags;
-                        node.file = self.file.to_string();
-                        node.olp = olp;
+                        let mut node = NodeFromOrg {
+                            title,
+                            uuid: id,
+                            content,
+                            level,
+                            parent: my_parent,
+                            tags,
+                            file: self.file.to_string(),
+                            olp,
+                            aliases,
+                            ..Default::default()
+                        };
 
                         self.nodes.push(node);
                     }
@@ -163,6 +181,14 @@ impl Traverser for RoamersTraverser {
             _ => {}
         }
     }
+}
+
+fn parse_aliases(aliases: orgize::ast::Token) -> Vec<String> {
+    aliases
+        .split(' ')
+        .map(|s| s.trim())
+        .map(ToString::to_string)
+        .collect()
 }
 
 fn parse_link(link: Link) -> Option<(String, String)> {
@@ -517,6 +543,30 @@ Linking to [[id:e655725f-97db-4eec-925a-b80d66ad97e8][Test]]";
                 "e655725f-97db-4eec-925a-b80d66ad97e8".to_string(),
                 "Test".to_string()
             )]
+        );
+    }
+
+    #[test]
+    fn test_aliases() {
+        const ORG: &'static str = ":PROPERTIES:
+:ID:       e655725f-97db-4eec-925a-b80d66ad97e8
+:ROAM_ALIASES: test1 test2
+:END:
+#+title: Test
+* other
+:PROPERTIES:
+:ID:       e655725f-97db-4eec-925a-b80d66ad97e9
+:ROAM_ALIASES: test3 test4
+:END:";
+        let org = Org::parse(ORG);
+        let res = get_nodes_from_document(org, "").unwrap();
+        assert_eq!(
+            res[0].aliases,
+            vec!["test1".to_string(), "test2".to_string()]
+        );
+        assert_eq!(
+            res[1].aliases,
+            vec!["test3".to_string(), "test4".to_string()]
         );
     }
 }
