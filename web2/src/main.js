@@ -46,13 +46,43 @@ export const syntaxHighlightSite = () => {
   hljs.highlightAll();
 }
 
+const katexOptions = {
+  delimiters: [
+    {left: "$$", right: "$$", display: true},
+    {left: "\\(", right: "\\)", display: false},
+    {left: "\\begin{equation}", right: "\\end{equation}", display: true},
+    {left: "\\begin{align}", right: "\\end{align}", display: true},
+    {left: "\\begin{align*}", right: "\\end{align*}", display: true},
+    {left: "\\begin{alignat}", right: "\\end{alignat}", display: true},
+    {left: "\\begin{gather}", right: "\\end{gather}", display: true},
+    {left: "\\begin{CD}", right: "\\end{CD}", display: true},
+    {left: "\\begin{algorithm}", right: "\\end{algorithm}", display: true},
+    {left: "\\begin{algorithmic}", right: "\\end{algorithmic}", display: true},
+    {left: "\\[", right: "\\]", display: true}
+  ],
+  errorCallback: (message, stack) => {
+    const latex = message.substring(36, message.length - 7);
+    const encoded = encodeURI(latex);
+    const style = window.getComputedStyle(document.body);
+    const textColor = style.getPropertyValue('--text');
+    const colorEncoded = encodeURI(textColor.substring(1));
+    fetch(`/latex?tex=${encoded}&color=${colorEncoded}`)
+      .then((resp) => resp.text())
+      .then((svg) => {
+        const container = document.getElementById('org-preview');
+        let newHTML = container.innerHTML.replace(latex, svg);
+        container.innerHTML = newHTML;
+      });
+  }
+};
+
 export const preview = (name) => {
   fetch(`/org?title=${name}`)
     .then((response) => {
       return response.text();
     }).then((html) => {
       document.getElementById('org-preview').innerHTML = html;
-      renderMathInElement(document.getElementById('org-preview'));
+      renderMathInElement(document.getElementById('org-preview'), katexOptions);
       syntaxHighlightSite();
     });	  
 };

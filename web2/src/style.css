@@ -120,3 +120,12 @@ pre:has(.hljs) {
   padding: 5px;
   border-radius: 5px;
 }
+
+td {
+  padding: 5px;
+  border: 1px solid var(--highlight);
+}
+
+table {
+  border-collapse: collapse;
+}

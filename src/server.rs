@@ -18,12 +18,13 @@ use tantivy::schema::Value;
 use tantivy::TantivyDocument;
 
 use crate::get_nodes_internal;
+use crate::latex;
 use crate::DB;
 
-static WEBSERVER: Mutex<Option<(JoinHandle<()>, Sender<()>)>> = Mutex::new(None);
+pub static WEBSERVER: Mutex<Option<(JoinHandle<()>, Sender<()>)>> = Mutex::new(None);
 
 #[defun]
-fn start_server(url: String, root: String) -> Result<()> {
+pub fn start_server(url: String, root: String) -> Result<()> {
     if WEBSERVER.lock().unwrap().is_some() {
         return Err(emacs::Error::msg("Server already running."));
     }
@@ -49,6 +50,12 @@ fn start_server(url: String, root: String) -> Result<()> {
             },
             (GET) (/graph) => {
                 get_graph_data()
+            },
+            (GET) (/latex) => {
+                match request.get_param("tex") {
+                    Some(tex) => get_latex_svg(tex, request.get_param("color").unwrap()),
+                    None => Response::empty_404(),
+                }
             },
             _ => default_route_content(root, Some(request.url()))
         )
@@ -111,43 +118,26 @@ fn get_org_as_html(name: String) -> Response {
     let mut db = db.lock().unwrap();
     let db = db.as_mut().unwrap();
 
-    let searcher = db.index.reader().unwrap().searcher();
-    let index = &db.index;
-    let title_field = db.schema.get_field("title").unwrap();
-
-    let query_parser = QueryParser::for_index(&index, vec![title_field]);
-
-    let query = match query_parser.parse_query(&format!("title:{name}")) {
-        Ok(query) => query,
-        Err(_) => return Response::empty_404(),
+    let [_title, _id, file] = match db
+        .sqlite
+        .get_all_nodes(["title", "id", "file"])
+        .into_iter()
+        .filter(|[title, node, _]| title.contains(&name) || node.contains(&name))
+        .next()
+    {
+        Some(node) => node,
+        None => return Response::text("Did not get node."),
     };
 
-    let res = match searcher.search(&query, &TopDocs::with_limit(1)) {
-        Ok(res) => res,
-        Err(_) => return Response::empty_404(),
+    // FIXME: This does not narrow to the node, but only to the file.
+    let contents = match std::fs::read_to_string(file.replace('"', "")) {
+        Ok(f) => f,
+        Err(_) => return Response::text("Could not get file contents."),
     };
 
-    let (_score, doc_address) = match res.into_iter().next() {
-        Some(next) => next,
-        None => return Response::empty_404(),
-    };
+    let mut html = Org::parse(contents).to_html();
 
-    let retrieved_doc: TantivyDocument = match searcher.doc(doc_address) {
-        Ok(doc) => doc,
-        Err(_) => return Response::empty_404(),
-    };
-
-    let body_field = db.schema.get_field("body").unwrap();
-
-    let body = retrieved_doc
-        .get_first(body_field)
-        .unwrap()
-        .as_str()
-        .unwrap();
-
-    let mut html = Org::parse(body).to_html();
-
-    Response::html(String::from_utf8(html.into_bytes()).unwrap())
+    Response::text(html)
 }
 
 fn search(query: String) -> Response {
@@ -185,4 +175,31 @@ fn get_graph_data() -> Response {
     let edges = db.sqlite.get_all_links();
 
     Response::json(&serde_json::to_string(&GraphData { nodes, edges }).unwrap())
+}
+
+fn get_latex_svg(tex: String, color: String) -> Response {
+    let db = &DB;
+    let mut db = db.lock().unwrap();
+    let db = db.as_mut().unwrap();
+
+    // TODO:
+    // let svg = match db.sqlite.get_all_nodes(["file"]).first() {
+    //     Some(file) => latex::get_image_with_ctx(body, file[0].clone()),
+    //     None => latex::get_image(body, vec![]),
+    // };
+
+    let svg = latex::get_image(
+        tex,
+        color,
+        vec![
+            "\\usepackage[noEnd=true,indLines=false,rightComments=false]{algpseudocodex}"
+                .to_string(),
+            "\\usepackage{algorithm}".to_string(),
+        ],
+    );
+
+    match svg {
+        Ok(svg) => Response::svg(svg),
+        Err(err) => Response::text(format!("Could not generate svg: {:#?}", err)),
+    }
 }
