@@ -2,7 +2,7 @@ use std::{
     fs::File,
     io::{Read, Write},
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Stdio},
 };
 
 use anyhow::bail;
@@ -11,6 +11,7 @@ use tempfile::TempDir;
 use crate::org;
 
 const PREAMBLE: &'static str = "\\documentclass{article}
+\\usepackage[T1]{fontenc}
 \\usepackage[active,tightpage]{preview}
 \\usepackage{amsmath}
 \\usepackage{amssymb}
@@ -31,8 +32,13 @@ fn preamble(headers: Vec<String>) -> String {
     )
 }
 
-pub fn get_image_with_ctx<P: AsRef<Path>>(latex: String, color: String, file: P) -> anyhow::Result<String> {
+pub fn get_image_with_ctx<P: AsRef<Path>>(
+    latex: String,
+    color: String,
+    file: P,
+) -> anyhow::Result<String> {
     let headers = org::get_latex_header(file)?;
+    println!("Headers: {headers:?}");
     get_image(latex, color, headers)
 }
 
@@ -45,7 +51,7 @@ pub fn get_image(latex: String, color: String, headers: Vec<String>) -> anyhow::
     // let's check if the file already exists.
     let mut existing_path = path.clone();
     existing_path.push(format!("{}.svg", hash));
-    if let Ok(mut file) = File::open(existing_path.as_path()){
+    if let Ok(mut file) = File::open(existing_path.as_path()) {
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
         println!("Found preexisting content for {hash}.");
@@ -57,8 +63,8 @@ pub fn get_image(latex: String, color: String, headers: Vec<String>) -> anyhow::
 
     let mut file = File::create(in_file.as_path())?;
     file.write_all(preamble(headers).as_bytes())?;
-    file.write_all("\n\\begin{document}\n".as_bytes())?;
     file.write_all(format!("\\definecolor{{mycolor}}{{HTML}}{{{color}}}\n").as_bytes())?;
+    file.write_all("\n\\begin{document}\n".as_bytes())?;
     file.write_all("\\begin{preview}\n".as_bytes())?;
     file.write_all("\\color{mycolor}\n".as_bytes())?;
     file.write_all(latex.as_bytes())?;
@@ -71,6 +77,8 @@ pub fn get_image(latex: String, color: String, headers: Vec<String>) -> anyhow::
             in_file.as_path().to_str().unwrap(),
         ])
         .current_dir(path.as_path())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .status()?;
 
     if !status.success() {
@@ -81,12 +89,18 @@ pub fn get_image(latex: String, color: String, headers: Vec<String>) -> anyhow::
     in_file.push(format!("{}.dvi", hash));
     let status = Command::new("dvisvgm")
         .args([
-            "--bbox=min",
+            "--optimize",
+            "--clipjoin",
+            "--relative",
+            "--bbox=preview",
+            "--no-fonts",
             in_file.as_path().to_str().unwrap(),
             "-o",
             format!("{}.svg", hash).as_str(),
         ])
         .current_dir(path.as_path())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .status()?;
 
     if !status.success() {
@@ -94,9 +108,9 @@ pub fn get_image(latex: String, color: String, headers: Vec<String>) -> anyhow::
     }
 
     path.push(format!("{}.svg", hash));
-    
+
     println!("Trying to read {}", path.display());
-    
+
     let mut file = File::open(path.as_path())?;
     let mut s = String::new();
     file.read_to_string(&mut s)?;

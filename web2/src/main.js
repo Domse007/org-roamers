@@ -17,6 +17,7 @@ const panel = document.getElementById('org-preview-dragging-area');
 const panel_wrapper = document.getElementById('org-preview-wrapper');
 
 let m_pos;
+let current_title;
 
 export function resize(e) {
   const dx = m_pos - e.x;
@@ -58,15 +59,19 @@ const katexOptions = {
     {left: "\\begin{CD}", right: "\\end{CD}", display: true},
     {left: "\\begin{algorithm}", right: "\\end{algorithm}", display: true},
     {left: "\\begin{algorithmic}", right: "\\end{algorithmic}", display: true},
+    {left: "\\begin{center}", right: "\\end{center}", display: true},
+    {left: "\\begin{tikpicture}", right: "\\end{tikzpicture}", display: true},
     {left: "\\[", right: "\\]", display: true}
   ],
   errorCallback: (message, stack) => {
+    console.log("Trying to process latex on server.");
     const latex = message.substring(36, message.length - 7);
-    const encoded = encodeURI(latex);
+    const encoded = encodeURIComponent(latex);
     const style = window.getComputedStyle(document.body);
     const textColor = style.getPropertyValue('--text');
-    const colorEncoded = encodeURI(textColor.substring(1));
-    fetch(`/latex?tex=${encoded}&color=${colorEncoded}`)
+    const colorEncoded = encodeURIComponent(textColor.substring(1));
+    const encodedTitle = encodeURIComponent(current_title);
+    fetch(`/latex?tex=${encoded}&color=${colorEncoded}&title=${encodedTitle}`)
       .then((resp) => resp.text())
       .then((svg) => {
         const container = document.getElementById('org-preview');
@@ -77,6 +82,7 @@ const katexOptions = {
 };
 
 export const preview = (name) => {
+  current_title = name;
   fetch(`/org?title=${name}`)
     .then((response) => {
       return response.text();
@@ -149,6 +155,7 @@ export function setupGraph() {
 }
 
 const search = async (query) => {
+  const encoded = encodeURIComponent(query);
   const resp = await fetch(`/search?q=${query}`);
   const text = await resp.json();
   const res = JSON.parse(text);
@@ -162,6 +169,7 @@ const InputHandler = (event) => {
   const query = searchInput.value;
   searchSuggestion.innerHTML = "";
   search(query).then((res) => {
+    console.log(res);
     res["results"].forEach((e) => {
       searchSuggestion.innerHTML += `<div class="suggestion" style="padding: 5px; cursor: pointer;">${e.title}</div>`;
     })

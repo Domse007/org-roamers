@@ -53,7 +53,11 @@ pub fn start_server(url: String, root: String) -> Result<()> {
             },
             (GET) (/latex) => {
                 match request.get_param("tex") {
-                    Some(tex) => get_latex_svg(tex, request.get_param("color").unwrap()),
+                    Some(tex) => get_latex_svg(
+                        tex,
+                        request.get_param("color").unwrap(),
+                        request.get_param("title").unwrap(),
+                    ),
                     None => Response::empty_404(),
                 }
             },
@@ -177,26 +181,25 @@ fn get_graph_data() -> Response {
     Response::json(&serde_json::to_string(&GraphData { nodes, edges }).unwrap())
 }
 
-fn get_latex_svg(tex: String, color: String) -> Response {
+fn get_latex_svg(tex: String, color: String, title: String) -> Response {
     let db = &DB;
     let mut db = db.lock().unwrap();
     let db = db.as_mut().unwrap();
 
-    // TODO:
-    // let svg = match db.sqlite.get_all_nodes(["file"]).first() {
-    //     Some(file) => latex::get_image_with_ctx(body, file[0].clone()),
-    //     None => latex::get_image(body, vec![]),
-    // };
+    let node = db
+        .sqlite
+        .get_all_nodes(["file", "title"])
+        .into_iter()
+        .filter(|[_, c_title]| c_title.contains(&title))
+        .next();
 
-    let svg = latex::get_image(
-        tex,
-        color,
-        vec![
-            "\\usepackage[noEnd=true,indLines=false,rightComments=false]{algpseudocodex}"
-                .to_string(),
-            "\\usepackage{algorithm}".to_string(),
-        ],
-    );
+    let svg = match node {
+        Some([file, _]) => {
+            let file = file.replace('"', "");
+            latex::get_image_with_ctx(tex, color, file)
+        }
+        None => latex::get_image(tex, color, vec![]),
+    };
 
     match svg {
         Ok(svg) => Response::svg(svg),

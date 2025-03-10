@@ -129,3 +129,8 @@ td {
 table {
   border-collapse: collapse;
 }
+
+/* this might be broken for some svgs. */
+svg {
+  fill: var(--text);
+}
