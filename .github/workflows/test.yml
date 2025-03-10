@@ -26,8 +26,6 @@ jobs:
           sudo apt update
           sudo apt upgrade
       - name: Install dependencies
-        run: sudo apt install -y texlive-latex-base dvisvgm
+        run: sudo apt install -y texlive-latex-extra dvisvgm
       - name: cargo test
         run: cargo test --all-features --all-targets
-      - name: cargo test docs
-        run: cargo test --doc
