@@ -21,6 +21,12 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.toolchain }}
+      - name: Update system
+        run: |
+          sudo apt update
+          sudo apt upgrade
+      - name: Install dependencies
+        run: sudo apt install -y texlive-latex-base dvisvgm
       - name: cargo test
         run: cargo test --all-features --all-targets
       - name: cargo test docs
