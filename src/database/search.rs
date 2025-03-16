@@ -61,6 +61,19 @@ impl Search {
         Ok(())
     }
 
+    pub fn index_many(&self, nodes: Vec<Node>) -> Result<()> {
+        if let Ok(mut writer) = self.writer.write() {
+            for node in nodes {
+                let doc = node.to_document(&self.schema)?;
+                let _ = writer.add_document(doc)?;
+            }
+            let _ = writer.commit()?;
+        } else {
+            bail!("unable to acquire lock, most likely poisoned");
+        }
+        Ok(())
+    }
+
     pub fn search(&self, q: &str, limit: usize, fields: Option<Vec<Field>>) -> Result<Vec<DocAddress>> {
         let searcher = self.reader.searcher();
         let fields = match fields {

@@ -22,6 +22,7 @@ pub struct NodeFromOrg {
     pub(crate) timestamps: Option<Timestamps>,
     pub(crate) links: Vec<(String, String)>,
     pub(crate) refs: Vec<String>,
+    pub(crate) cites: Vec<String>,
 }
 
 fn get_orgize<P: AsRef<Path>>(path: P) -> anyhow::Result<Org> {

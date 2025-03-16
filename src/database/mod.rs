@@ -100,8 +100,18 @@ impl Database {
         }
         let linkids: Vec<u64> = linkids.iter().map(|(_, _, id)| *id).collect();
 
+        let citeids: Vec<(&String, u64)> = node.aliases.iter().map(|t| (t, hash(&t))).collect();
+        for (cite, citeid) in citeids.iter() {
+            let citeid = *citeid;
+            if let Ok(None) = self.store.get_cite(citeid) {
+                let cite = Citation::new(citeid, cite.to_string());
+                let _ = self.store.put_cite(citeid, &cite)?;
+            }
+        }
+        let citeids: Vec<u64> = citeids.iter().map(|(_, id)| *id).collect();
+
         let id = hash(&node.uuid);
-        let node = Node::from_orgnode(id, node, tagids, linkids, refids, aliasids, file_id);
+        let node = Node::from_orgnode(id, node, tagids, linkids, refids, aliasids, citeids, file_id);
         let _ = self.store.put_node(id, &node)?;
 
         Ok(())

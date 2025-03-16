@@ -23,6 +23,7 @@ pub struct Node {
     olp: Vec<String>,
     tags: Vec<Key>,
     aliases: Vec<Key>,
+    cites: Vec<Key>,
     timestamps: Option<Timestamps>,
     links: Vec<Key>,
     refrs: Vec<Key>,
@@ -36,6 +37,7 @@ impl Node {
         links: Vec<u64>,
         refrs: Vec<u64>,
         aliases: Vec<u64>,
+        cites: Vec<u64>,
         file_id: u64,
     ) -> Self {
         Self {
@@ -46,6 +48,7 @@ impl Node {
             file: file_id,
             level: org.level,
             olp: org.olp,
+            cites,
             // TODO
             timestamps: None,
             tags,
@@ -70,6 +73,21 @@ impl Node {
         Ok(doc)
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Citation {
+    id: Key,
+    cite: String,
+}
+
+impl Citation {
+    pub fn new(id: Key, cite: String) -> Self {
+        Self {
+            id, cite
+        }
+    }
+}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Reference {

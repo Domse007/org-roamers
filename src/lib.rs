@@ -4,4 +4,6 @@ pub mod org;
 pub mod parser;
 mod server;
 
-pub mod prelude {}
+pub mod prelude {
+    pub use super::server::Server;
+}

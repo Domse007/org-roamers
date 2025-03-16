@@ -9,6 +9,8 @@ use tracing::info;
 use std::fs::{self, DirEntry};
 use std::path::Path;
 
+use org_roamers::prelude::*;
+
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
@@ -22,11 +24,10 @@ async fn main() -> Result<()> {
 
     info!("Starting up org-roamers standalone application");
 
-    let app = Router::new().route("/", get(|| async { "Hello, World!" }));
+    let app = Server::new();
 
-    // run our app with hyper, listening globally on port 3000
     let listener = tokio::net::TcpListener::bind("0.0.0.0:9298").await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app.service()).await?;
 
     Ok(())
 }

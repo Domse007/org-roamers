@@ -2,7 +2,7 @@
 
 use std::{fmt, marker::PhantomData, path::PathBuf};
 
-use super::datamodel::{Alias, File, Link, Node, Reference, Tag};
+use super::{datamodel::{Alias, File, Link, Node, Reference, Tag}, Citation};
 use anyhow::Result;
 // use arroy::{distances::Euclidean, Database as ArroyDB, Reader, Writer};
 use heed::{byteorder::NativeEndian, Database, Env, EnvOpenOptions};
@@ -14,6 +14,8 @@ type LinkDB = Database<U64<NativeEndian>, SerdeBincode<Link>>;
 type TagDB = Database<U64<NativeEndian>, SerdeBincode<Tag>>;
 type AliasDB = Database<U64<NativeEndian>, SerdeBincode<Alias>>;
 type RefDB = Database<U64<NativeEndian>, SerdeBincode<Reference>>;
+type CiteDB = Database<U64<NativeEndian>, SerdeBincode<Citation>>;
+
 
 pub struct Store {
     env: Env,
@@ -23,6 +25,7 @@ pub struct Store {
     tags: TagDB,
     aliases: AliasDB,
     references: RefDB,
+    cites: CiteDB,
 }
 
 impl Store {
@@ -45,6 +48,8 @@ impl Store {
         let tags: TagDB = env.create_database(&mut wtx, Some("aliases"))?;
         let aliases: AliasDB = env.create_database(&mut wtx, Some("tags"))?;
         let references: RefDB = env.create_database(&mut wtx, Some("refs"))?;
+        let cites: CiteDB = env.create_database(&mut wtx, Some("cites"))?;
+
 
         // TODO: Arroy maybe version mismatch? Wrong return type from create_db
         // let embeds: ArroyDB<Euclidean> = env.create_database(&mut wtx, Some("embeds"))?;
@@ -59,6 +64,7 @@ impl Store {
             tags,
             aliases,
             references,
+            cites,
         })
     }
 
@@ -185,6 +191,27 @@ impl Store {
     pub fn del_ref(&self, key: u64) -> Result<bool> {
         let mut wtx = self.env.write_txn()?;
         let r = self.references.delete(&mut wtx, &key)?;
+        let _ = wtx.commit()?;
+        Ok(r)
+    }
+
+    pub fn get_cite(&self, key: u64) -> Result<Option<Citation>> {
+        let rtx = self.env.read_txn()?;
+        let refer: Option<Citation> = self.cites.get(&rtx, &key)?;
+        rtx.commit()?;
+        Ok(refer)
+    }
+
+    pub fn put_cite(&self, key: u64, cite: &Citation) -> Result<()> {
+        let mut wtx = self.env.write_txn()?;
+        let _ = self.cites.put(&mut wtx, &key, cite)?;
+        let _ = wtx.commit()?;
+        Ok(())
+    }
+
+    pub fn del_cite(&self, key: u64) -> Result<bool> {
+        let mut wtx = self.env.write_txn()?;
+        let r = self.cites.delete(&mut wtx, &key)?;
         let _ = wtx.commit()?;
         Ok(r)
     }
