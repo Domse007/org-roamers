@@ -19,6 +19,7 @@ use tantivy::TantivyDocument;
 
 use crate::get_nodes_internal;
 use crate::latex;
+use crate::GetNodesResultWrapper;
 use crate::DB;
 
 pub static WEBSERVER: Mutex<Option<(JoinHandle<()>, Sender<()>)>> = Mutex::new(None);
@@ -144,12 +145,37 @@ fn get_org_as_html(name: String) -> Response {
     Response::text(html)
 }
 
+#[derive(Serialize)]
+struct SearchResult {
+    tantivy: GetNodesResultWrapper,
+    sqlite: Vec<String>,
+}
+
 fn search(query: String) -> Response {
     let logger = crate::logger::StdOutLogger;
-    let result = match get_nodes_internal(logger, query, 10) {
+    let db = &DB;
+    let mut db = db.lock().unwrap();
+    let db = db.as_mut().unwrap();
+
+    let nodes = db
+        .sqlite
+        .get_all_nodes(["title"])
+        .into_iter()
+        .filter(|[file]| file.contains(&query))
+        .take(10)
+        .map(|e| e[0][1..e[0].len() - 1].to_string())
+        .collect();
+
+    let tan_result = match get_nodes_internal(db, logger, query, 10) {
         Ok(result) => result,
         Err(_) => return Response::empty_404(),
     };
+
+    let result = SearchResult {
+        tantivy: tan_result,
+        sqlite: nodes,
+    };
+
     let json = match serde_json::to_string(&result) {
         Ok(json) => json,
         Err(_) => return Response::empty_404(),

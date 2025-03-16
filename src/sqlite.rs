@@ -192,7 +192,6 @@ impl SqliteConnection {
     }
 }
 
-#[cfg(feature = "42")]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -221,7 +220,8 @@ mod tests {
                 aliases: vec!["t1".to_string()],
                 content: "* title\n content".to_string(),
                 links: vec![],
-                timestamps: Timestamps::default(),
+                parent: None,
+                timestamps: None,
                 refs: Vec::new(),
             }
         )

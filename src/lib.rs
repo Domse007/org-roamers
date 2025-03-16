@@ -1,11 +1,12 @@
-mod logger;
+pub mod database;
+mod latex;
+pub mod logger;
 mod migrate;
 pub mod org;
-mod server;
-mod latex;
+//mod export;
 pub mod parser;
+pub mod server;
 pub mod sqlite;
-pub mod database;
 
 emacs::plugin_is_GPL_compatible!();
 
@@ -79,6 +80,13 @@ pub fn init(_: &Env) -> Result<()> {
 //TODO: use path.
 #[defun]
 pub fn prepare(logger: &Env, path: String, sqlite_db_path: String) -> emacs::Result<()> {
+    prepare_internal(logger, path, sqlite_db_path)
+}
+pub fn prepare_internal(
+    logger: impl Logger,
+    path: String,
+    sqlite_db_path: String,
+) -> emacs::Result<()> {
     let path = Path::new(&path);
 
     let path = if path.is_file() {
@@ -175,20 +183,21 @@ pub struct GetNodesResultWrapper {
 
 #[defun]
 pub fn get_nodes(_logger: &Env, search: String, num_results: usize) -> Result<String> {
-    let results = get_nodes_internal(_logger, search, num_results)?;
+    let db = &DB;
+    let mut db = db.lock().unwrap();
+    let db = db.as_mut().unwrap();
+    
+    let results = get_nodes_internal(db, _logger, search, num_results)?;
 
     Ok(serde_json::to_string(&results)?)
 }
 
 fn get_nodes_internal(
+    db: &mut Global,
     _logger: impl Logger,
     search: String,
     num_results: usize,
 ) -> Result<GetNodesResultWrapper> {
-    let db = &DB;
-    let mut db = db.lock().unwrap();
-    let db = db.as_mut().unwrap();
-
     let reader = db.index.reader()?;
 
     let searcher = reader.searcher();

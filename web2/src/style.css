@@ -16,6 +16,7 @@
   --string: var(--text);
   --ident: #a6d189;
   --comment: #626880;
+  --type: #ca9ee6;
 }
 
 body {
@@ -113,6 +114,10 @@ pre:has(.hljs) {
 
 .hljs-comment {
   color: var(--comment) !important;
+}
+
+.hljs-type {
+  color: var(--type);
 }
 
 .src {

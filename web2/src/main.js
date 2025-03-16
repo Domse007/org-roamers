@@ -170,8 +170,11 @@ const InputHandler = (event) => {
   searchSuggestion.innerHTML = "";
   search(query).then((res) => {
     console.log(res);
-    res["results"].forEach((e) => {
+    res.tantivy["results"].forEach((e) => {
       searchSuggestion.innerHTML += `<div class="suggestion" style="padding: 5px; cursor: pointer;">${e.title}</div>`;
+    })
+    res.sqlite.forEach((e) => {
+      searchSuggestion.innerHTML += `<div class="suggestion" style="padding: 5px; cursor: pointer;">${e}</div>`;
     })
     updateSuggestions();
   })
