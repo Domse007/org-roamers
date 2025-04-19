@@ -19,7 +19,9 @@ use tantivy::TantivyDocument;
 
 use crate::get_nodes_internal;
 use crate::latex;
+use crate::sqlite::SqliteConnection;
 use crate::GetNodesResultWrapper;
+use crate::Global;
 use crate::DB;
 
 pub static WEBSERVER: Mutex<Option<(JoinHandle<()>, Sender<()>)>> = Mutex::new(None);
@@ -186,23 +188,43 @@ fn search(query: String) -> Response {
 
 #[derive(Serialize)]
 struct GraphData {
-    nodes: Vec<(String, String)>,
+    /// The tuple is (id, title, parent)
+    nodes: Vec<(String, String, String)>,
     edges: Vec<(String, String)>,
 }
 
 fn get_graph_data() -> Response {
     let db = &DB;
     let mut db = db.lock().unwrap();
-    let db = db.as_mut().unwrap();
+    let mut db = db.as_mut().unwrap();
+
+    let mut olp = |s: String, db: &mut Global| {
+        (!s.is_empty())
+            .then(|| {
+                SqliteConnection::parse_olp(s)
+                    .unwrap_or_default()
+                    .pop()
+                    .unwrap_or_default()
+            })
+            .map(|parent| db.sqlite.get_id_by_title(parent.as_str()))
+            .unwrap_or_default()
+            .unwrap_or_default()
+    };
 
     let nodes = db
         .sqlite
-        .get_all_nodes(["id", "title"])
+        .get_all_nodes(["id", "title", "olp"])
         .into_iter()
-        .map(|e| (e[0].to_string(), e[1].to_string()))
-        .collect::<Vec<(String, String)>>();
+        .map(|e| (e[0].to_string(), e[1].to_string(), olp(e[2].to_string(), &mut db)))
+        .collect::<Vec<(String, String, String)>>();
 
-    let edges = db.sqlite.get_all_links();
+    let mut edges = db.sqlite.get_all_links();
+
+    for node in &nodes {
+        if let Some(parent_id) = db.sqlite.get_parent_for_id(node.0.as_str()) {
+            edges.push((parent_id, node.0.to_string()));
+        }
+    }
 
     Response::json(&serde_json::to_string(&GraphData { nodes, edges }).unwrap())
 }

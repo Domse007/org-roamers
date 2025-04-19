@@ -26,6 +26,59 @@ impl SqliteConnection {
         }
     }
 
+    pub fn get_parent_for_id(&mut self, id: &str) -> Option<String> {
+        let stmnt = format!(
+            "SELECT file, id, level FROM nodes
+             WHERE id = '{}'
+             AND level = 1;",
+            id
+        );
+        let mut stmt = self.connection.prepare(&stmnt).unwrap();
+        let file_for = match stmt
+            .query_map([], |row| {
+                Ok(row.get::<usize, String>(0).unwrap().to_string())
+            })
+            .unwrap()
+            .next()
+        {
+            Some(file) => file.unwrap(),
+            None => return None,
+        };
+
+        let stmnt = format!(
+            "SELECT file, id, level FROM nodes
+             WHERE file = '{}'
+             AND level = 0;",
+            file_for
+        );
+        let mut stmt = self.connection.prepare(&stmnt).unwrap();
+
+        let res = stmt
+            .query_map([], |row| {
+                Ok(row.get::<usize, String>(1).unwrap().to_string())
+            })
+            .unwrap()
+            .next()
+            .map(Result::unwrap);
+        
+        res
+    }
+
+    pub fn get_id_by_title(&mut self, title: &str) -> Option<String> {
+        let stmnt = format!(
+            "SELECT title, id
+             FROM nodes WHERE title = '\"{}\"';",
+            title
+        );
+        let mut stmt = self.connection.prepare(&stmnt).unwrap();
+        let res = stmt
+            .query_map([], |row| Ok(row.get(1).unwrap()))
+            .unwrap()
+            .next()
+            .map(Result::unwrap);
+        res
+    }
+
     /// # Return
     /// It returs Vec of tuples where the first element is the name of the node
     /// pointing to `dest` and the second elemet is the id of the node.
@@ -72,7 +125,7 @@ impl SqliteConnection {
             .query_map([], |row| {
                 let mut curr: [String; PARAMS] = [const { String::new() }; PARAMS];
                 for i in 0..PARAMS {
-                    curr[i] = row.get(i).unwrap();
+                    curr[i] = row.get(i).unwrap_or_default();
                 }
                 Ok(curr)
             })
@@ -152,7 +205,7 @@ impl SqliteConnection {
         }
     }
 
-    pub(super) fn parse_olp(olp: String) -> anyhow::Result<Vec<String>> {
+    pub(crate) fn parse_olp(olp: String) -> anyhow::Result<Vec<String>> {
         let mut parser = Parser::new(&olp);
         let whitespace = |parser: &mut Parser| {
             let mut attempt = parser.attempt();

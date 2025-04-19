@@ -61,6 +61,7 @@ const katexOptions = {
     {left: "\\begin{algorithmic}", right: "\\end{algorithmic}", display: true},
     {left: "\\begin{center}", right: "\\end{center}", display: true},
     {left: "\\begin{tikpicture}", right: "\\end{tikzpicture}", display: true},
+    {left: "\\begin{center}", right: "\\end{center}", display: true },
     {left: "\\[", right: "\\]", display: true}
   ],
   errorCallback: (message, stack) => {
@@ -110,7 +111,7 @@ const updateGraph = () => {
     .then((json) => {
       json["nodes"].forEach((node) => {
 	graph.addNode(node[0], {
-          label: node[1],
+          label: node[1].substring(1, node[1].length - 1),
           x: randomNumber(1, 100),
           y: randomNumber(1, 100),
           size: 10,
@@ -125,6 +126,20 @@ const updateGraph = () => {
           console.log(`${edge[0]}->${edge[1]}: ${error}`);
         }
       });
+      let count = 0;
+      // iterate again to get all parent links
+      json["nodes"].forEach((node) => {
+        if (node[2] != null && node[2].length != 0) {
+          try {
+            count++;
+            // probably broken, because it's not the id of self.
+            graph.addEdge(node[0], node[2], { color: edgeColor });
+          } catch (error) {
+            console.log(`ERROR :: ${node[0]} -> ${node[2]}: ${error}`);
+          }
+        }
+      })
+      console.log(`Counted ${count} olp links.`);
       setupGraph()
     })
 }
