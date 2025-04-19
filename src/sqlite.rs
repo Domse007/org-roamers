@@ -19,11 +19,29 @@ pub struct SqliteConnection {
 }
 
 impl SqliteConnection {
+    const MIN_VERSION: usize = 20;
+
     pub fn init<P: AsRef<Path>>(path: P) -> Option<Self> {
-        match Connection::open(path) {
-            Ok(connection) => Some(Self { connection }),
-            Err(_) => None,
+        let this = match Connection::open(path) {
+            Ok(connection) => Self { connection },
+            Err(_) => return None,
+        };
+
+        let version: usize = this
+            .connection
+            .pragma_query_value(None, "user_version", |row| Ok(row.get_unwrap(0)))
+            .unwrap();
+
+        if version != Self::MIN_VERSION {
+            println!(
+                "ERROR :: DB version does not match: {} (DB) != {} (required)",
+                version,
+                Self::MIN_VERSION
+            );
+            return None;
         }
+
+        Some(this)
     }
 
     pub fn get_parent_for_id(&mut self, id: &str) -> Option<String> {
@@ -60,7 +78,7 @@ impl SqliteConnection {
             .unwrap()
             .next()
             .map(Result::unwrap);
-        
+
         res
     }
 
