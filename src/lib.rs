@@ -22,7 +22,7 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use emacs::{defun, Env, Result};
-use tantivy::{doc, schema, Index, IndexWriter};
+use tantivy::{doc, Index, IndexWriter};
 use tantivy::{schema::*, DocAddress, Score};
 
 struct Global {

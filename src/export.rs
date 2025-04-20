@@ -25,7 +25,7 @@ enum TableRow {
 }
 
 impl HtmlExport {
-    pub fn finish(mut self) -> String {
+    pub fn finish(self) -> String {
         self.output
     }
 }

@@ -20,7 +20,7 @@ pub fn start(env: &Env, path: String) -> emacs::Result<()> {
 pub fn start_internal(
     logger: impl Logger,
     db: &mut Global,
-    path: &Path,
+    _path: &Path,
 ) -> Result<(), Box<dyn Error>> {
     let rows = db.sqlite.get_all_nodes(["title", "id", "file"]);
 

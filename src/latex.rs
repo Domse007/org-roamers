@@ -6,7 +6,6 @@ use std::{
 };
 
 use anyhow::bail;
-use tempfile::TempDir;
 
 use crate::org;
 

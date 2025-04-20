@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::Path, str::Chars};
+use std::{collections::HashMap, path::Path};
 
 use rusqlite::Connection;
 

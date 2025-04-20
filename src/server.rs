@@ -1,7 +1,4 @@
-use std::fs::read_to_string;
 use std::fs::File;
-use std::io::Read;
-use std::path::Path;
 use std::path::PathBuf;
 use std::sync::mpsc::Sender;
 use std::sync::Mutex;
@@ -12,10 +9,6 @@ use emacs::Result;
 use orgize::Org;
 use rouille::{router, Response, Server};
 use serde::Serialize;
-use tantivy::collector::TopDocs;
-use tantivy::query::QueryParser;
-use tantivy::schema::Value;
-use tantivy::TantivyDocument;
 
 use crate::export::HtmlExport;
 use crate::get_nodes_internal;
@@ -126,7 +119,7 @@ fn get_org_as_html(name: String) -> Response {
     let mut db = db.lock().unwrap();
     let db = db.as_mut().unwrap();
 
-    let [_title, id, file] = match db
+    let [_title, _id, file] = match db
         .sqlite
         .get_all_nodes(["title", "id", "file"])
         .into_iter()
@@ -200,7 +193,7 @@ fn get_graph_data() -> Response {
     let mut db = db.lock().unwrap();
     let mut db = db.as_mut().unwrap();
 
-    let mut olp = |s: String, db: &mut Global| {
+    let olp = |s: String, db: &mut Global| {
         (!s.is_empty())
             .then(|| {
                 SqliteConnection::parse_olp(s)
