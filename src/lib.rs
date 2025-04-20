@@ -3,7 +3,7 @@ mod latex;
 pub mod logger;
 mod migrate;
 pub mod org;
-// mod export;
+mod export;
 pub mod parser;
 pub mod server;
 pub mod sqlite;

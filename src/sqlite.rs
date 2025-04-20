@@ -1,4 +1,4 @@
-use std::{path::Path, str::Chars};
+use std::{collections::HashMap, path::Path, str::Chars};
 
 use rusqlite::Connection;
 
@@ -42,6 +42,54 @@ impl SqliteConnection {
         }
 
         Some(this)
+    }
+
+    pub fn get_links_from(&mut self, id: &str) -> HashMap<String, String> {
+        let stmnt = format!(
+            "SELECT DISTINCT source, dest FROM links
+             WHERE source = '{}';",
+            id
+        );
+
+        let links = {
+            let mut stmt = self.connection.prepare(&stmnt).unwrap();
+            stmt.query_map([], |row| {
+                Ok((
+                    row.get::<usize, String>(0).unwrap(),
+                    row.get::<usize, String>(1).unwrap(),
+                ))
+            })
+            .unwrap()
+            .map(Result::unwrap)
+            .collect::<Vec<(String, String)>>()
+        };
+
+        println!("Got elements {}", links.len());
+
+        let mut hm = HashMap::new();
+
+        for (source, dest) in links {
+            let dest = dest.to_string();
+            let name = self.get_name_by_id(&dest).unwrap_or(dest);
+            hm.insert(source, name);
+        }
+
+        hm
+    }
+
+    pub fn get_name_by_id(&mut self, id: &str) -> Option<String> {
+        let stmnt = format!(
+            "SELECT id, title FROM nodes
+             WHERE id = '{id}';"
+        );
+        let mut stmt = self.connection.prepare(&stmnt).unwrap();
+        let res = stmt
+            .query_map([], |row| Ok(row.get(1).unwrap()))
+            .unwrap()
+            .map(Result::unwrap)
+            .next();
+
+        res
     }
 
     pub fn get_parent_for_id(&mut self, id: &str) -> Option<String> {

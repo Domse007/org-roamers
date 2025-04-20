@@ -44,8 +44,32 @@ a {
   color: var(--text);
 }
 
+#org-preview-title {
+  color: var(--highlight);
+  text-align: center;
+}
+
+#org-preview-footer {
+  background-color: var(--base);
+  border-radius: 5px;
+  padding: 5px;
+}
+
+.org-preview-footer-element {
+  cursor: pointer;
+  margin-bottom: 5px;
+}
+
 h1, h2, h3, h4 {
   color: var(--highlight-2);
+}
+
+hr {
+  color: var(--highlight);
+}
+
+.center {
+  text-align: center;
 }
 
 #search-wrapper {

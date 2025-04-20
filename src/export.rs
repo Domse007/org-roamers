@@ -1,8 +1,18 @@
-use orgize::{export::{Container, Event, TraversalContext, Traverser}, rowan::NodeOrToken, SyntaxKind};
+use std::cmp::min;
+use std::fmt::Write;
 
+use orgize::rowan::ast::AstNode;
+use orgize::{
+    export::{Container, Event, HtmlEscape, TraversalContext, Traverser},
+    rowan::NodeOrToken,
+    SyntaxKind,
+};
+
+#[derive(Default)]
 pub struct HtmlExport {
     output: String,
-    
+    table_row: TableRow,
+    in_descriptive_list: Vec<bool>,
 }
 
 #[derive(Default, PartialEq, Eq)]
@@ -14,10 +24,25 @@ enum TableRow {
     Body,
 }
 
+impl HtmlExport {
+    pub fn finish(mut self) -> String {
+        self.output
+    }
+}
+
 impl Traverser for HtmlExport {
     fn event(&mut self, event: Event, ctx: &mut TraversalContext) {
         match event {
-            Event::Enter(Container::Document(_)) => self.output += "<main>",
+            Event::Enter(Container::Document(document)) => {
+                self.output += "<main>";
+                if let Some(title) = document.title() {
+                    let _ = write!(
+                        &mut self.output,
+                        r#"<h1 id="org-preview-title">{}</h1>"#,
+                        title
+                    );
+                }
+            }
             Event::Leave(Container::Document(_)) => self.output += "</main>",
 
             Event::Enter(Container::Headline(headline)) => {
@@ -202,12 +227,21 @@ impl Traverser for HtmlExport {
                 let path = link.path();
                 let path = path.trim_start_matches("file:");
 
+                if link.path().starts_with("id:") {
+                    let id = link.path().trim_start_matches("id:").to_string();
+                    let _ = write!(
+                        &mut self.output,
+                        r#"<a id="{}" class="org-preview-id-link">"#,
+                        HtmlEscape(&id),
+                    );
+                } else {
+                    let _ = write!(&mut self.output, r#"<a href="{}">"#, HtmlEscape(&path));
+                }
+
                 if link.is_image() {
                     let _ = write!(&mut self.output, r#"<img src="{}">"#, HtmlEscape(&path));
                     return ctx.skip();
                 }
-
-                let _ = write!(&mut self.output, r#"<a href="{}">"#, HtmlEscape(&path));
 
                 if !link.has_description() {
                     let _ = write!(&mut self.output, "{}</a>", HtmlEscape(&path));
@@ -232,7 +266,7 @@ impl Traverser for HtmlExport {
 
             Event::Timestamp(timestamp) => {
                 self.output += r#"<span class="timestamp-wrapper"><span class="timestamp">"#;
-                for e in timestamp.syntax.children_with_tokens() {
+                for e in timestamp.syntax().children_with_tokens() {
                     match e {
                         NodeOrToken::Token(t) if t.kind() == SyntaxKind::MINUS2 => {
                             self.output += "&#x2013;";

@@ -17,6 +17,7 @@ use tantivy::query::QueryParser;
 use tantivy::schema::Value;
 use tantivy::TantivyDocument;
 
+use crate::export::HtmlExport;
 use crate::get_nodes_internal;
 use crate::latex;
 use crate::sqlite::SqliteConnection;
@@ -125,7 +126,7 @@ fn get_org_as_html(name: String) -> Response {
     let mut db = db.lock().unwrap();
     let db = db.as_mut().unwrap();
 
-    let [_title, _id, file] = match db
+    let [_title, id, file] = match db
         .sqlite
         .get_all_nodes(["title", "id", "file"])
         .into_iter()
@@ -142,9 +143,10 @@ fn get_org_as_html(name: String) -> Response {
         Err(_) => return Response::text("Could not get file contents."),
     };
 
-    let mut html = Org::parse(contents).to_html();
+    let mut handler = HtmlExport::default();
+    Org::parse(contents).traverse(&mut handler);
 
-    Response::text(html)
+    Response::text(handler.finish())
 }
 
 #[derive(Serialize)]

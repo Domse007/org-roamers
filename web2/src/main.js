@@ -91,7 +91,41 @@ export const preview = (name) => {
       document.getElementById('org-preview').innerHTML = html;
       renderMathInElement(document.getElementById('org-preview'), katexOptions);
       syntaxHighlightSite();
-    });	  
+
+      // Prepare footer for setupLinksFooter because of async dependencies...
+      document.getElementById('org-preview').innerHTML += "<div id='org-preview-footer'></div>";
+    }).then((_) => {
+      setupLinks();
+      setupLinksFooter();
+    });
+};
+
+const setupLinksFooter = () => {
+  let pre = document.getElementById('org-preview-footer');
+  console.log(`element: ${pre.innerHTML}`);
+
+  Array.from(document.getElementsByClassName('org-preview-id-link'))
+    .forEach((elem) => {
+      pre.innerHTML += `<div class="org-preview-footer-element"><a>${elem.innerHTML}</a></div>`;
+    });
+
+  setTimeout(() => {
+    Array.from(document.getElementsByClassName('org-preview-footer-element'))
+      .forEach((elem) => elem.addEventListener('click', (event) => {
+        console.log(`Trying to open ${event.target.innerHTML}`);
+        preview(event.target.innerHTML);
+      }));   
+  }, 1000);
+};
+
+const setupLinks = () => {
+  setTimeout(() => {
+    Array.from(document.getElementsByClassName('org-preview-id-link'))
+      .forEach((elem) => elem.addEventListener('click', (elem) => {
+        console.log(`Trying to open ${elem.target.innerHTML}`);
+        preview(elem.target.innerHTML);
+      }));
+   }, 1000);
 };
 
 const randomNumber = (min, max) => Math.random() * (max - min) + min;
@@ -114,7 +148,7 @@ const updateGraph = () => {
           label: node[1].substring(1, node[1].length - 1),
           x: randomNumber(1, 100),
           y: randomNumber(1, 100),
-          size: 10,
+          size: 5,
           color: nodeColor,
           borderColor: nodeBorderColor,
         });
