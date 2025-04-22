@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{log, org, Global, Logger, DB};
+use crate::{log, org, Global, Logger};
 
 pub fn start_internal(
     logger: impl Logger,

@@ -49,14 +49,20 @@ fn main() -> Result<ExitCode> {
         serve_latex_svg: server::get_latex_svg,
     };
 
-    prepare_internal(
+    let global = prepare_internal(
         logger,
         configuration.roam_path.as_str(),
         configuration.sqlite_path.as_str(),
     )
     .unwrap();
 
-    let runtime = start_server(configuration.get_url(false), "web/".to_string(), calls).unwrap();
+    let runtime = start_server(
+        configuration.get_url(false),
+        "web/".to_string(),
+        calls,
+        global,
+    )
+    .unwrap();
 
     println!("Starting CLI...");
 

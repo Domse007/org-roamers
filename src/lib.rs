@@ -24,7 +24,7 @@ use std::sync::Mutex;
 use tantivy::{doc, Index, IndexWriter};
 use tantivy::{schema::*, DocAddress, Score};
 
-struct Global {
+pub struct Global {
     _tempdir: TempDir,
     schema: Schema,
     index_writer: IndexWriter,
@@ -35,13 +35,15 @@ struct Global {
 
 const INDEX_WRITER_SIZE: usize = 50_000_000;
 
-static DB: Mutex<Option<Global>> = Mutex::new(None);
-
 pub fn init_tantivy(
     logger: impl Logger,
     path: Option<&Path>,
 ) -> Result<(TempDir, Schema, IndexWriter, Index), Box<dyn Error>> {
-    log!(logger, "Working in {}", std::env::current_dir().unwrap().display());
+    log!(
+        logger,
+        "Working in {}",
+        std::env::current_dir().unwrap().display()
+    );
 
     let index_path = match path {
         Some(path) => TempDir::new_in(path),
@@ -75,7 +77,7 @@ pub fn prepare_internal(
     logger: impl Logger,
     path: &str,
     sqlite_db_path: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<Global, Box<dyn std::error::Error>> {
     let path = Path::new(&path);
 
     let path = if path.is_file() {
@@ -89,30 +91,22 @@ pub fn prepare_internal(
         None
     };
 
-    if DB.lock().unwrap().is_none() {
-        let (tempdir, schema, indexwriter, index) = match init_tantivy(logger, path) {
-            Ok(env) => env,
-            Err(err) => {
-                return Err(format!("ERROR: could not initialize tantivy: {:?}", err).into())
-            }
-        };
-        let sqlite_con = match SqliteConnection::init(sqlite_db_path) {
-            Some(con) => con,
-            None => return Err("ERROR: could not initialize the sqlite connection".into()),
-        };
+    let (tempdir, schema, indexwriter, index) = match init_tantivy(logger, path) {
+        Ok(env) => env,
+        Err(err) => return Err(format!("ERROR: could not initialize tantivy: {:?}", err).into()),
+    };
+    let sqlite_con = match SqliteConnection::init(sqlite_db_path) {
+        Some(con) => con,
+        None => return Err("ERROR: could not initialize the sqlite connection".into()),
+    };
 
-        let db = &DB;
-        let mut access = db.lock().unwrap();
-        *access = Some(Global {
-            _tempdir: tempdir,
-            index_writer: indexwriter,
-            index,
-            schema,
-            sqlite: sqlite_con,
-        });
-    }
-
-    Ok(())
+    Ok(Global {
+        _tempdir: tempdir,
+        index_writer: indexwriter,
+        index,
+        schema,
+        sqlite: sqlite_con,
+    })
 }
 
 fn add_node_internal(

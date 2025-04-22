@@ -3,6 +3,7 @@ use std::error::Error;
 use std::fs::File;
 use std::path::PathBuf;
 use std::sync::mpsc::Sender;
+use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread::JoinHandle;
 
@@ -17,7 +18,6 @@ use crate::latex;
 use crate::sqlite::SqliteConnection;
 use crate::GetNodesResultWrapper;
 use crate::Global;
-use crate::DB;
 
 pub struct ServerRuntime {
     handle: JoinHandle<()>,
@@ -35,32 +35,37 @@ pub fn start_server(
     url: String,
     root: String,
     calls: APICalls,
+    _global: Global,
 ) -> Result<ServerRuntime, Box<dyn Error>> {
     let root: &'static str = Box::leak(Box::new(root));
 
+    let lock = Arc::new(Mutex::new(_global));
+
     let server = Server::new(url, move |request| {
+        let mut global = lock.lock().unwrap();
         router!(request,
             (GET) (/)  => {
-                (calls.default_route)(root.to_string(), None)
+                (calls.default_route)(&mut global, root.to_string(), None)
             },
             (GET) (/org) => {
                 match request.get_param("title") {
-                    Some(title) => (calls.get_org_as_html)(title),
+                    Some(title) => (calls.get_org_as_html)(&mut global, title),
                     None => Response::empty_404(),
                 }
             },
             (GET) (/search) => {
                 match request.get_param("q") {
-                    Some(query) => (calls.serve_search_results)(query),
+                    Some(query) => (calls.serve_search_results)(&mut global, query),
                     None => Response::empty_404(),
                 }
             },
             (GET) (/graph) => {
-                get_graph_data()
+                get_graph_data(&mut global)
             },
             (GET) (/latex) => {
                 match request.get_param("tex") {
                     Some(tex) => (calls.serve_latex_svg)(
+                        &mut global,
                         tex,
                         request.get_param("color").unwrap(),
                         request.get_param("title").unwrap(),
@@ -68,7 +73,7 @@ pub fn start_server(
                     None => Response::empty_404(),
                 }
             },
-            _ => (calls.default_route)(root.to_string(), Some(request.url()))
+            _ => (calls.default_route)(&mut global, root.to_string(), Some(request.url()))
         )
     })
     .unwrap();
@@ -78,7 +83,7 @@ pub fn start_server(
     Ok(ServerRuntime { handle, sender })
 }
 
-pub fn default_route_content(root: String, url: Option<String>) -> Response {
+pub fn default_route_content(db: &mut Global, root: String, url: Option<String>) -> Response {
     let mut path = PathBuf::from(root);
 
     match url {
@@ -104,11 +109,7 @@ pub fn default_route_content(root: String, url: Option<String>) -> Response {
     Response::from_file(mime, file)
 }
 
-pub fn get_org_as_html(name: String) -> Response {
-    let db = &DB;
-    let mut db = db.lock().unwrap();
-    let db = db.as_mut().unwrap();
-
+pub fn get_org_as_html(db: &mut Global, name: String) -> Response {
     let [_title, _id, file] = match db
         .sqlite
         .get_all_nodes(["title", "id", "file"])
@@ -138,11 +139,8 @@ struct SearchResult {
     sqlite: Vec<String>,
 }
 
-pub fn search(query: String) -> Response {
+pub fn search(db: &mut Global, query: String) -> Response {
     let logger = crate::logger::StdOutLogger;
-    let db = &DB;
-    let mut db = db.lock().unwrap();
-    let db = db.as_mut().unwrap();
 
     let nodes = db
         .sqlite
@@ -178,11 +176,7 @@ pub struct GraphData {
     edges: Vec<(String, String)>,
 }
 
-pub fn get_graph_data() -> Response {
-    let db = &DB;
-    let mut db = db.lock().unwrap();
-    let mut db = db.as_mut().unwrap();
-
+pub fn get_graph_data(mut db: &mut Global) -> Response {
     let olp = |s: String, db: &mut Global| {
         (!s.is_empty())
             .then(|| {
@@ -220,11 +214,7 @@ pub fn get_graph_data() -> Response {
     Response::json(&serde_json::to_string(&GraphData { nodes, edges }).unwrap())
 }
 
-pub fn get_latex_svg(tex: String, color: String, title: String) -> Response {
-    let db = &DB;
-    let mut db = db.lock().unwrap();
-    let db = db.as_mut().unwrap();
-
+pub fn get_latex_svg(db: &mut Global, tex: String, color: String, title: String) -> Response {
     let node = db
         .sqlite
         .get_all_nodes(["file", "title"])
