@@ -83,7 +83,7 @@ pub fn start_server(
     Ok(ServerRuntime { handle, sender })
 }
 
-pub fn default_route_content(db: &mut Global, root: String, url: Option<String>) -> Response {
+pub fn default_route_content(_db: &mut Global, root: String, url: Option<String>) -> Response {
     let mut path = PathBuf::from(root);
 
     match url {

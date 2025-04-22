@@ -2,7 +2,6 @@ pub mod api;
 pub mod database;
 mod export;
 mod latex;
-mod migrate;
 pub mod org;
 pub mod parser;
 pub mod server;
