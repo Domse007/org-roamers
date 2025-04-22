@@ -1,10 +1,10 @@
 mod cli;
 mod conf;
 
-use crate::cli::run_cli;
 use std::{env, panic, process::ExitCode};
 
 use anyhow::Result;
+use cli::run_cli_server;
 use conf::Configuration;
 use org_roamers::{
     api::APICalls,
@@ -71,7 +71,7 @@ fn main() -> Result<ExitCode> {
 
     info!("Starting CLI...");
 
-    run_cli(&configuration, runtime);
+    run_cli_server(&configuration, runtime);
 
     Ok(ExitCode::SUCCESS)
 }

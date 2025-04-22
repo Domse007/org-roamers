@@ -1,3 +1,6 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
 pub struct Configuration {
     pub sqlite_path: String,
     pub roam_path: String,
