@@ -10,6 +10,7 @@ use orgize::Org;
 use rouille::{router, Response, Server};
 use serde::Serialize;
 
+use crate::api::APICalls;
 use crate::export::HtmlExport;
 use crate::get_nodes_internal;
 use crate::latex;
@@ -20,8 +21,7 @@ use crate::DB;
 
 pub static WEBSERVER: Mutex<Option<(JoinHandle<()>, Sender<()>)>> = Mutex::new(None);
 
-#[defun]
-pub fn start_server(url: String, root: String) -> Result<()> {
+pub fn start_server(url: String, root: String, calls: APICalls) -> Result<()> {
     if WEBSERVER.lock().unwrap().is_some() {
         return Err(emacs::Error::msg("Server already running."));
     }
@@ -31,17 +31,17 @@ pub fn start_server(url: String, root: String) -> Result<()> {
     let server = Server::new(url, move |request| {
         router!(request,
             (GET) (/)  => {
-                default_route_content(root, None)
+                (calls.default_route)(root.to_string(), None)
             },
             (GET) (/org) => {
                 match request.get_param("title") {
-                    Some(title) => get_org_as_html(title),
+                    Some(title) => (calls.get_org_as_html)(title),
                     None => Response::empty_404(),
                 }
             },
             (GET) (/search) => {
                 match request.get_param("q") {
-                    Some(query) => search(query),
+                    Some(query) => (calls.serve_search_results)(query),
                     None => Response::empty_404(),
                 }
             },
@@ -50,7 +50,7 @@ pub fn start_server(url: String, root: String) -> Result<()> {
             },
             (GET) (/latex) => {
                 match request.get_param("tex") {
-                    Some(tex) => get_latex_svg(
+                    Some(tex) => (calls.serve_latex_svg)(
                         tex,
                         request.get_param("color").unwrap(),
                         request.get_param("title").unwrap(),
@@ -58,7 +58,7 @@ pub fn start_server(url: String, root: String) -> Result<()> {
                     None => Response::empty_404(),
                 }
             },
-            _ => default_route_content(root, Some(request.url()))
+            _ => (calls.default_route)(root.to_string(), Some(request.url()))
         )
     })
     .unwrap();
@@ -88,7 +88,7 @@ fn stop_server() -> Result<()> {
     Ok(())
 }
 
-fn default_route_content(root: &str, url: Option<String>) -> Response {
+pub fn default_route_content(root: String, url: Option<String>) -> Response {
     let mut path = PathBuf::from(root);
 
     match url {
@@ -114,7 +114,7 @@ fn default_route_content(root: &str, url: Option<String>) -> Response {
     Response::from_file(mime, file)
 }
 
-fn get_org_as_html(name: String) -> Response {
+pub fn get_org_as_html(name: String) -> Response {
     let db = &DB;
     let mut db = db.lock().unwrap();
     let db = db.as_mut().unwrap();
@@ -148,7 +148,7 @@ struct SearchResult {
     sqlite: Vec<String>,
 }
 
-fn search(query: String) -> Response {
+pub fn search(query: String) -> Response {
     let logger = crate::logger::StdOutLogger;
     let db = &DB;
     let mut db = db.lock().unwrap();
@@ -182,13 +182,13 @@ fn search(query: String) -> Response {
 }
 
 #[derive(Serialize)]
-struct GraphData {
+pub struct GraphData {
     /// The tuple is (id, title, parent)
     nodes: Vec<(String, String, String)>,
     edges: Vec<(String, String)>,
 }
 
-fn get_graph_data() -> Response {
+pub fn get_graph_data() -> Response {
     let db = &DB;
     let mut db = db.lock().unwrap();
     let mut db = db.as_mut().unwrap();
@@ -224,7 +224,7 @@ fn get_graph_data() -> Response {
     Response::json(&serde_json::to_string(&GraphData { nodes, edges }).unwrap())
 }
 
-fn get_latex_svg(tex: String, color: String, title: String) -> Response {
+pub fn get_latex_svg(tex: String, color: String, title: String) -> Response {
     let db = &DB;
     let mut db = db.lock().unwrap();
     let db = db.as_mut().unwrap();

@@ -7,6 +7,7 @@ mod export;
 pub mod parser;
 pub mod server;
 pub mod sqlite;
+pub mod api;
 
 emacs::plugin_is_GPL_compatible!();
 
