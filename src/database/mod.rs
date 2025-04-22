@@ -1,15 +1,15 @@
 //! # Database
 
 // TODO: Access control?
-pub mod store;
 pub mod datamodel;
 pub mod embeddings;
+pub mod store;
 
 use std::hash::Hash;
 
-use store::Store;
 use anyhow::Result;
 use datamodel::*;
+use store::Store;
 
 use crate::org::NodeFromOrg;
 
@@ -27,7 +27,7 @@ fn hash<T: Hash>(t: &T) -> u64 {
 impl Database {
     pub fn new() -> Result<Self> {
         Ok(Self {
-            store: Store::new()?
+            store: Store::new()?,
         })
     }
 
@@ -71,10 +71,14 @@ impl Database {
         }
         let aliasids: Vec<u64> = aliasids.iter().map(|(_, id)| *id).collect();
 
-        let linkids: Vec<(u64, u64, u64)> = node.links.iter().map(|(src, dst)| {
-            let link = format!("{src}-{dst}");
-            (hash(src), hash(dst), hash(&link))
-        }).collect();
+        let linkids: Vec<(u64, u64, u64)> = node
+            .links
+            .iter()
+            .map(|(src, dst)| {
+                let link = format!("{src}-{dst}");
+                (hash(src), hash(dst), hash(&link))
+            })
+            .collect();
         for (srcid, dstid, linkid) in linkids.iter() {
             let srcid = *srcid;
             let dstid = *dstid;

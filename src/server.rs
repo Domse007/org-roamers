@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::error::Error;
 use std::fs::File;
 use std::path::PathBuf;
@@ -18,13 +19,23 @@ use crate::GetNodesResultWrapper;
 use crate::Global;
 use crate::DB;
 
-pub static WEBSERVER: Mutex<Option<(JoinHandle<()>, Sender<()>)>> = Mutex::new(None);
+pub struct ServerRuntime {
+    handle: JoinHandle<()>,
+    sender: Sender<()>,
+}
 
-pub fn start_server(url: String, root: String, calls: APICalls) -> Result<(), Box<dyn Error>> {
-    if WEBSERVER.lock().unwrap().is_some() {
-        return Err("Server already running.".into());
+impl ServerRuntime {
+    pub fn graceful_shutdown(self) -> Result<(), Box<dyn Any + Send>> {
+        self.sender.send(()).unwrap();
+        self.handle.join()
     }
+}
 
+pub fn start_server(
+    url: String,
+    root: String,
+    calls: APICalls,
+) -> Result<ServerRuntime, Box<dyn Error>> {
     let root: &'static str = Box::leak(Box::new(root));
 
     let server = Server::new(url, move |request| {
@@ -62,28 +73,9 @@ pub fn start_server(url: String, root: String, calls: APICalls) -> Result<(), Bo
     })
     .unwrap();
 
-    let ctx = server.stoppable();
+    let (handle, sender) = server.stoppable();
 
-    let mut ws = WEBSERVER.lock().unwrap();
-    *ws = Some(ctx);
-
-    Ok(())
-}
-
-fn stop_server() -> Result<(), Box<dyn Error>> {
-    if WEBSERVER.lock().unwrap().is_none() {
-        return Err("No server is running.".into());
-    }
-
-    let mut server = WEBSERVER.lock().unwrap();
-
-    let (handle, sender) = server.take().unwrap();
-
-    sender.send(()).unwrap();
-
-    handle.join().unwrap();
-
-    Ok(())
+    Ok(ServerRuntime { handle, sender })
 }
 
 pub fn default_route_content(root: String, url: Option<String>) -> Response {

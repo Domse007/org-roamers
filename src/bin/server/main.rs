@@ -1,6 +1,11 @@
-use std::{env, process::ExitCode, time::Duration};
+mod cli;
+mod conf;
+
+use crate::cli::run_cli;
+use std::{env, process::ExitCode};
 
 use anyhow::Result;
+use conf::Configuration;
 use org_roamers::{
     api::APICalls,
     prepare_internal,
@@ -29,6 +34,13 @@ fn main() -> Result<ExitCode> {
         }
     };
 
+    let configuration = Configuration {
+        sqlite_path: sqlite_path.to_string(),
+        roam_path: path.to_string(),
+        ip_addr: "localhost".to_string(),
+        port: 5000,
+    };
+
     let calls = APICalls {
         default_route: server::default_route_content,
         get_graph_data: server::get_graph_data,
@@ -37,11 +49,18 @@ fn main() -> Result<ExitCode> {
         serve_latex_svg: server::get_latex_svg,
     };
 
-    prepare_internal(logger, path.to_string(), sqlite_path.to_string()).unwrap();
+    prepare_internal(
+        logger,
+        configuration.roam_path.as_str(),
+        configuration.sqlite_path.as_str(),
+    )
+    .unwrap();
 
-    start_server("localhost:5000".to_string(), "web/".to_string(), calls).unwrap();
+    let runtime = start_server(configuration.get_url(false), "web/".to_string(), calls).unwrap();
 
-    std::thread::sleep(Duration::from_secs(100000));
+    println!("Starting CLI...");
+
+    run_cli(&configuration, runtime);
 
     Ok(ExitCode::SUCCESS)
 }

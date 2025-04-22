@@ -28,7 +28,15 @@ pub struct Node {
 }
 
 impl Node {
-    pub fn from_orgnode(id: Key, org: NodeFromOrg, tags: Vec<u64>, links: Vec<u64>, refrs: Vec<u64>, aliases: Vec<u64>, fileId: u64) -> Self {
+    pub fn from_orgnode(
+        id: Key,
+        org: NodeFromOrg,
+        tags: Vec<u64>,
+        links: Vec<u64>,
+        refrs: Vec<u64>,
+        aliases: Vec<u64>,
+        fileId: u64,
+    ) -> Self {
         Self {
             id,
             uuid: org.uuid,
@@ -42,7 +50,7 @@ impl Node {
             tags,
             links,
             refrs,
-            aliases
+            aliases,
         }
     }
 }
@@ -58,7 +66,9 @@ pub struct Reference {
 impl Reference {
     pub fn new(id: Key, refref: String, reftype: String) -> Self {
         Self {
-            id, refref, reftype
+            id,
+            refref,
+            reftype,
         }
     }
 }
@@ -72,9 +82,7 @@ pub struct File {
 
 impl File {
     pub fn with_hash(id: Key, path: PathBuf, hash: String) -> Self {
-        Self {
-            id, path, hash
-        }
+        Self { id, path, hash }
     }
 }
 
@@ -86,9 +94,7 @@ pub struct Alias {
 
 impl Alias {
     pub fn new(id: Key, text: String) -> Self {
-        Self {
-            id, text
-        }
+        Self { id, text }
     }
 }
 
@@ -104,7 +110,9 @@ impl Link {
     // TODO: Other link types
     pub fn id_to_id(id: Key, src: Key, dst: Key) -> Self {
         Self {
-            id, src, destination: LinkDest::Node(dst)
+            id,
+            src,
+            destination: LinkDest::Node(dst),
         }
     }
 }
@@ -136,8 +144,6 @@ pub struct Tag {
 
 impl Tag {
     pub fn new(id: Key, content: String) -> Self {
-        Self {
-            id, content
-        }
+        Self { id, content }
     }
 }

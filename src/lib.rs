@@ -41,7 +41,7 @@ pub fn init_tantivy(
     logger: impl Logger,
     path: Option<&Path>,
 ) -> Result<(TempDir, Schema, IndexWriter, Index), Box<dyn Error>> {
-    log!(logger, "{}", std::env::current_dir().unwrap().display());
+    log!(logger, "Working in {}", std::env::current_dir().unwrap().display());
 
     let index_path = match path {
         Some(path) => TempDir::new_in(path),
@@ -73,8 +73,8 @@ pub fn init_tantivy(
 
 pub fn prepare_internal(
     logger: impl Logger,
-    path: String,
-    sqlite_db_path: String,
+    path: &str,
+    sqlite_db_path: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let path = Path::new(&path);
 

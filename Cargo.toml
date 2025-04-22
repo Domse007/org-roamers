@@ -27,7 +27,3 @@ debug = 0
 [profile.release]
 lto = true
 codegen-units = 1
-
-[[bin]]
-name = "org-roamers"
-path = "src/bin/main.rs"
