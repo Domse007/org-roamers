@@ -2,24 +2,22 @@ pub mod api;
 pub mod database;
 mod export;
 mod latex;
-pub mod logger;
 mod migrate;
 pub mod org;
 pub mod parser;
 pub mod server;
 pub mod sqlite;
 
-pub use logger::{Logger, StdOutLogger};
 use serde::Serialize;
 use sqlite::SqliteConnection;
 use tantivy::collector::TopDocs;
 use tantivy::query::QueryParser;
 use tempfile::TempDir;
+use tracing::info;
 
 use std::error::Error;
 use std::fs;
 use std::path::Path;
-use std::sync::Mutex;
 
 use tantivy::{doc, Index, IndexWriter};
 use tantivy::{schema::*, DocAddress, Score};
@@ -36,22 +34,16 @@ pub struct Global {
 const INDEX_WRITER_SIZE: usize = 50_000_000;
 
 pub fn init_tantivy(
-    logger: impl Logger,
     path: Option<&Path>,
 ) -> Result<(TempDir, Schema, IndexWriter, Index), Box<dyn Error>> {
-    log!(
-        logger,
-        "Working in {}",
-        std::env::current_dir().unwrap().display()
-    );
+    info!("Working in {}", std::env::current_dir().unwrap().display());
 
     let index_path = match path {
         Some(path) => TempDir::new_in(path),
         None => TempDir::new(),
     }?;
 
-    log!(
-        logger,
+    info!(
         "Creating a new temp dir in {:?}",
         index_path.path().as_os_str()
     );
@@ -68,13 +60,12 @@ pub fn init_tantivy(
 
     let index_writer: IndexWriter = index.writer(INDEX_WRITER_SIZE)?;
 
-    log!(logger, "Finished initializing DB.");
+    info!("Finished initializing DB.");
 
     Ok((index_path, schema, index_writer, index))
 }
 
 pub fn prepare_internal(
-    logger: impl Logger,
     path: &str,
     sqlite_db_path: &str,
 ) -> Result<Global, Box<dyn std::error::Error>> {
@@ -91,7 +82,7 @@ pub fn prepare_internal(
         None
     };
 
-    let (tempdir, schema, indexwriter, index) = match init_tantivy(logger, path) {
+    let (tempdir, schema, indexwriter, index) = match init_tantivy(path) {
         Ok(env) => env,
         Err(err) => return Err(format!("ERROR: could not initialize tantivy: {:?}", err).into()),
     };
@@ -110,7 +101,6 @@ pub fn prepare_internal(
 }
 
 fn add_node_internal(
-    logger: &impl Logger,
     db: &mut Global,
     title: String,
     id: String,
@@ -130,7 +120,7 @@ fn add_node_internal(
 
     db.index_writer.add_document(document)?;
 
-    log!(logger, "Written document: {}.", &title);
+    info!("Written document: {}.", &title);
 
     db.index_writer.commit()?;
 
@@ -150,7 +140,6 @@ pub struct GetNodesResultWrapper {
 
 fn get_nodes_internal(
     db: &mut Global,
-    _logger: impl Logger,
     search: String,
     num_results: usize,
 ) -> Result<GetNodesResultWrapper, Box<dyn Error>> {

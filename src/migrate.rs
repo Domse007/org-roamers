@@ -3,10 +3,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{log, org, Global, Logger};
+use tracing::info;
+
+use crate::{org, Global};
 
 pub fn start_internal(
-    logger: impl Logger,
     db: &mut Global,
     _path: &Path,
 ) -> Result<(), Box<dyn Error>> {
@@ -17,7 +18,7 @@ pub fn start_internal(
         let [title, id, file] = row;
         let path = PathBuf::from(&file);
 
-        log!(logger, "Adding {} to index: {}", title, file);
+        info!("Adding {} to index: {}", title, file);
 
         if !path.exists() {
             return Err(format!("File '{}' does not exist.", path.to_str().unwrap()).into());
@@ -35,7 +36,7 @@ pub fn start_internal(
         }
 
         if let Some(body) = body {
-            crate::add_node_internal(&logger, db, title, id, body, file)?;
+            crate::add_node_internal(db, title, id, body, file)?;
         } else {
             return Err(format!(
                 "Could not get file contents for: {}",

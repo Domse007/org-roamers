@@ -2,7 +2,7 @@ mod cli;
 mod conf;
 
 use crate::cli::run_cli;
-use std::{env, process::ExitCode};
+use std::{env, panic, process::ExitCode};
 
 use anyhow::Result;
 use conf::Configuration;
@@ -10,18 +10,24 @@ use org_roamers::{
     api::APICalls,
     prepare_internal,
     server::{self, start_server},
-    StdOutLogger,
 };
+use tracing::{error, info};
+use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 fn main() -> Result<ExitCode> {
-    let logger = StdOutLogger;
+    tracing_subscriber::registry()
+        .with(fmt::layer())
+        .try_init()
+        .unwrap();
+
+    panic::set_hook(Box::new(|info| error!("Server paniced with {info}")));
 
     let args = env::args().skip(1).collect::<Vec<String>>();
 
     let path = match args.get(0) {
         Some(path) => path,
         None => {
-            println!("Could not get path");
+            error!("Could not get path");
             return Ok(ExitCode::FAILURE);
         }
     };
@@ -29,7 +35,7 @@ fn main() -> Result<ExitCode> {
     let sqlite_path = match args.get(1) {
         Some(path) => path,
         None => {
-            println!("Could not get sqlite_path.");
+            error!("Could not get sqlite_path.");
             return Ok(ExitCode::FAILURE);
         }
     };
@@ -50,7 +56,6 @@ fn main() -> Result<ExitCode> {
     };
 
     let global = prepare_internal(
-        logger,
         configuration.roam_path.as_str(),
         configuration.sqlite_path.as_str(),
     )
@@ -64,7 +69,7 @@ fn main() -> Result<ExitCode> {
     )
     .unwrap();
 
-    println!("Starting CLI...");
+    info!("Starting CLI...");
 
     run_cli(&configuration, runtime);
 

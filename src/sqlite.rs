@@ -1,6 +1,7 @@
 use std::{collections::HashMap, path::Path};
 
 use rusqlite::Connection;
+use tracing::info;
 
 use crate::{database::datamodel::Timestamps, org::NodeFromOrg, parser::Parser};
 
@@ -64,7 +65,7 @@ impl SqliteConnection {
             .collect::<Vec<(String, String)>>()
         };
 
-        println!("Got elements {}", links.len());
+        info!("Got elements {}", links.len());
 
         let mut hm = HashMap::new();
 

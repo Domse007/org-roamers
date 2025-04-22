@@ -140,8 +140,6 @@ struct SearchResult {
 }
 
 pub fn search(db: &mut Global, query: String) -> Response {
-    let logger = crate::logger::StdOutLogger;
-
     let nodes = db
         .sqlite
         .get_all_nodes(["title"])
@@ -151,7 +149,7 @@ pub fn search(db: &mut Global, query: String) -> Response {
         .map(|e| e[0][1..e[0].len() - 1].to_string())
         .collect();
 
-    let tan_result = match get_nodes_internal(db, logger, query, 10) {
+    let tan_result = match get_nodes_internal(db, query, 10) {
         Ok(result) => result,
         Err(_) => return Response::empty_404(),
     };
