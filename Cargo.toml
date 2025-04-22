@@ -9,7 +9,6 @@ crate-type = ["cdylib", "lib"]
 [dependencies]
 anyhow = "1.0.96"
 arroy = "0.5.0"
-emacs = "0.18.0"
 heed = "0.21.0"
 heed-types = "0.21.0"
 orgize = "0.10.0-alpha.10"

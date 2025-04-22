@@ -1,15 +1,13 @@
+pub mod api;
 pub mod database;
+mod export;
 mod latex;
 pub mod logger;
 mod migrate;
 pub mod org;
-mod export;
 pub mod parser;
 pub mod server;
 pub mod sqlite;
-pub mod api;
-
-emacs::plugin_is_GPL_compatible!();
 
 pub use logger::{Logger, StdOutLogger};
 use serde::Serialize;
@@ -18,11 +16,11 @@ use tantivy::collector::TopDocs;
 use tantivy::query::QueryParser;
 use tempfile::TempDir;
 
+use std::error::Error;
 use std::fs;
 use std::path::Path;
 use std::sync::Mutex;
 
-use emacs::{defun, Env, Result};
 use tantivy::{doc, Index, IndexWriter};
 use tantivy::{schema::*, DocAddress, Score};
 
@@ -42,7 +40,7 @@ static DB: Mutex<Option<Global>> = Mutex::new(None);
 pub fn init_tantivy(
     logger: impl Logger,
     path: Option<&Path>,
-) -> Result<(TempDir, Schema, IndexWriter, Index)> {
+) -> Result<(TempDir, Schema, IndexWriter, Index), Box<dyn Error>> {
     log!(logger, "{}", std::env::current_dir().unwrap().display());
 
     let index_path = match path {
@@ -73,21 +71,11 @@ pub fn init_tantivy(
     Ok((index_path, schema, index_writer, index))
 }
 
-#[emacs::module(name = "org-roamers-utils")]
-pub fn init(_: &Env) -> Result<()> {
-    Ok(())
-}
-
-//TODO: use path.
-#[defun]
-pub fn prepare(logger: &Env, path: String, sqlite_db_path: String) -> emacs::Result<()> {
-    prepare_internal(logger, path, sqlite_db_path)
-}
 pub fn prepare_internal(
     logger: impl Logger,
     path: String,
     sqlite_db_path: String,
-) -> emacs::Result<()> {
+) -> Result<(), Box<dyn std::error::Error>> {
     let path = Path::new(&path);
 
     let path = if path.is_file() {
@@ -105,19 +93,12 @@ pub fn prepare_internal(
         let (tempdir, schema, indexwriter, index) = match init_tantivy(logger, path) {
             Ok(env) => env,
             Err(err) => {
-                return Err(emacs::Error::msg(format!(
-                    "ERROR: could not initialize tantivy: {:?}",
-                    err
-                )))
+                return Err(format!("ERROR: could not initialize tantivy: {:?}", err).into())
             }
         };
         let sqlite_con = match SqliteConnection::init(sqlite_db_path) {
             Some(con) => con,
-            None => {
-                return Err(emacs::Error::msg(
-                    "ERROR: could not initialize the sqlite connection",
-                ))
-            }
+            None => return Err("ERROR: could not initialize the sqlite connection".into()),
         };
 
         let db = &DB;
@@ -134,15 +115,6 @@ pub fn prepare_internal(
     Ok(())
 }
 
-#[defun]
-pub fn add_node(logger: &Env, title: String, id: String, body: String, file: String) -> Result<()> {
-    let db = &DB;
-    let mut db = db.lock().unwrap();
-    let db = db.as_mut().unwrap();
-
-    add_node_internal(&logger, db, title, id, body, file)
-}
-
 fn add_node_internal(
     logger: &impl Logger,
     db: &mut Global,
@@ -150,7 +122,7 @@ fn add_node_internal(
     id: String,
     body: String,
     file: String,
-) -> Result<()> {
+) -> Result<(), Box<dyn Error>> {
     let title_field = db.schema.get_field("title").unwrap();
     let id_field = db.schema.get_field("id").unwrap();
     let body_field = db.schema.get_field("body").unwrap();
@@ -182,23 +154,12 @@ pub struct GetNodesResultWrapper {
     results: Vec<GetNodesResult>,
 }
 
-#[defun]
-pub fn get_nodes(_logger: &Env, search: String, num_results: usize) -> Result<String> {
-    let db = &DB;
-    let mut db = db.lock().unwrap();
-    let db = db.as_mut().unwrap();
-    
-    let results = get_nodes_internal(db, _logger, search, num_results)?;
-
-    Ok(serde_json::to_string(&results)?)
-}
-
 fn get_nodes_internal(
     db: &mut Global,
     _logger: impl Logger,
     search: String,
     num_results: usize,
-) -> Result<GetNodesResultWrapper> {
+) -> Result<GetNodesResultWrapper, Box<dyn Error>> {
     let reader = db.index.reader()?;
 
     let searcher = reader.searcher();

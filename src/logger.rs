@@ -1,4 +1,4 @@
-use emacs::{Env, Result};
+use std::error::Error;
 
 #[macro_export]
 macro_rules! log {
@@ -8,26 +8,20 @@ macro_rules! log {
 }
 
 pub trait Logger {
-    fn log(&self, message: impl ToString) -> Result<()>;
-}
-
-impl Logger for &Env {
-    fn log(&self, message: impl ToString) -> Result<()> {
-        self.message(message.to_string()).map(|_| ())
-    }
+    fn log(&self, message: impl ToString) -> Result<(), Box<dyn Error>>;
 }
 
 pub struct StdOutLogger;
 
 impl Logger for &StdOutLogger {
-    fn log(&self, message: impl ToString) -> Result<()> {
+    fn log(&self, message: impl ToString) -> Result<(), Box<dyn Error>> {
         println!("{}", message.to_string());
         Result::Ok(())
     }
 }
 
 impl Logger for StdOutLogger {
-    fn log(&self, message: impl ToString) -> Result<()> {
+    fn log(&self, message: impl ToString) -> Result<(), Box<dyn Error>> {
         (&self).log(message)
     }
 }

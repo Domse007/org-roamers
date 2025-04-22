@@ -1,11 +1,10 @@
+use std::error::Error;
 use std::fs::File;
 use std::path::PathBuf;
 use std::sync::mpsc::Sender;
 use std::sync::Mutex;
 use std::thread::JoinHandle;
 
-use emacs::defun;
-use emacs::Result;
 use orgize::Org;
 use rouille::{router, Response, Server};
 use serde::Serialize;
@@ -21,9 +20,9 @@ use crate::DB;
 
 pub static WEBSERVER: Mutex<Option<(JoinHandle<()>, Sender<()>)>> = Mutex::new(None);
 
-pub fn start_server(url: String, root: String, calls: APICalls) -> Result<()> {
+pub fn start_server(url: String, root: String, calls: APICalls) -> Result<(), Box<dyn Error>> {
     if WEBSERVER.lock().unwrap().is_some() {
-        return Err(emacs::Error::msg("Server already running."));
+        return Err("Server already running.".into());
     }
 
     let root: &'static str = Box::leak(Box::new(root));
@@ -71,10 +70,9 @@ pub fn start_server(url: String, root: String, calls: APICalls) -> Result<()> {
     Ok(())
 }
 
-#[defun]
-fn stop_server() -> Result<()> {
+fn stop_server() -> Result<(), Box<dyn Error>> {
     if WEBSERVER.lock().unwrap().is_none() {
-        return Err(emacs::Error::msg("No server is running."));
+        return Err("No server is running.".into());
     }
 
     let mut server = WEBSERVER.lock().unwrap();
@@ -210,7 +208,13 @@ pub fn get_graph_data() -> Response {
         .sqlite
         .get_all_nodes(["id", "title", "olp"])
         .into_iter()
-        .map(|e| (e[0].to_string(), e[1].to_string(), olp(e[2].to_string(), &mut db)))
+        .map(|e| {
+            (
+                e[0].to_string(),
+                e[1].to_string(),
+                olp(e[2].to_string(), &mut db),
+            )
+        })
         .collect::<Vec<(String, String, String)>>();
 
     let mut edges = db.sqlite.get_all_links();

@@ -1,7 +1,12 @@
 use std::{env, process::ExitCode, time::Duration};
 
 use anyhow::Result;
-use org_roamers::{api::APICalls, prepare_internal, server::{self, start_server}, StdOutLogger};
+use org_roamers::{
+    api::APICalls,
+    prepare_internal,
+    server::{self, start_server},
+    StdOutLogger,
+};
 
 fn main() -> Result<ExitCode> {
     let logger = StdOutLogger;

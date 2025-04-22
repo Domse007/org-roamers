@@ -73,9 +73,6 @@ mod tests {
             r#""to":"a64477aa-d900-476d-b500-b8ab0b03c17d"}]}"#
         );
 
-	println!("{}", serde_json::to_string_pretty(&data).unwrap());
-
         assert_eq!(serde_json::to_string(&data).unwrap(), serialized);
-	assert!(false);
     }
 }

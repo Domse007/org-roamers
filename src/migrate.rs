@@ -1,21 +1,9 @@
-use emacs::{defun, Env};
 use std::{
     error::Error,
     path::{Path, PathBuf},
 };
 
 use crate::{log, org, Global, Logger, DB};
-
-#[defun]
-pub fn start(env: &Env, path: String) -> emacs::Result<()> {
-    let path = PathBuf::from(path);
-
-    let db = &DB;
-    let mut db = db.lock().unwrap();
-    let db = db.as_mut().unwrap();
-
-    start_internal(env, db, path.as_path()).map_err(|e| emacs::Error::msg(e.to_string()))
-}
 
 pub fn start_internal(
     logger: impl Logger,
@@ -32,15 +20,10 @@ pub fn start_internal(
         log!(logger, "Adding {} to index: {}", title, file);
 
         if !path.exists() {
-            return Err(emacs::Error::msg(format!(
-                "File '{}' does not exist.",
-                path.to_str().unwrap()
-            ))
-            .into());
+            return Err(format!("File '{}' does not exist.", path.to_str().unwrap()).into());
         }
 
-        let nodes = org::get_nodes_from_file(path.as_path())
-            .map_err(|e| emacs::Error::msg(e.to_string()))?;
+        let nodes = org::get_nodes_from_file(path.as_path()).map_err(|e| e.to_string())?;
 
         let mut body = None;
 
@@ -54,10 +37,10 @@ pub fn start_internal(
         if let Some(body) = body {
             crate::add_node_internal(&logger, db, title, id, body, file)?;
         } else {
-            return Err(emacs::Error::msg(format!(
+            return Err(format!(
                 "Could not get file contents for: {}",
                 path.to_str().unwrap()
-            ))
+            )
             .into());
         }
     }
