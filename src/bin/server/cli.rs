@@ -15,6 +15,63 @@ use tracing::warn;
 
 use crate::conf::Configuration;
 
+trait CLICommand {
+    fn name(&self) -> &'static str;
+    fn exec(&self, writer: &mut Box<dyn Write>, stream: &TcpStream, conf: &Configuration);
+    fn should_exit(&self) -> bool {
+        false
+    }
+}
+
+struct Exit;
+
+impl CLICommand for Exit {
+    fn name(&self) -> &'static str {
+        "exit"
+    }
+
+    fn exec(&self, writer: &mut Box<dyn Write>, stream: &TcpStream, _conf: &Configuration) {
+        write!(writer, "INFO :: graceful shutdown success. Exiting...").unwrap();
+        if let Err(err) = stream.shutdown(Shutdown::Both) {
+            warn!("Could not properly shutdown stream: {err}");
+        }
+    }
+
+    fn should_exit(&self) -> bool {
+        true
+    }
+}
+
+struct Conf;
+
+impl CLICommand for Conf {
+    fn name(&self) -> &'static str {
+        "conf"
+    }
+
+    fn exec(&self, writer: &mut Box<dyn Write>, _stream: &TcpStream, conf: &Configuration) {
+        let json = serde_json::to_string_pretty(conf).unwrap();
+        write!(writer, "{}", json).unwrap();
+    }
+}
+
+struct Open;
+
+impl CLICommand for Open {
+    fn name(&self) -> &'static str {
+        "open"
+    }
+
+    fn exec(&self, writer: &mut Box<dyn Write>, _stream: &TcpStream, conf: &Configuration) {
+        let url = conf.get_url(true);
+        let status = Command::new("xdg-open").arg(&url).status();
+        match status {
+            Ok(code) if code.success() => write!(writer, "Successfully opened {}", url).unwrap(),
+            _ => write!(writer, "Failed to open {}", url).unwrap(),
+        }
+    }
+}
+
 pub fn run_cli_server(configuration: &Configuration, runtime: ServerRuntime) {
     let tcp = match TcpListener::bind("localhost:12568") {
         Ok(tcp) => tcp,
@@ -56,6 +113,8 @@ fn handle_connection_intern(
 ) -> Result<bool, Box<dyn Error>> {
     let reader = BufReader::new(stream.try_clone()?);
 
+    let commands: Vec<Box<dyn CLICommand>> = vec![Box::new(Exit), Box::new(Conf), Box::new(Open)];
+
     for line in reader.lines() {
         let line = match line {
             Ok(line) => line,
@@ -65,29 +124,22 @@ fn handle_connection_intern(
             }
         };
 
-        let mut writer = BufWriter::new(stream.try_clone()?);
+        let mut writer: Box<dyn Write> = Box::new(BufWriter::new(stream.try_clone()?));
+        let mut flag = true;
 
-        match line.as_str() {
-            "exit" => {
-                write!(writer, "INFO :: graceful shutdown success. Exiting...")?;
-                if let Err(err) = stream.shutdown(Shutdown::Both) {
-                    warn!("Could not properly shutdown stream: {err}");
+        for cmd in &commands {
+            if cmd.name() == line.as_str() {
+                flag = false;
+                cmd.exec(&mut writer, &stream, configuration);
+                if cmd.should_exit() {
+                    return Ok(true);
                 }
-                return Ok(true);
+                break;
             }
-            "conf" => {
-                let json = serde_json::to_string_pretty(&configuration)?;
-                write!(writer, "{}", json)?;
-            }
-            "open" => {
-                let url = configuration.get_url(true);
-                let status = Command::new("xdg-open").arg(&url).status();
-                match status {
-                    Ok(code) if code.success() => write!(writer, "Successfully opened {}", url)?,
-                    _ => write!(writer, "Failed to open {}", url)?,
-                }
-            }
-            unknown => write!(writer, "ERROR :: Unknown command: {}", unknown)?,
+        }
+
+        if flag {
+            write!(writer, "ERROR :: Unknown command: {}", line)?
         }
 
         write!(writer, "\n\n")?;

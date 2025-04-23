@@ -21,7 +21,7 @@ use std::path::Path;
 use tantivy::{doc, Index, IndexWriter};
 use tantivy::{schema::*, DocAddress, Score};
 
-pub struct Global {
+pub struct ServerState {
     _tempdir: TempDir,
     schema: Schema,
     index_writer: IndexWriter,
@@ -67,7 +67,7 @@ pub fn init_tantivy(
 pub fn prepare_internal(
     path: &str,
     sqlite_db_path: &str,
-) -> Result<Global, Box<dyn std::error::Error>> {
+) -> Result<ServerState, Box<dyn std::error::Error>> {
     let path = Path::new(&path);
 
     let path = if path.is_file() {
@@ -90,7 +90,7 @@ pub fn prepare_internal(
         None => return Err("ERROR: could not initialize the sqlite connection".into()),
     };
 
-    Ok(Global {
+    Ok(ServerState {
         _tempdir: tempdir,
         index_writer: indexwriter,
         index,
@@ -100,7 +100,7 @@ pub fn prepare_internal(
 }
 
 fn add_node_internal(
-    db: &mut Global,
+    db: &mut ServerState,
     title: String,
     id: String,
     body: String,
@@ -138,7 +138,7 @@ pub struct GetNodesResultWrapper {
 }
 
 fn get_nodes_internal(
-    db: &mut Global,
+    db: &mut ServerState,
     search: String,
     num_results: usize,
 ) -> Result<GetNodesResultWrapper, Box<dyn Error>> {

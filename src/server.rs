@@ -17,7 +17,7 @@ use crate::get_nodes_internal;
 use crate::latex;
 use crate::sqlite::SqliteConnection;
 use crate::GetNodesResultWrapper;
-use crate::Global;
+use crate::ServerState;
 
 pub struct ServerRuntime {
     handle: JoinHandle<()>,
@@ -35,7 +35,7 @@ pub fn start_server(
     url: String,
     root: String,
     calls: APICalls,
-    _global: Global,
+    _global: ServerState,
 ) -> Result<ServerRuntime, Box<dyn Error>> {
     let root: &'static str = Box::leak(Box::new(root));
 
@@ -83,7 +83,7 @@ pub fn start_server(
     Ok(ServerRuntime { handle, sender })
 }
 
-pub fn default_route_content(_db: &mut Global, root: String, url: Option<String>) -> Response {
+pub fn default_route_content(_db: &mut ServerState, root: String, url: Option<String>) -> Response {
     let mut path = PathBuf::from(root);
 
     match url {
@@ -109,7 +109,7 @@ pub fn default_route_content(_db: &mut Global, root: String, url: Option<String>
     Response::from_file(mime, file)
 }
 
-pub fn get_org_as_html(db: &mut Global, name: String) -> Response {
+pub fn get_org_as_html(db: &mut ServerState, name: String) -> Response {
     let [_title, _id, file] = match db
         .sqlite
         .get_all_nodes(["title", "id", "file"])
@@ -139,7 +139,7 @@ struct SearchResult {
     sqlite: Vec<String>,
 }
 
-pub fn search(db: &mut Global, query: String) -> Response {
+pub fn search(db: &mut ServerState, query: String) -> Response {
     let nodes = db
         .sqlite
         .get_all_nodes(["title"])
@@ -149,6 +149,7 @@ pub fn search(db: &mut Global, query: String) -> Response {
         .map(|e| e[0][1..e[0].len() - 1].to_string())
         .collect();
 
+    // TODO: currently not working?
     let tan_result = match get_nodes_internal(db, query, 10) {
         Ok(result) => result,
         Err(_) => return Response::empty_404(),
@@ -174,8 +175,8 @@ pub struct GraphData {
     edges: Vec<(String, String)>,
 }
 
-pub fn get_graph_data(mut db: &mut Global) -> Response {
-    let olp = |s: String, db: &mut Global| {
+pub fn get_graph_data(mut db: &mut ServerState) -> Response {
+    let olp = |s: String, db: &mut ServerState| {
         (!s.is_empty())
             .then(|| {
                 SqliteConnection::parse_olp(s)
@@ -212,7 +213,7 @@ pub fn get_graph_data(mut db: &mut Global) -> Response {
     Response::json(&serde_json::to_string(&GraphData { nodes, edges }).unwrap())
 }
 
-pub fn get_latex_svg(db: &mut Global, tex: String, color: String, title: String) -> Response {
+pub fn get_latex_svg(db: &mut ServerState, tex: String, color: String, title: String) -> Response {
     let node = db
         .sqlite
         .get_all_nodes(["file", "title"])
