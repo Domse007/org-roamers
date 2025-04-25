@@ -345,6 +345,7 @@ mod tests {
                 parent: None,
                 timestamps: None,
                 refs: Vec::new(),
+                cites: Vec::new()
             }
         )
     }
