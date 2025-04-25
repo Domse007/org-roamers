@@ -9,7 +9,7 @@ use std::process::Command;
 use std::process::Stdio;
 
 use anyhow::bail;
-use tempfile::TempDir;
+use tracing::info;
 
 use crate::org;
 
@@ -41,7 +41,6 @@ pub fn get_image_with_ctx<P: AsRef<Path>>(
     file: P,
 ) -> anyhow::Result<String> {
     let headers = org::get_latex_header(file)?;
-    println!("Headers: {headers:?}");
     get_image(latex, color, headers)
 }
 
@@ -57,7 +56,7 @@ pub fn get_image(latex: String, color: String, headers: Vec<String>) -> anyhow::
     if let Ok(mut file) = File::open(existing_path.as_path()) {
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
-        println!("Found preexisting content for {hash}.");
+        info!("Found preexisting content for {hash}.");
         return Ok(contents);
     }
 
@@ -112,7 +111,7 @@ pub fn get_image(latex: String, color: String, headers: Vec<String>) -> anyhow::
 
     path.push(format!("{}.svg", hash));
 
-    println!("Trying to read {}", path.display());
+    info!("Trying to read {}", path.display());
 
     let mut file = File::open(path.as_path())?;
     let mut s = String::new();

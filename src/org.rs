@@ -1,7 +1,7 @@
 use std::{fs::File, io::Read, path::Path};
 
 use orgize::{
-    ast::{Document, Headline, Keyword, Link},
+    ast::{Document, Keyword, Link},
     export::{Container, Event, Traverser},
     Org, SyntaxElement,
 };
@@ -142,7 +142,7 @@ impl Traverser for RoamersTraverser {
 
                         content.push_str(&subheading);
 
-                        let mut node = NodeFromOrg {
+                        let node = NodeFromOrg {
                             title,
                             uuid: id,
                             content,

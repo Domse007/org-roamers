@@ -42,14 +42,19 @@ impl Store {
         let env = unsafe { EnvOpenOptions::new().max_dbs(16).open(path)? };
 
         let mut wtx = env.write_txn()?;
-        let nodes: NodeDB = env.create_database(&mut wtx, Some("nodes"))?;
-        let files: FileDB = env.create_database(&mut wtx, Some("links"))?;
-        let links: LinkDB = env.create_database(&mut wtx, Some("files"))?;
-        let tags: TagDB = env.create_database(&mut wtx, Some("aliases"))?;
-        let aliases: AliasDB = env.create_database(&mut wtx, Some("tags"))?;
-        let references: RefDB = env.create_database(&mut wtx, Some("refs"))?;
+        let nodes: NodeDB =
+            env.create_database(&mut wtx, Some("nodes"))?;
+        let files: FileDB =
+            env.create_database(&mut wtx, Some("links"))?;
+        let links: LinkDB =
+            env.create_database(&mut wtx, Some("files"))?;
+        let tags: TagDB =
+            env.create_database(&mut wtx, Some("aliases"))?;
+        let aliases: AliasDB =
+            env.create_database(&mut wtx, Some("tags"))?;
+        let references: RefDB =
+            env.create_database(&mut wtx, Some("refs"))?;
         let cites: CiteDB = env.create_database(&mut wtx, Some("cites"))?;
-
 
         // TODO: Arroy maybe version mismatch? Wrong return type from create_db
         // let embeds: ArroyDB<Euclidean> = env.create_database(&mut wtx, Some("embeds"))?;

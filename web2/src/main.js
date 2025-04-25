@@ -61,6 +61,7 @@ const katexOptions = {
     {left: "\\begin{algorithmic}", right: "\\end{algorithmic}", display: true},
     {left: "\\begin{center}", right: "\\end{center}", display: true},
     {left: "\\begin{tikpicture}", right: "\\end{tikzpicture}", display: true},
+    {left: "\\begin{center}", right: "\\end{center}", display: true },
     {left: "\\[", right: "\\]", display: true}
   ],
   errorCallback: (message, stack) => {
@@ -90,7 +91,41 @@ export const preview = (name) => {
       document.getElementById('org-preview').innerHTML = html;
       renderMathInElement(document.getElementById('org-preview'), katexOptions);
       syntaxHighlightSite();
-    });	  
+
+      // Prepare footer for setupLinksFooter because of async dependencies...
+      document.getElementById('org-preview').innerHTML += "<div id='org-preview-footer'></div>";
+    }).then((_) => {
+      setupLinks();
+      setupLinksFooter();
+    });
+};
+
+const setupLinksFooter = () => {
+  let pre = document.getElementById('org-preview-footer');
+  console.log(`element: ${pre.innerHTML}`);
+
+  Array.from(document.getElementsByClassName('org-preview-id-link'))
+    .forEach((elem) => {
+      pre.innerHTML += `<div class="org-preview-footer-element"><a>${elem.innerHTML}</a></div>`;
+    });
+
+  setTimeout(() => {
+    Array.from(document.getElementsByClassName('org-preview-footer-element'))
+      .forEach((elem) => elem.addEventListener('click', (event) => {
+        console.log(`Trying to open ${event.target.innerHTML}`);
+        preview(event.target.innerHTML);
+      }));   
+  }, 1000);
+};
+
+const setupLinks = () => {
+  setTimeout(() => {
+    Array.from(document.getElementsByClassName('org-preview-id-link'))
+      .forEach((elem) => elem.addEventListener('click', (elem) => {
+        console.log(`Trying to open ${elem.target.innerHTML}`);
+        preview(elem.target.innerHTML);
+      }));
+   }, 1000);
 };
 
 const randomNumber = (min, max) => Math.random() * (max - min) + min;
@@ -110,10 +145,10 @@ const updateGraph = () => {
     .then((json) => {
       json["nodes"].forEach((node) => {
 	graph.addNode(node[0], {
-          label: node[1],
+          label: node[1].substring(1, node[1].length - 1),
           x: randomNumber(1, 100),
           y: randomNumber(1, 100),
-          size: 10,
+          size: 5,
           color: nodeColor,
           borderColor: nodeBorderColor,
         });
@@ -125,6 +160,20 @@ const updateGraph = () => {
           console.log(`${edge[0]}->${edge[1]}: ${error}`);
         }
       });
+      let count = 0;
+      // iterate again to get all parent links
+      json["nodes"].forEach((node) => {
+        if (node[2] != null && node[2].length != 0) {
+          try {
+            count++;
+            // probably broken, because it's not the id of self.
+            graph.addEdge(node[0], node[2], { color: edgeColor });
+          } catch (error) {
+            console.log(`ERROR :: ${node[0]} -> ${node[2]}: ${error}`);
+          }
+        }
+      })
+      console.log(`Counted ${count} olp links.`);
       setupGraph()
     })
 }
@@ -170,8 +219,11 @@ const InputHandler = (event) => {
   searchSuggestion.innerHTML = "";
   search(query).then((res) => {
     console.log(res);
-    res["results"].forEach((e) => {
+    res.tantivy["results"].forEach((e) => {
       searchSuggestion.innerHTML += `<div class="suggestion" style="padding: 5px; cursor: pointer;">${e.title}</div>`;
+    })
+    res.sqlite.forEach((e) => {
+      searchSuggestion.innerHTML += `<div class="suggestion" style="padding: 5px; cursor: pointer;">${e}</div>`;
     })
     updateSuggestions();
   })
