@@ -1,0 +1,20 @@
+/* Based on catpuccin frappé */
+:root {
+  --base: #303446;
+  --surface: #414559;
+  --overlay: #838ba7;
+  --text: #c6d0f5;
+  --highlight: #babbf1;
+  --highlight-2: #a6d189;
+  --warn: #e78284;
+  --clickable: #8caaee;
+  --font: Arial, Helvetica, sans-serif;
+  --node: #ef9f76;
+  --node-border: #babbf1;
+  /* Code highlighting colors: */
+  --keyword: #e78284;
+  --string: var(--text);
+  --ident: #a6d189;
+  --comment: #626880;
+  --type: #ca9ee6;
+}
