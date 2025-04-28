@@ -2,3 +2,4 @@
 *.so
 node_modules
 web
+/web2/dist/

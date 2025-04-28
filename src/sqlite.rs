@@ -3,7 +3,9 @@ use std::{collections::HashMap, path::Path};
 use rusqlite::Connection;
 use tracing::info;
 
-use crate::{database::datamodel::Timestamps, org::NodeFromOrg, parser::Parser};
+use crate::{
+    api::types::RoamLink, database::datamodel::Timestamps, org::NodeFromOrg, parser::Parser,
+};
 
 #[derive(thiserror::Error, Debug)]
 pub enum OlpError {
@@ -96,7 +98,7 @@ impl SqliteConnection {
     pub fn get_parent_for_id(&mut self, id: &str) -> Option<String> {
         let stmnt = format!(
             "SELECT file, id, level FROM nodes
-             WHERE id = '{}'
+             WHERE id = '\"{}\"'
              AND level = 1;",
             id
         );
@@ -167,7 +169,7 @@ impl SqliteConnection {
             .collect()
     }
 
-    pub fn get_all_links(&mut self) -> Vec<(String, String)> {
+    pub fn get_all_links(&mut self) -> Vec<RoamLink> {
         const STMNT: &'static str = "
             SELECT links.source, links.dest, links.type
             FROM links
@@ -175,9 +177,18 @@ impl SqliteConnection {
         let mut stmnt = self.connection.prepare(STMNT).unwrap();
 
         stmnt
-            .query_map([], |row| Ok((row.get(0).unwrap(), row.get(1).unwrap())))
+            .query_map([], |row| {
+                Ok((
+                    row.get::<usize, String>(0).unwrap(),
+                    row.get::<usize, String>(1).unwrap(),
+                ))
+            })
             .unwrap()
             .map(|e| e.unwrap())
+            .map(|(from, to)| RoamLink {
+                from: from.into(),
+                to: to.into(),
+            })
             .collect()
     }
 

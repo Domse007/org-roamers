@@ -11,6 +11,12 @@ use orgize::Org;
 use rouille::{router, Response, Server};
 use serde::Serialize;
 
+use crate::api::types::GraphData;
+use crate::api::types::RoamLink;
+use crate::api::types::RoamNode;
+use crate::api::types::SearchResponse;
+use crate::api::types::SearchResponseElement;
+use crate::api::types::SearchResponseProvider;
 use crate::api::APICalls;
 use crate::export::HtmlExport;
 use crate::get_nodes_internal;
@@ -133,46 +139,32 @@ pub fn get_org_as_html(db: &mut ServerState, name: String) -> Response {
     Response::text(handler.finish())
 }
 
-#[derive(Serialize)]
-struct SearchResult {
-    tantivy: GetNodesResultWrapper,
-    sqlite: Vec<String>,
-}
-
 pub fn search(db: &mut ServerState, query: String) -> Response {
     let nodes = db
         .sqlite
-        .get_all_nodes(["title"])
+        .get_all_nodes(["title", "id"])
         .into_iter()
-        .filter(|[file]| file.contains(&query))
+        .filter(|[file, _id]| file.contains(&query))
         .take(10)
-        .map(|e| e[0][1..e[0].len() - 1].to_string())
+        .map(|e| SearchResponseElement {
+            display: e[0][1..e[0].len() - 1].to_string(),
+            id: e[1].clone().into(),
+        })
         .collect();
 
     // TODO: currently not working?
-    let tan_result = match get_nodes_internal(db, query, 10) {
+    let _tan_result = match get_nodes_internal(db, query, 10) {
         Ok(result) => result,
         Err(_) => return Response::empty_404(),
     };
 
-    let result = SearchResult {
-        tantivy: tan_result,
-        sqlite: nodes,
-    };
-
-    let json = match serde_json::to_string(&result) {
-        Ok(json) => json,
-        Err(_) => return Response::empty_404(),
-    };
-
-    Response::json(&json)
-}
-
-#[derive(Serialize)]
-pub struct GraphData {
-    /// The tuple is (id, title, parent)
-    nodes: Vec<(String, String, String)>,
-    edges: Vec<(String, String)>,
+    SearchResponse {
+        providers: vec![SearchResponseProvider {
+            source: "sqlite".to_string(),
+            results: nodes,
+        }],
+    }
+    .into()
 }
 
 pub fn get_graph_data(mut db: &mut ServerState) -> Response {
@@ -193,24 +185,25 @@ pub fn get_graph_data(mut db: &mut ServerState) -> Response {
         .sqlite
         .get_all_nodes(["id", "title", "olp"])
         .into_iter()
-        .map(|e| {
-            (
-                e[0].to_string(),
-                e[1].to_string(),
-                olp(e[2].to_string(), &mut db),
-            )
+        .map(|e| RoamNode {
+            title: e[1].to_string().into(),
+            id: e[0].to_string().into(),
+            parent: olp(e[2].to_string(), &mut db).into(),
         })
-        .collect::<Vec<(String, String, String)>>();
+        .collect::<Vec<RoamNode>>();
 
-    let mut edges = db.sqlite.get_all_links();
+    let mut links = db.sqlite.get_all_links();
 
     for node in &nodes {
-        if let Some(parent_id) = db.sqlite.get_parent_for_id(node.0.as_str()) {
-            edges.push((parent_id, node.0.to_string()));
+        if let Some(parent_id) = db.sqlite.get_parent_for_id(node.id.id()) {
+            links.push(RoamLink {
+                from: parent_id.into(),
+                to: node.id.clone(),
+            });
         }
     }
 
-    Response::json(&serde_json::to_string(&GraphData { nodes, edges }).unwrap())
+    GraphData { nodes, links }.into()
 }
 
 pub fn get_latex_svg(db: &mut ServerState, tex: String, color: String, title: String) -> Response {

@@ -1,10 +1,11 @@
+use rouille::Response;
 use serde::{Deserialize, Serialize};
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct RoamID(String);
 
 impl RoamID {
-    fn id(&self) -> &str {
+    pub fn id(&self) -> &str {
         &self.0
     }
 }
@@ -30,7 +31,7 @@ impl From<String> for RoamID {
 }
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub struct RoamTitle(pub String);
+pub struct RoamTitle(String);
 
 impl RoamTitle {
     fn title(&self) -> &str {
@@ -64,6 +65,7 @@ pub struct RoamLink {
 pub struct RoamNode {
     pub title: RoamTitle,
     pub id: RoamID,
+    pub parent: RoamID,
 }
 
 /// Response structure for transmitting graph information.
@@ -75,10 +77,12 @@ pub struct RoamNode {
 ///     {
 ///       "title": "Rust",
 ///       "id": "a64477aa-d900-476d-b500-b8ab0b03c17d"
+///       "parent": "",
 ///     },
 ///     {
 ///       "title": "Vec<T>",
 ///       "id": "bcb77e31-b4c6-4cf9-a05d-47b766349e57"
+///       "parent": "",
 ///     }
 ///   ],
 ///   "links": [
@@ -95,6 +99,47 @@ pub struct GraphData {
     pub links: Vec<RoamLink>,
 }
 
+impl Into<Response> for GraphData {
+    fn into(self) -> Response {
+        Response::json(&serde_json::to_string(&self).unwrap())
+    }
+}
+
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub struct SearchResponseElement {
+    pub display: String,
+    pub id: RoamID,
+}
+
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub struct SearchResponseProvider {
+    pub source: String,
+    pub results: Vec<SearchResponseElement>,
+}
+
+/// # Example
+/// ```json
+/// {
+///   "providers": [{
+///       "source": "sqlite",
+///       "results": [{
+///           "display": "Vec<T>",
+///           "id": "bcb77e31-b4c6-4cf9-a05d-47b766349e57"
+///       }]
+///   }]
+/// }
+/// ```
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub struct SearchResponse {
+    pub providers: Vec<SearchResponseProvider>,
+}
+
+impl Into<Response> for SearchResponse {
+    fn into(self) -> Response {
+        Response::json(&serde_json::to_string(&self).unwrap())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -105,10 +150,12 @@ mod tests {
                 RoamNode {
                     title: RoamTitle("Rust".to_string()),
                     id: RoamID("a64477aa-d900-476d-b500-b8ab0b03c17d".to_string()),
+                    parent: RoamID("".to_string()),
                 },
                 RoamNode {
                     title: RoamTitle("Vec<T>".to_string()),
                     id: RoamID("bcb77e31-b4c6-4cf9-a05d-47b766349e57".to_string()),
+                    parent: RoamID("".to_string()),
                 },
             ],
             links: vec![RoamLink {
@@ -118,10 +165,10 @@ mod tests {
         };
 
         let serialized = concat!(
-            r#"{"nodes":[{"title":"Rust","id":"a64477aa-d900-476d-b500-b8ab0b03c17d"},"#,
-            r#"{"title":"Vec<T>","id":"bcb77e31-b4c6-4cf9-a05d-47b766349e57"}],"#,
-            r#""links":[{"from":"bcb77e31-b4c6-4cf9-a05d-47b766349e57","#,
-            r#""to":"a64477aa-d900-476d-b500-b8ab0b03c17d"}]}"#
+            "{\"nodes\":[{\"title\":\"Rust\",\"id\":\"a64477aa-d900-476d-b500-b8ab0b03c17d\",",
+            "\"parent\":\"\"},{\"title\":\"Vec<T>\",\"id\":\"bcb77e31-b4c6-4cf9-a05d-47b766349e57\",",
+            "\"parent\":\"\"}],\"links\":[{\"from\":\"bcb77e31-b4c6-4cf9-a05d-47b766349e57\",",
+            "\"to\":\"a64477aa-d900-476d-b500-b8ab0b03c17d\"}]}"
         );
 
         assert_eq!(serde_json::to_string(&data).unwrap(), serialized);
@@ -150,5 +197,25 @@ mod tests {
             RoamTitle::from(s),
             RoamTitle("Vec<T> in \"Rust\"".to_string())
         );
+    }
+
+    #[test]
+    fn test_search_response_serialization() {
+        let data = SearchResponse {
+            providers: vec![SearchResponseProvider {
+                source: "sqlite".to_string(),
+                results: vec![SearchResponseElement {
+                    display: "Vec<T>".to_string(),
+                    id: RoamID("bcb77e31-b4c6-4cf9-a05d-47b766349e57".to_string()),
+                }],
+            }],
+        };
+
+        let expected = concat!(
+            "{\"providers\":[{\"source\":\"sqlite\",\"results\":[{\"display\"",
+            ":\"Vec<T>\",\"id\":\"bcb77e31-b4c6-4cf9-a05d-47b766349e57\"}]}]}"
+        );
+
+        assert_eq!(serde_json::to_string(&data).unwrap(), expected);
     }
 }
