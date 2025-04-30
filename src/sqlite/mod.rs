@@ -1,11 +1,15 @@
+use std::fmt::Write;
 use std::{collections::HashMap, path::Path};
 
+use anyhow::{bail, Result};
 use rusqlite::Connection;
 use tracing::info;
 
 use crate::{
     api::types::RoamLink, database::datamodel::Timestamps, org::NodeFromOrg, parser::Parser,
 };
+
+pub mod rebuild;
 
 #[derive(thiserror::Error, Debug)]
 pub enum OlpError {
@@ -24,27 +28,45 @@ pub struct SqliteConnection {
 impl SqliteConnection {
     const MIN_VERSION: usize = 20;
 
-    pub fn init<P: AsRef<Path>>(path: P) -> Option<Self> {
-        let this = match Connection::open(path) {
-            Ok(connection) => Self { connection },
-            Err(_) => return None,
+    pub fn init<P: AsRef<Path>>(path: Option<P>) -> Result<Self> {
+        let this = match path {
+            Some(path) => Self {
+                connection: Connection::open(path)?,
+            },
+            None => {
+                info!("No path supplied. Building own db.");
+                let mut connection = Connection::open_in_memory()?;
+                rebuild::init_version(&mut connection, Self::MIN_VERSION)?;
+                rebuild::init_files_table(&mut connection)?;
+                rebuild::init_nodes_table(&mut connection)?;
+                rebuild::init_aliases(&mut connection)?;
+                rebuild::init_tags(&mut connection)?;
+                Self { connection }
+            }
         };
 
         let version: usize = this
             .connection
-            .pragma_query_value(None, "user_version", |row| Ok(row.get_unwrap(0)))
-            .unwrap();
+            .pragma_query_value(None, "user_version", |row| Ok(row.get_unwrap(0)))?;
 
         if version != Self::MIN_VERSION {
-            println!(
-                "ERROR :: DB version does not match: {} (DB) != {} (required)",
+            tracing::error!(
+                "DB version does not match: {} (DB) != {} (required)",
                 version,
                 Self::MIN_VERSION
             );
-            return None;
+            bail!(
+                "Incompatible version: (MIN) {} != {} (SUPPLIED)",
+                Self::MIN_VERSION,
+                version
+            );
         }
 
-        Some(this)
+        Ok(this)
+    }
+
+    pub fn insert_files<P: AsRef<Path>>(&mut self, roam_path: P) -> Result<()> {
+        rebuild::iter_files(&mut self.connection, roam_path)
     }
 
     pub fn get_links_from(&mut self, id: &str) -> HashMap<String, String> {
@@ -281,8 +303,20 @@ impl SqliteConnection {
             // TODO: Handle references
             refs: Vec::new(),
             // TODO: Citations
-            cites: Vec::new()
+            cites: Vec::new(),
         }
+    }
+
+    pub(crate) fn into_olp_string(olp: Vec<String>) -> String {
+        if olp.is_empty() {
+            return "".to_string();
+        }
+        let mut olp_s = "(".to_string();
+        for elem in olp {
+            let _ = write!(olp_s, "\"\"{}\"\" ", elem);
+        }
+        olp_s.push(')');
+        olp_s
     }
 
     pub(crate) fn parse_olp(olp: String) -> anyhow::Result<Vec<String>> {
@@ -370,5 +404,14 @@ mod tests {
             res.unwrap(),
             vec!["This is a test".to_string(), "How about that".to_string()]
         );
+    }
+
+    #[test]
+    fn test_olp_deserialize_serialize() {
+        let olp = "(\"test\" \"other\")";
+        let arr = SqliteConnection::parse_olp(olp.to_string()).unwrap();
+        assert_eq!(arr, vec!["test".to_string(), "other".to_string()]);
+        let s = SqliteConnection::into_olp_string(arr);
+        assert_eq!(s, "(\"\"test\"\" \"\"other\"\" )");
     }
 }

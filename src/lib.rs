@@ -88,7 +88,7 @@ pub fn prepare_internal<P: AsRef<Path>>(
         Ok(env) => env,
         Err(err) => return Err(format!("ERROR: could not initialize tantivy: {:?}", err).into()),
     };
-    let sqlite_con = match SqliteConnection::init(sqlite_db_path) {
+    let sqlite_con = match SqliteConnection::init(Some(sqlite_db_path)) {
         Ok(con) => con,
         Err(e) => return Err("ERROR: could not initialize the sqlite connection".into()),
     };

@@ -99,9 +99,11 @@ impl Traverser for RoamersTraverser {
                         self.id_stack.push((title, id));
                     }
                 }
-                if let Some(title) = document.title() {
-                    self.olp.push(title);
-                }
+                // REMARK: org-roam does not use the main title as part of the olp path.
+                // This is really unfortunate and might be a good change in the future.
+                // if let Some(title) = document.title() {
+                //     self.olp.push(title);
+                // }
             }
             Event::Leave(Container::Document(_)) => {
                 let _ = self.id_stack.pop();
@@ -278,7 +280,7 @@ some text
                     uuid: "e6557233-97db-4eec-925a-b80d66ad97e8".to_string(),
                     content: "some text\n".to_string(),
                     level: 1,
-                    olp: vec!["Hello World".to_string()],
+                    olp: vec![],
                     ..Default::default()
                 }
             ]
@@ -498,7 +500,7 @@ some text
                     level: 1,
                     parent: Some("e655725f-97db-4eec-925a-b80d66ad97e8".to_string()),
                     tags: vec!["test1".to_string(), "test2".to_string()],
-                    olp: vec!["Test".to_string()],
+                    olp: vec![],
                     ..Default::default()
                 },
             ]
