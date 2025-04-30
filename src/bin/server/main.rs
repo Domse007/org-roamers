@@ -1,7 +1,7 @@
 mod cli;
 mod conf;
 
-use std::{env, panic, process::ExitCode};
+use std::{env, panic, path::PathBuf, process::ExitCode, str::FromStr};
 
 use anyhow::Result;
 use cli::run_cli_server;
@@ -40,8 +40,15 @@ fn main() -> Result<ExitCode> {
         }
     };
 
+    let html_path = {
+        let mut path = PathBuf::from_str(conf::CONFIG_PATH).unwrap();
+        path.push("html_settings.json");
+        path
+    };
+
     let configuration = Configuration {
         sqlite_path: sqlite_path.to_string(),
+        html_export_path: html_path,
         roam_path: path.to_string(),
         ip_addr: "localhost".to_string(),
         port: 5000,
@@ -58,6 +65,7 @@ fn main() -> Result<ExitCode> {
     let global = prepare_internal(
         configuration.roam_path.as_str(),
         configuration.sqlite_path.as_str(),
+        configuration.html_export_path.as_path(),
     )
     .unwrap();
 

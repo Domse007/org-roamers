@@ -1,4 +1,4 @@
-use std::io::{stdin, stdout, BufRead, Write, BufReader};
+use std::io::{stdin, stdout, BufRead, BufReader, Write};
 use std::net::TcpStream;
 
 fn main() {
@@ -24,13 +24,13 @@ fn main() {
         let _ = tcp.write(line.unwrap().as_bytes());
         let _ = tcp.write("\n".as_bytes());
 
-	for line in BufReader::new(tcp.try_clone().unwrap()).lines() {
-	    let line = line.unwrap();
-	    if line.trim().is_empty() {
-		break;
-	    }
-	    println!("{}", line);
-	}
+        for line in BufReader::new(tcp.try_clone().unwrap()).lines() {
+            let line = line.unwrap();
+            if line.trim().is_empty() {
+                break;
+            }
+            println!("{}", line);
+        }
 
         print!("{}", PS);
         let _ = stdout().flush();

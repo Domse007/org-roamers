@@ -9,7 +9,6 @@ use std::thread::JoinHandle;
 
 use orgize::Org;
 use rouille::{router, Response, Server};
-use serde::Serialize;
 
 use crate::api::types::GraphData;
 use crate::api::types::RoamLink;
@@ -22,7 +21,6 @@ use crate::export::HtmlExport;
 use crate::get_nodes_internal;
 use crate::latex;
 use crate::sqlite::SqliteConnection;
-use crate::GetNodesResultWrapper;
 use crate::ServerState;
 
 pub struct ServerRuntime {
@@ -44,6 +42,11 @@ pub fn start_server(
     _global: ServerState,
 ) -> Result<ServerRuntime, Box<dyn Error>> {
     let root: &'static str = Box::leak(Box::new(root));
+
+    tracing::info!(
+        "Using HTML settings: {}",
+        serde_json::to_string(&_global.html_export_settings).unwrap()
+    );
 
     let lock = Arc::new(Mutex::new(_global));
 
@@ -133,7 +136,7 @@ pub fn get_org_as_html(db: &mut ServerState, name: String) -> Response {
         Err(_) => return Response::text("Could not get file contents."),
     };
 
-    let mut handler = HtmlExport::default();
+    let mut handler = HtmlExport::new(&db.html_export_settings);
     Org::parse(contents).traverse(&mut handler);
 
     Response::text(handler.finish())

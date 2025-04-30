@@ -7,6 +7,7 @@ pub mod parser;
 pub mod server;
 pub mod sqlite;
 
+use export::HtmlExportSettings;
 use serde::Serialize;
 use sqlite::SqliteConnection;
 use tantivy::collector::TopDocs;
@@ -28,6 +29,7 @@ pub struct ServerState {
     index: Index,
 
     sqlite: SqliteConnection,
+    html_export_settings: HtmlExportSettings,
 }
 
 const INDEX_WRITER_SIZE: usize = 50_000_000;
@@ -64,9 +66,10 @@ pub fn init_tantivy(
     Ok((index_path, schema, index_writer, index))
 }
 
-pub fn prepare_internal(
+pub fn prepare_internal<P: AsRef<Path>>(
     path: &str,
     sqlite_db_path: &str,
+    html_export_settings_path: P,
 ) -> Result<ServerState, Box<dyn std::error::Error>> {
     let path = Path::new(&path);
 
@@ -86,8 +89,8 @@ pub fn prepare_internal(
         Err(err) => return Err(format!("ERROR: could not initialize tantivy: {:?}", err).into()),
     };
     let sqlite_con = match SqliteConnection::init(sqlite_db_path) {
-        Some(con) => con,
-        None => return Err("ERROR: could not initialize the sqlite connection".into()),
+        Ok(con) => con,
+        Err(e) => return Err("ERROR: could not initialize the sqlite connection".into()),
     };
 
     Ok(ServerState {
@@ -96,6 +99,7 @@ pub fn prepare_internal(
         index,
         schema,
         sqlite: sqlite_con,
+        html_export_settings: HtmlExportSettings::new(html_export_settings_path).unwrap(),
     })
 }
 

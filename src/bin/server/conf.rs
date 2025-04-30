@@ -1,8 +1,14 @@
+use std::path::PathBuf;
+
 use serde::{Deserialize, Serialize};
+
+#[cfg(target_os = "linux")]
+pub const CONFIG_PATH: &'static str = "/etc/org-roamers/";
 
 #[derive(Serialize, Deserialize)]
 pub struct Configuration {
     pub sqlite_path: String,
+    pub html_export_path: PathBuf,
     pub roam_path: String,
     pub ip_addr: String,
     pub port: u16,

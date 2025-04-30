@@ -1,18 +1,54 @@
 use std::cmp::min;
 use std::fmt::Write;
+use std::fs;
+use std::path::Path;
 
+use anyhow::Result;
 use orgize::rowan::ast::AstNode;
 use orgize::{
     export::{Container, Event, HtmlEscape, TraversalContext, Traverser},
     rowan::NodeOrToken,
     SyntaxKind,
 };
+use serde::{Deserialize, Serialize};
 
-#[derive(Default)]
-pub struct HtmlExport {
+#[derive(Serialize, Deserialize, Default)]
+pub struct EnvAdvice {
+    on: String,
+    header: String,
+    css_style: String,
+    text_styling: String,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+pub struct HtmlExportSettings {
+    pub env_advices: Vec<EnvAdvice>,
+}
+
+impl HtmlExportSettings {
+    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
+        serde_json::from_str(fs::read_to_string(path)?.as_str()).map_err(Into::into)
+    }
+}
+
+pub struct HtmlExport<'a> {
+    settings: &'a HtmlExportSettings,
     output: String,
     table_row: TableRow,
     in_descriptive_list: Vec<bool>,
+    in_special_block: bool,
+}
+
+impl<'a> HtmlExport<'a> {
+    pub fn new(settings: &'a HtmlExportSettings) -> Self {
+        Self {
+            settings,
+            output: String::with_capacity(1000),
+            table_row: TableRow::default(),
+            in_descriptive_list: vec![],
+            in_special_block: false,
+        }
+    }
 }
 
 #[derive(Default, PartialEq, Eq)]
@@ -24,13 +60,13 @@ enum TableRow {
     Body,
 }
 
-impl HtmlExport {
+impl<'a> HtmlExport<'a> {
     pub fn finish(self) -> String {
         self.output
     }
 }
 
-impl Traverser for HtmlExport {
+impl<'a> Traverser for HtmlExport<'a> {
     fn event(&mut self, event: Event, ctx: &mut TraversalContext) {
         match event {
             Event::Enter(Container::Document(document)) => {
@@ -55,8 +91,54 @@ impl Traverser for HtmlExport {
             }
             Event::Leave(Container::Headline(_)) => {}
 
-            Event::Enter(Container::Paragraph(_)) => self.output += "<p>",
-            Event::Leave(Container::Paragraph(_)) => self.output += "</p>",
+            Event::Enter(Container::SpecialBlock(specialblock)) => {
+                let mut iter = specialblock
+                    .syntax()
+                    .first_child()
+                    .unwrap()
+                    .children_with_tokens();
+                match iter.nth(1).map(|token| token.to_string()) {
+                    Some(block_type) => {
+                        let advice = self
+                            .settings
+                            .env_advices
+                            .iter()
+                            .find(|e| e.on.to_lowercase() == block_type);
+                        match advice {
+                            Some(advice) => {
+                                let _ = write!(
+                                    self.output,
+                                    "<div class=\"{}\" style=\"{}\">{}<p style=\"{}\">",
+                                    advice.on, advice.css_style, advice.header, advice.text_styling
+                                );
+                            }
+                            None => {
+                                let _ = write!(self.output, "<div class=\"{}\"><p>", block_type);
+                            }
+                        }
+                    }
+                    None => {
+                        tracing::warn!("Block type not found.");
+                        self.output += "<div><p>";
+                    }
+                }
+                self.in_special_block = true;
+            }
+            Event::Leave(Container::SpecialBlock(_)) => {
+                self.in_special_block = false;
+                self.output += "</p></div>";
+            }
+
+            Event::Enter(Container::Paragraph(_)) => {
+                if !self.in_special_block {
+                    self.output += "<p>"
+                }
+            }
+            Event::Leave(Container::Paragraph(_)) => {
+                if !self.in_special_block {
+                    self.output += "</p>";
+                }
+            }
 
             Event::Enter(Container::Section(_)) => self.output += "<section>",
             Event::Leave(Container::Section(_)) => self.output += "</section>",
