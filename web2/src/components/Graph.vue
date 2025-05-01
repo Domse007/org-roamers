@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { MultiGraph } from "graphology";
+import louvain from "graphology-communities-louvain";
 import forceAtlas2 from "graphology-layout-forceatlas2";
 import FA2Layout from "graphology-layout-forceatlas2/worker";
 import Sigma from "sigma";
@@ -66,6 +67,32 @@ function setupGraph() {
     settings: settings,
   });
 
+  // Graph coloring
+  const c = (v: string) =>
+    getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const colors = [
+    c("--overlay"),
+    c("--highlight"),
+    c("--highlight-2"),
+    c("--warn"),
+    c("--clickable"),
+    c("--node"),
+    c("--node-border"),
+    c("--keyword"),
+    c("--ident"),
+    c("--comment"),
+    c("--type"),
+  ];
+  const communities = louvain(graph);
+  Object.entries(communities).forEach(([node, communityId]) => {
+    const color = colors[communityId % colors.length];
+    graph.mergeNodeAttributes(node, {
+      community: communityId,
+      color,
+    });
+  });
+
+  // Graph layouting
   layout.start();
   const element = document.getElementById("graph")!;
   const style = window.getComputedStyle(document.body);

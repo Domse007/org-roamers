@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import hljs from 'highlight.js';
+import hljs from "highlight.js";
 import { nextTick, ref, useTemplateRef, watch, type Ref } from "vue";
 import renderMathInElement from "katex/contrib/auto-render";
 
@@ -8,7 +8,7 @@ const shown: Ref<"none" | "flex"> = ref("none");
 
 const rendered = ref("");
 let current_id: string = "";
-const preview_ref = useTemplateRef('preview-ref');
+const preview_ref = useTemplateRef("preview-ref");
 
 const preview = (id: string) => {
   current_id = id;
@@ -27,11 +27,13 @@ const expand = () => {
   shown.value = "flex";
 };
 const collapse = () => {
-  shown.value = "none"
+  shown.value = "none";
 };
 
 const resize = () => {
-  if (rendered.value.length == 0) { return; }
+  if (rendered.value.length == 0) {
+    return;
+  }
   if (shown.value == "none") {
     expand();
   } else {
@@ -50,18 +52,22 @@ const katexOptions = {
     { left: "\\begin{gather}", right: "\\end{gather}", display: true },
     { left: "\\begin{CD}", right: "\\end{CD}", display: true },
     { left: "\\begin{algorithm}", right: "\\end{algorithm}", display: true },
-    { left: "\\begin{algorithmic}", right: "\\end{algorithmic}", display: true },
+    {
+      left: "\\begin{algorithmic}",
+      right: "\\end{algorithmic}",
+      display: true,
+    },
     { left: "\\begin{center}", right: "\\end{center}", display: true },
     { left: "\\begin{tikpicture}", right: "\\end{tikzpicture}", display: true },
     { left: "\\begin{center}", right: "\\end{center}", display: true },
-    { left: "\\[", right: "\\]", display: true }
+    { left: "\\[", right: "\\]", display: true },
   ],
   errorCallback: (message: string, _stack: unknown) => {
     console.log("Trying to process latex on server.");
     const latex = message.substring(36, message.length - 7);
     const encoded = encodeURIComponent(latex);
     const style = window.getComputedStyle(document.body);
-    const textColor = style.getPropertyValue('--text');
+    const textColor = style.getPropertyValue("--text");
     const colorEncoded = encodeURIComponent(textColor.substring(1));
     const encodedTitle = encodeURIComponent(current_id);
     fetch(`/latex?tex=${encoded}&color=${colorEncoded}&id=${encodedTitle}`)
@@ -70,12 +76,12 @@ const katexOptions = {
         const newHTML = rendered.value.replace(latex, svg);
         rendered.value = newHTML;
       });
-  }
+  },
 };
 
 // Updpate the selector from 'pre code' to 'code' to autodetect inline src
 // like src_java[:exports code]{ void main() } which has no <pre></pre>.
-hljs.configure({ 'cssSelector': 'code' });
+hljs.configure({ cssSelector: "code" });
 
 watch(props, () => preview(props.id));
 watch(rendered, async () => {
@@ -87,8 +93,15 @@ watch(rendered, async () => {
 </script>
 
 <template>
-  <div class="collapse-btn" tabindex="1" :onclick="resize" :style="{ 'position': 'absolute', 'right': '0px' }">></div>
-  <div class="org-preview-outerframe" :style="{ 'display': shown }">
+  <div
+    class="collapse-btn"
+    tabindex="1"
+    :onclick="resize"
+    :style="{ position: 'absolute', right: '0px' }"
+  >
+    >
+  </div>
+  <div class="org-preview-outerframe" :style="{ display: shown }">
     <div class="collapse-btn" tabindex="1" :onclick="resize">></div>
     <div id="org-preview-frame">
       <div id="org-preview" ref="preview-ref" v-html="rendered"></div>
@@ -174,7 +187,7 @@ hr {
   border-left: 2px solid var(--highlight);
 }
 
-.quote>p {
+.quote > p {
   margin-top: 0px;
   margin-bottom: 0px;
   padding: 5px;
