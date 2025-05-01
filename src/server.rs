@@ -77,7 +77,7 @@ pub fn start_server(
                         &mut global,
                         tex,
                         request.get_param("color").unwrap(),
-                        request.get_param("title").unwrap(),
+                        request.get_param("id").unwrap(),
                     ),
                     None => Response::empty_404(),
                 }
@@ -209,12 +209,12 @@ pub fn get_graph_data(mut db: &mut ServerState) -> Response {
     GraphData { nodes, links }.into()
 }
 
-pub fn get_latex_svg(db: &mut ServerState, tex: String, color: String, title: String) -> Response {
+pub fn get_latex_svg(db: &mut ServerState, tex: String, color: String, id: String) -> Response {
     let node = db
         .sqlite
-        .get_all_nodes(["file", "title"])
+        .get_all_nodes(["file", "id"])
         .into_iter()
-        .filter(|[_, c_title]| c_title.contains(&title))
+        .filter(|[_, c_id]| c_id.contains(&id))
         .next();
 
     let svg = match node {

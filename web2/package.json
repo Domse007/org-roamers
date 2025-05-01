@@ -18,11 +18,13 @@
     "graphology-layout-forceatlas2": "^0.10.1",
     "highlightjs": "^9.16.2",
     "katex": "^0.16.22",
+    "run-p": "^0.0.0",
     "sigma": "^3.0.1",
     "vue": "^3.5.13"
   },
   "devDependencies": {
     "@tsconfig/node22": "^22.0.1",
+    "@types/katex": "^0.16.7",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-vue": "^5.2.3",
     "@vue/eslint-config-prettier": "^10.2.0",

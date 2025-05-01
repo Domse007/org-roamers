@@ -70,7 +70,7 @@ impl<'a> Traverser for HtmlExport<'a> {
     fn event(&mut self, event: Event, ctx: &mut TraversalContext) {
         match event {
             Event::Enter(Container::Document(document)) => {
-                self.output += "<main>";
+                self.output += "<div>";
                 if let Some(title) = document.title() {
                     let _ = write!(
                         &mut self.output,
@@ -79,7 +79,7 @@ impl<'a> Traverser for HtmlExport<'a> {
                     );
                 }
             }
-            Event::Leave(Container::Document(_)) => self.output += "</main>",
+            Event::Leave(Container::Document(_)) => self.output += "</div>",
 
             Event::Enter(Container::Headline(headline)) => {
                 let level = min(headline.level(), 6);
@@ -174,7 +174,7 @@ impl<'a> Traverser for HtmlExport<'a> {
             }
             Event::Leave(Container::SourceBlock(_)) => self.output += "</code></pre>",
 
-            Event::Enter(Container::QuoteBlock(_)) => self.output += "<blockquote>",
+            Event::Enter(Container::QuoteBlock(_)) => self.output += "<blockquote class=\"quote\">",
             Event::Leave(Container::QuoteBlock(_)) => self.output += "</blockquote>",
 
             Event::Enter(Container::VerseBlock(_)) => self.output += "<p class=\"verse\">",

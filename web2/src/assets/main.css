@@ -18,3 +18,7 @@
   --comment: #626880;
   --type: #ca9ee6;
 }
+
+body {
+  background-color: var(--base);
+}
