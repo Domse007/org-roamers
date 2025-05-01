@@ -374,6 +374,16 @@ impl<'a> Traverser for HtmlExport<'a> {
 
             Event::Entity(entity) => self.output += entity.html(),
 
+            Event::InlineSrc(src) => {
+                let code = src.value();
+                let lang = src.language();
+                write!(
+                    self.output,
+                    "<code class=\"language-{}\">{}</code>",
+                    lang, code
+                );
+            }
+
             _ => {}
         }
     }

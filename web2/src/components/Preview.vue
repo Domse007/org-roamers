@@ -41,20 +41,20 @@ const resize = () => {
 
 const katexOptions = {
   delimiters: [
-    {left: "$$", right: "$$", display: true},
-    {left: "\\(", right: "\\)", display: false},
-    {left: "\\begin{equation}", right: "\\end{equation}", display: true},
-    {left: "\\begin{align}", right: "\\end{align}", display: true},
-    {left: "\\begin{align*}", right: "\\end{align*}", display: true},
-    {left: "\\begin{alignat}", right: "\\end{alignat}", display: true},
-    {left: "\\begin{gather}", right: "\\end{gather}", display: true},
-    {left: "\\begin{CD}", right: "\\end{CD}", display: true},
-    {left: "\\begin{algorithm}", right: "\\end{algorithm}", display: true},
-    {left: "\\begin{algorithmic}", right: "\\end{algorithmic}", display: true},
-    {left: "\\begin{center}", right: "\\end{center}", display: true},
-    {left: "\\begin{tikpicture}", right: "\\end{tikzpicture}", display: true},
-    {left: "\\begin{center}", right: "\\end{center}", display: true },
-    {left: "\\[", right: "\\]", display: true}
+    { left: "$$", right: "$$", display: true },
+    { left: "\\(", right: "\\)", display: false },
+    { left: "\\begin{equation}", right: "\\end{equation}", display: true },
+    { left: "\\begin{align}", right: "\\end{align}", display: true },
+    { left: "\\begin{align*}", right: "\\end{align*}", display: true },
+    { left: "\\begin{alignat}", right: "\\end{alignat}", display: true },
+    { left: "\\begin{gather}", right: "\\end{gather}", display: true },
+    { left: "\\begin{CD}", right: "\\end{CD}", display: true },
+    { left: "\\begin{algorithm}", right: "\\end{algorithm}", display: true },
+    { left: "\\begin{algorithmic}", right: "\\end{algorithmic}", display: true },
+    { left: "\\begin{center}", right: "\\end{center}", display: true },
+    { left: "\\begin{tikpicture}", right: "\\end{tikzpicture}", display: true },
+    { left: "\\begin{center}", right: "\\end{center}", display: true },
+    { left: "\\[", right: "\\]", display: true }
   ],
   errorCallback: (message: string, _stack: unknown) => {
     console.log("Trying to process latex on server.");
@@ -72,6 +72,10 @@ const katexOptions = {
       });
   }
 };
+
+// Updpate the selector from 'pre code' to 'code' to autodetect inline src
+// like src_java[:exports code]{ void main() } which has no <pre></pre>.
+hljs.configure({ 'cssSelector': 'code' });
 
 watch(props, () => preview(props.id));
 watch(rendered, async () => {
@@ -192,41 +196,51 @@ pre {
 .hljs-string {
   color: var(--string) !important;
 }
+
 .hljs-section,
 .hljs-selector-class,
 .hljs-template-variable,
 .hljs-deletion {
   color: #800 !important;
 }
+
 .hljs-variable {
   color: var(--ident) !important;
 }
+
 .hljs-title {
   color: var(--ident) !important;
 }
+
 .hljs-comment {
   color: var(--comment) !important;
 }
+
 .hljs-type {
   color: var(--type);
 }
+
 .src {
   background-color: var(--base) !important;
   padding: 5px;
   border-radius: 5px;
 }
+
 td {
   padding: 5px;
   border: 1px solid var(--highlight);
 }
+
 table {
   border-collapse: collapse;
 }
+
 /* This is a bit hacky. */
 .katex-html {
   display: none;
   visibility: hidden;
 }
+
 /* this might be broken for some svgs. */
 svg {
   fill: var(--text);
