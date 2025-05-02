@@ -1,7 +1,7 @@
 use rouille::Response;
 use serde::{Deserialize, Serialize};
 
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Hash, Eq)]
 pub struct RoamID(String);
 
 impl RoamID {
@@ -105,7 +105,7 @@ impl Into<Response> for GraphData {
     }
 }
 
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Hash, Eq)]
 pub struct SearchResponseElement {
     pub display: String,
     pub id: RoamID,

@@ -65,6 +65,10 @@ impl SqliteConnection {
         Ok(this)
     }
 
+    pub fn connection(&mut self) -> &mut Connection {
+        &mut self.connection
+    }
+
     pub fn insert_files<P: AsRef<Path>>(&mut self, roam_path: P) -> Result<()> {
         rebuild::iter_files(&mut self.connection, roam_path)
     }

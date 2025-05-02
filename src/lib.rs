@@ -4,6 +4,7 @@ mod export;
 mod latex;
 pub mod org;
 pub mod parser;
+pub mod search;
 pub mod server;
 pub mod sqlite;
 

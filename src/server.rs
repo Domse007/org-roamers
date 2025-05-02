@@ -20,6 +20,7 @@ use crate::api::APICalls;
 use crate::export::HtmlExport;
 use crate::get_nodes_internal;
 use crate::latex;
+use crate::search::Search;
 use crate::sqlite::SqliteConnection;
 use crate::ServerState;
 
@@ -143,22 +144,15 @@ pub fn get_org_as_html(db: &mut ServerState, name: String) -> Response {
 }
 
 pub fn search(db: &mut ServerState, query: String) -> Response {
-    let nodes = db
-        .sqlite
-        .get_all_nodes(["title", "id"])
-        .into_iter()
-        .filter(|[file, _id]| file.contains(&query))
-        .take(10)
-        .map(|e| SearchResponseElement {
-            display: e[0][1..e[0].len() - 1].to_string(),
-            id: e[1].clone().into(),
-        })
-        .collect();
+    let search = Search::new(query.as_str());
+    let res = search.search(db.sqlite.connection());
 
-    // TODO: currently not working?
-    let _tan_result = match get_nodes_internal(db, query, 10) {
-        Ok(result) => result,
-        Err(_) => return Response::empty_404(),
+    let nodes = match res {
+        Ok(res) => res,
+        Err(err) => {
+            tracing::error!("An error occured while prividing search: {err}");
+            return SearchResponse { providers: vec![] }.into();
+        }
     };
 
     SearchResponse {
