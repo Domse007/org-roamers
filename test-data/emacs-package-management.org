@@ -2,6 +2,7 @@
 :ID:       5a8c7d3e-6f21-4c9d-b3a2-9f8e1d2c7b4e
 :END:
 #+title: Emacs Package Management
+#+filetags: :emacs:lisp:
 
 Emacs supports package management through ELPA, MELPA, and other repositories.
 
@@ -11,7 +12,7 @@ Packages can be installed using:
 M-x package-install RET package-name RET
 #+end_src
 
-** Using `use-package`
+** Using `use-package`                                                  :usepackage:
 :PROPERTIES:
 :ID:       4a948b84-0906-4ea8-9f31-e6a5f958bcb7
 :END:

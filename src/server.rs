@@ -180,7 +180,7 @@ pub fn get_graph_data(mut db: &mut ServerState) -> Response {
 
     let nodes = db
         .sqlite
-        .get_all_nodes(["id", "title", "olp"])
+        .get_all_nodes(["id", "title", "actual_olp"])
         .into_iter()
         .map(|e| RoamNode {
             title: e[1].to_string().into(),

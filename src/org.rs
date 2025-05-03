@@ -17,6 +17,7 @@ pub struct NodeFromOrg {
     pub(crate) level: u64,
     pub(crate) parent: Option<String>,
     pub(crate) olp: Vec<String>,
+    pub(crate) actual_olp: Vec<String>,
     pub(crate) tags: Vec<String>,
     pub(crate) aliases: Vec<String>,
     pub(crate) timestamps: Option<Timestamps>,
@@ -51,6 +52,7 @@ pub struct RoamersTraverser {
     nodes: Vec<NodeFromOrg>,
     id_stack: Vec<(String, String)>,
     olp: Vec<String>,
+    actual_olp: Vec<String>,
 }
 
 impl RoamersTraverser {
@@ -63,6 +65,10 @@ impl RoamersTraverser {
 
     pub fn current_olp(&self) -> Vec<String> {
         self.olp.clone()
+    }
+
+    pub fn current_actual_olp(&self) -> Vec<String> {
+        self.actual_olp.clone()
     }
 }
 
@@ -91,6 +97,7 @@ impl Traverser for RoamersTraverser {
                             aliases,
                             parent: None,
                             olp: vec![],
+                            actual_olp: vec![],
                             ..Default::default()
                         };
 
@@ -100,10 +107,10 @@ impl Traverser for RoamersTraverser {
                     }
                 }
                 // REMARK: org-roam does not use the main title as part of the olp path.
-                // This is really unfortunate and might be a good change in the future.
-                // if let Some(title) = document.title() {
-                //     self.olp.push(title);
-                // }
+                // only org-roamers has this additional field...
+                if let Some(title) = document.title() {
+                    self.actual_olp.push(title);
+                }
             }
             Event::Leave(Container::Document(_)) => {
                 let _ = self.id_stack.pop();
@@ -126,9 +133,10 @@ impl Traverser for RoamersTraverser {
 
                         let id = id.to_string();
                         // TODO: this is wrong.
-                        let title = headline.title_raw();
+                        let title = headline.title_raw().trim().to_string();
                         let level = headline.level() as u64;
                         let olp = self.current_olp();
+                        let actual_olp = self.current_actual_olp();
 
                         // update parent for children.
                         self.id_stack.push((title.clone(), id.clone()));
@@ -153,6 +161,7 @@ impl Traverser for RoamersTraverser {
                             tags,
                             file: self.file.to_string(),
                             olp,
+                            actual_olp,
                             aliases,
                             ..Default::default()
                         };
@@ -161,9 +170,11 @@ impl Traverser for RoamersTraverser {
                     }
                 }
                 self.olp.push(headline.title_raw());
+                self.actual_olp.push(headline.title_raw());
             }
             Event::Leave(Container::Headline(headline)) => {
                 let _ = self.olp.pop();
+                let _ = self.actual_olp.pop();
                 if let Some(properties) = headline.properties() {
                     if let Some(id) = properties.get("ID") {
                         if let Some((_, id_from_stack)) = self.id_stack.last() {
@@ -176,8 +187,19 @@ impl Traverser for RoamersTraverser {
             }
             Event::Enter(Container::Link(link)) => {
                 if let Some((id, description)) = parse_link(link) {
-                    if let Some(node) = self.nodes.last_mut() {
+                    let id_parent = match self.id_stack.last() {
+                        Some(parent) => parent,
+                        None => return,
+                    };
+                    let node = self
+                        .nodes
+                        .iter_mut()
+                        .rev()
+                        .find(|n| n.title == id_parent.0.trim());
+                    if let Some(node) = node {
                         node.links.push((id, description));
+                    } else {
+                        tracing::error!("Did not find parent for {id}");
                     }
                 }
             }
@@ -281,6 +303,7 @@ some text
                     content: "some text\n".to_string(),
                     level: 1,
                     olp: vec![],
+                    actual_olp: vec!["Hello World".to_string()],
                     ..Default::default()
                 }
             ]
@@ -325,6 +348,7 @@ some text
                     uuid: "e655725d-97db-4eec-925a-b80d66ad97e8".to_string(),
                     content: "Welcome\n".to_string(),
                     olp: vec!["Hello World".to_string()],
+                                        actual_olp: vec!["Hello World".to_string()],
                     level: 2,
                     ..Default::default()
                 },
@@ -378,6 +402,7 @@ some text
                     uuid: "e655725d-97db-4eec-925a-b80d66ad97e8".to_string(),
                     content: "Welcome\n*** testing\n:PROPERTIES:\n:ID:       e6557233-97db-4eec-925a-b80d66ad97e8\n:END:\nsome text\n".to_string(),
                     olp: vec!["Hello World".to_string()],
+                                        actual_olp: vec!["Hello World".to_string()],
                     level: 2,
                     ..Default::default()
                 },
@@ -387,6 +412,7 @@ some text
                     uuid: "e6557233-97db-4eec-925a-b80d66ad97e8".to_string(),
                     content: "some text\n".to_string(),
                     olp: vec!["Hello World".to_string(), "Hello".to_string()],
+                    actual_olp: vec!["Hello World".to_string(), "Hello".to_string()],
                     level: 3,
                     ..Default::default()
                 }
@@ -429,6 +455,7 @@ some text
                     uuid: "e6557233-97db-4eec-925a-b80d66ad97e8".to_string(),
                     content: "some text\n".to_string(),
                     olp: vec!["Hello World".to_string(), "Hello".to_string()],
+                    actual_olp: vec!["Hello World".to_string(), "Hello".to_string()],
                     level: 3,
                     ..Default::default()
                 }
@@ -495,12 +522,13 @@ some text
                 },
                 NodeFromOrg {
                     uuid: "e655725f-97db-4eec-925a-b80d66ad97e9".to_string(),
-                    title: "other ".to_string(),
+                    title: "other".to_string(),
                     content: String::new(),
                     level: 1,
                     parent: Some("e655725f-97db-4eec-925a-b80d66ad97e8".to_string()),
                     tags: vec!["test1".to_string(), "test2".to_string()],
                     olp: vec![],
+                    actual_olp: vec!["Test".to_string()],
                     ..Default::default()
                 },
             ]

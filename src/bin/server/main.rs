@@ -32,13 +32,7 @@ fn main() -> Result<ExitCode> {
         }
     };
 
-    let sqlite_path = match args.get(1) {
-        Some(path) => path,
-        None => {
-            error!("Could not get sqlite_path.");
-            return Ok(ExitCode::FAILURE);
-        }
-    };
+    let sqlite_path = args.get(1);
 
     let html_path = {
         let mut path = PathBuf::from_str(conf::CONFIG_PATH).unwrap();
@@ -47,7 +41,7 @@ fn main() -> Result<ExitCode> {
     };
 
     let configuration = Configuration {
-        sqlite_path: sqlite_path.to_string(),
+        sqlite_path: sqlite_path.cloned(),
         html_export_path: html_path,
         roam_path: path.to_string(),
         ip_addr: "localhost".to_string(),
@@ -62,12 +56,24 @@ fn main() -> Result<ExitCode> {
         serve_latex_svg: server::get_latex_svg,
     };
 
-    let global = prepare_internal(
+    let mut global = match prepare_internal(
         configuration.roam_path.as_str(),
-        configuration.sqlite_path.as_str(),
+        configuration.sqlite_path.as_ref().map(|s| s.as_str()),
         configuration.html_export_path.as_path(),
-    )
-    .unwrap();
+    ) {
+        Ok(g) => g,
+        Err(e) => {
+            tracing::error!("An error occured: {e}");
+            return Ok(ExitCode::FAILURE);
+        }
+    };
+
+    if configuration.sqlite_path.is_none() {
+        global
+            .sqlite
+            .insert_files(&configuration.roam_path)
+            .unwrap();
+    }
 
     let runtime = start_server(
         configuration.get_url(false),

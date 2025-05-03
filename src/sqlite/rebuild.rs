@@ -25,12 +25,33 @@ pub fn init_files_table(con: &mut Connection) -> Result<()> {
     Ok(())
 }
 
+/// If the table is constructed by org-roamers, actual_olp is added to the
+/// table, to simplify the graph construction, because org-roam by default does
+/// not consider the toplevel node. Therefore if we have:
+///
+/// ```org
+/// #+title: Maintitle         (with id)
+/// * subtitle                 (with id)
+/// ```
+///
+/// The reference org-roam implementation constructs no olp, while actual_olp
+/// generates `("Maintitle")`.
 pub fn init_nodes_table(con: &mut Connection) -> Result<()> {
     const STMNT: &'static str = concat!(
         "CREATE TABLE nodes (id NOT NULL PRIMARY KEY, file NOT NULL,",
         "level NOT NULL, pos NOT NULL, todo, priority, scheduled text,",
-        "deadline text, title, properties, olp,",
+        "deadline text, title, properties, olp, actual_olp,",
         "FOREIGN KEY (file) REFERENCES files (file) ON DELETE CASCADE);"
+    );
+    con.execute(STMNT, [])?;
+    Ok(())
+}
+
+pub fn init_links_table(con: &mut Connection) -> Result<()> {
+    const STMNT: &str = concat!(
+        "CREATE TABLE links (pos NOT NULL, source NOT NULL, dest NOT NULL,",
+        "type NOT NULL, properties NOT NULL, FOREIGN KEY (source)",
+        "REFERENCES nodes (id) ON DELETE CASCADE);"
     );
     con.execute(STMNT, [])?;
     Ok(())
@@ -48,13 +69,13 @@ pub fn init_aliases(con: &mut Connection) -> Result<()> {
 }
 
 pub fn init_tags(con: &mut Connection) -> Result<()> {
-    let STMNT_TAGS: &'static str = concat!(
+    let stmnt_tags: &'static str = concat!(
         "CREATE TABLE tags (node_id NOT NULL, tag,",
         "FOREIGN KEY (node_id) REFERENCES nodes (id) ON DELETE CASCADE);"
     );
-    let STMNT_INDEX: &'static str = concat!("CREATE INDEX tags_node_id ON tags (node_id);");
-    con.execute(STMNT_TAGS, [])?;
-    con.execute(STMNT_INDEX, [])?;
+    let stmnt_index: &'static str = concat!("CREATE INDEX tags_node_id ON tags (node_id);");
+    con.execute(stmnt_tags, [])?;
+    con.execute(stmnt_index, [])?;
     Ok(())
 }
 
@@ -71,6 +92,7 @@ pub fn insert_node(
     title: &str,
     properties: &str,
     olp: &str,
+    actual_olp: &str,
 ) -> Result<()> {
     let s = |s: &str| {
         if s.is_empty() {
@@ -85,12 +107,41 @@ pub fn insert_node(
         "nodes",
         [
             "id", "file", "level", "pos", "todo", "priority", "scheduled",
-            "deadline", "title", "properties", "olp",
+            "deadline", "title", "properties", "olp", "actual_olp",
         ],
         [
             s(id).as_str(), s(file).as_str(), level.to_string().as_str(), pos.to_string().as_str(),
             if todo { "true" } else { "false" }, priority.to_string().as_str(),
-            s(scheduled).as_str(), s(deadline).as_str(), s(title).as_str(), s(properties).as_str(), s(olp).as_str(),
+            s(scheduled).as_str(), s(deadline).as_str(), s(title).as_str(), s(properties).as_str(),
+            s(olp).as_str(), s(actual_olp).as_str(),
+        ],
+    )?;
+    Ok(())
+}
+
+pub fn insert_tag(con: &mut Connection, id: &str, tag: &str) -> Result<()> {
+    let id = format!("\"\"\"{id}\"\"\"");
+    let tag = format!("\"{tag}\"");
+    insert_row(con, "tags", ["node_id", "tag"], [&id, &tag])?;
+    Ok(())
+}
+
+pub fn insert_link(con: &mut Connection, source: &str, dest: &str) -> Result<()> {
+    const TYPE: &str = "id";
+    const PROPERTIES: &str = "";
+    const POS: usize = 0;
+    let s = |s| format!("\"{}\"", s);
+    let quotify = |s| format!("\"\"\"{}\"\"\"", s);
+    insert_row(
+        con,
+        "links",
+        ["pos", "source", "dest", "type", "properties"],
+        [
+            POS.to_string().as_str(),
+            quotify(source).as_str(),
+            quotify(dest).as_str(),
+            quotify(TYPE).as_str(),
+            s(PROPERTIES).as_str(),
         ],
     )?;
     Ok(())
@@ -103,7 +154,6 @@ pub fn insert_row<const I: usize>(
     vals: [&str; I],
 ) -> Result<()> {
     let stmnt = insert_row_formatter(table, cols, vals);
-    println!("{}", stmnt);
     con.execute(&stmnt, [])?;
     Ok(())
 }
@@ -141,6 +191,7 @@ pub(super) fn iter_files<P: AsRef<Path>>(con: &mut Connection, roam_path: P) -> 
         }
 
         if metadata.is_file() && entry.path().extension() == Some(OsStr::new("org")) {
+            println!("Adding file {:?}", entry.path());
             let nodes = org::get_nodes_from_file(entry.path())?;
             for node in nodes {
                 self::insert_node(
@@ -156,7 +207,15 @@ pub(super) fn iter_files<P: AsRef<Path>>(con: &mut Connection, roam_path: P) -> 
                     node.title.as_str(),
                     "",
                     SqliteConnection::into_olp_string(node.olp).as_str(),
+                    SqliteConnection::into_olp_string(node.actual_olp).as_str(),
                 )?;
+                for tag in node.tags {
+                    insert_tag(con, &node.uuid, &tag)?;
+                }
+                for link in node.links {
+                    println!("    {} -> {}", node.uuid, link.0);
+                    insert_link(con, &node.uuid, &link.0)?;
+                }
                 // TODO: add files. For this title is required, which is the
                 // toplevel `#+title` tile.
             }

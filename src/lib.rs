@@ -29,8 +29,8 @@ pub struct ServerState {
     index_writer: IndexWriter,
     index: Index,
 
-    sqlite: SqliteConnection,
-    html_export_settings: HtmlExportSettings,
+    pub sqlite: SqliteConnection,
+    pub html_export_settings: HtmlExportSettings,
 }
 
 const INDEX_WRITER_SIZE: usize = 50_000_000;
@@ -69,7 +69,7 @@ pub fn init_tantivy(
 
 pub fn prepare_internal<P: AsRef<Path>>(
     path: &str,
-    sqlite_db_path: &str,
+    sqlite_db_path: Option<&str>,
     html_export_settings_path: P,
 ) -> Result<ServerState, Box<dyn std::error::Error>> {
     let path = Path::new(&path);
@@ -89,9 +89,11 @@ pub fn prepare_internal<P: AsRef<Path>>(
         Ok(env) => env,
         Err(err) => return Err(format!("ERROR: could not initialize tantivy: {:?}", err).into()),
     };
-    let sqlite_con = match SqliteConnection::init(Some(sqlite_db_path)) {
+    let sqlite_con = match SqliteConnection::init(sqlite_db_path) {
         Ok(con) => con,
-        Err(e) => return Err("ERROR: could not initialize the sqlite connection".into()),
+        Err(e) => {
+            return Err(format!("ERROR: could not initialize the sqlite connection: {e}").into())
+        }
     };
 
     Ok(ServerState {

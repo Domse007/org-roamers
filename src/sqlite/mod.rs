@@ -30,7 +30,7 @@ impl SqliteConnection {
 
     pub fn init<P: AsRef<Path>>(path: Option<P>) -> Result<Self> {
         let this = match path {
-            Some(path) => Self {
+            Some(ref path) => Self {
                 connection: Connection::open(path)?,
             },
             None => {
@@ -39,6 +39,7 @@ impl SqliteConnection {
                 rebuild::init_version(&mut connection, Self::MIN_VERSION)?;
                 rebuild::init_files_table(&mut connection)?;
                 rebuild::init_nodes_table(&mut connection)?;
+                rebuild::init_links_table(&mut connection)?;
                 rebuild::init_aliases(&mut connection)?;
                 rebuild::init_tags(&mut connection)?;
                 Self { connection }
@@ -266,12 +267,12 @@ impl SqliteConnection {
     /// remove this function (or the entire file).
     pub fn nodes_from_org(&mut self) -> Vec<NodeFromOrg> {
         // TODO: tags must be fetched from tags table
-        self.get_all_nodes(["id", "title", "file", "level", "olp"])
+        self.get_all_nodes(["id", "title", "file", "level", "olp", "actual_olp"])
             .into_iter()
-            .map(|[uuid, title, file, level, olp]| {
+            .map(|[uuid, title, file, level, olp, actual_olp]| {
                 let tags = self.get_tags_for_node(&uuid);
                 let aliases = self.get_aliases_for_node(&uuid);
-                Self::into_node_from_org(uuid, title, file, level, olp, tags, aliases)
+                Self::into_node_from_org(uuid, title, file, level, olp, actual_olp, tags, aliases)
             })
             .collect()
     }
@@ -282,6 +283,7 @@ impl SqliteConnection {
         file: String,
         level: String,
         olp: String,
+        actual_olp: String,
         tags: Vec<String>,
         aliases: Vec<String>,
     ) -> NodeFromOrg {
@@ -292,6 +294,7 @@ impl SqliteConnection {
         let links = Vec::new();
         let level = level.parse::<u64>().unwrap_or(0);
         let olp = Self::parse_olp(olp).unwrap();
+        let actual_olp = Self::parse_olp(actual_olp).unwrap();
         NodeFromOrg {
             uuid,
             title,
@@ -299,6 +302,7 @@ impl SqliteConnection {
             file,
             level,
             olp,
+            actual_olp,
             tags,
             aliases,
             timestamps,
@@ -376,6 +380,7 @@ mod tests {
             "/home/user/org/test.org".to_string(),
             "1".to_string(),
             "(\"test1\" \"test 2\")".to_string(),
+            "(\"test1\" \"test 2\")".to_string(),
             ["tag1", "tag2"].iter().map(ToString::to_string).collect(),
             vec!["t1".to_string()],
         );
@@ -387,6 +392,7 @@ mod tests {
                 file: "/home/user/org/test.org".to_string(),
                 level: 1,
                 olp: ["test1", "test2"].iter().map(ToString::to_string).collect(),
+                actual_olp: ["test1", "test2"].iter().map(ToString::to_string).collect(),
                 tags: ["tag1", "tag2"].iter().map(ToString::to_string).collect(),
                 aliases: vec!["t1".to_string()],
                 content: "* title\n content".to_string(),
