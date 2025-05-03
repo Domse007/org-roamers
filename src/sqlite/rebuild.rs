@@ -1,11 +1,7 @@
-use std::{
-    ffi::OsStr,
-    fs::{self, DirEntry},
-    path::Path,
-};
+use std::{ffi::OsStr, fs, path::Path};
 
 use anyhow::Result;
-use rusqlite::{Connection, Statement};
+use rusqlite::Connection;
 
 use crate::org;
 
@@ -191,7 +187,7 @@ pub(super) fn iter_files<P: AsRef<Path>>(con: &mut Connection, roam_path: P) -> 
         }
 
         if metadata.is_file() && entry.path().extension() == Some(OsStr::new("org")) {
-            println!("Adding file {:?}", entry.path());
+            tracing::info!("Adding file {:?}", entry.path());
             let nodes = org::get_nodes_from_file(entry.path())?;
             for node in nodes {
                 self::insert_node(
@@ -213,7 +209,7 @@ pub(super) fn iter_files<P: AsRef<Path>>(con: &mut Connection, roam_path: P) -> 
                     insert_tag(con, &node.uuid, &tag)?;
                 }
                 for link in node.links {
-                    println!("    {} -> {}", node.uuid, link.0);
+                    tracing::info!("    {} -> {}", node.uuid, link.0);
                     insert_link(con, &node.uuid, &link.0)?;
                 }
                 // TODO: add files. For this title is required, which is the

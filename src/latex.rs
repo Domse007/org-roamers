@@ -2,7 +2,6 @@ use std::io::Read;
 use std::process::Command;
 use std::process::Stdio;
 use std::{
-    fmt::Display,
     fs::File,
     io::Write,
     path::{Path, PathBuf},

@@ -377,7 +377,7 @@ impl<'a> Traverser for HtmlExport<'a> {
             Event::InlineSrc(src) => {
                 let code = src.value();
                 let lang = src.language();
-                write!(
+                let _ = write!(
                     self.output,
                     "<code class=\"language-{}\">{}</code>",
                     lang, code

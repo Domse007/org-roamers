@@ -34,7 +34,7 @@ impl From<String> for RoamID {
 pub struct RoamTitle(String);
 
 impl RoamTitle {
-    fn title(&self) -> &str {
+    pub fn title(&self) -> &str {
         &self.0
     }
 }

@@ -7,7 +7,7 @@ use tracing::info;
 use crate::api::types::SearchResponseElement;
 
 #[derive(PartialEq, Debug)]
-struct ForNode<'a> {
+pub struct ForNode<'a> {
     node_search: Vec<&'a str>,
     tag_filters: Vec<&'a str>,
 }
@@ -86,7 +86,7 @@ fn format_search_param(search: &[&str]) -> String {
 }
 
 #[derive(PartialEq, Debug)]
-struct ForTag<'a> {
+pub struct ForTag<'a> {
     tag_search: Vec<&'a str>,
 }
 

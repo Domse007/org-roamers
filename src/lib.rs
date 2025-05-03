@@ -1,4 +1,5 @@
 pub mod api;
+#[allow(warnings)]
 pub mod database;
 mod export;
 mod latex;
@@ -11,8 +12,6 @@ pub mod sqlite;
 use export::HtmlExportSettings;
 use serde::Serialize;
 use sqlite::SqliteConnection;
-use tantivy::collector::TopDocs;
-use tantivy::query::QueryParser;
 use tempfile::TempDir;
 use tracing::info;
 
@@ -20,14 +19,15 @@ use std::error::Error;
 use std::fs;
 use std::path::Path;
 
+use tantivy::schema::*;
 use tantivy::{doc, Index, IndexWriter};
-use tantivy::{schema::*, DocAddress, Score};
 
 pub struct ServerState {
+    // TODO: use tantivy as a search backend.
     _tempdir: TempDir,
-    schema: Schema,
-    index_writer: IndexWriter,
-    index: Index,
+    _schema: Schema,
+    _index_writer: IndexWriter,
+    _index: Index,
 
     pub sqlite: SqliteConnection,
     pub html_export_settings: HtmlExportSettings,
@@ -98,40 +98,40 @@ pub fn prepare_internal<P: AsRef<Path>>(
 
     Ok(ServerState {
         _tempdir: tempdir,
-        index_writer: indexwriter,
-        index,
-        schema,
+        _index_writer: indexwriter,
+        _index: index,
+        _schema: schema,
         sqlite: sqlite_con,
         html_export_settings: HtmlExportSettings::new(html_export_settings_path).unwrap(),
     })
 }
 
-fn add_node_internal(
-    db: &mut ServerState,
-    title: String,
-    id: String,
-    body: String,
-    file: String,
-) -> Result<(), Box<dyn Error>> {
-    let title_field = db.schema.get_field("title").unwrap();
-    let id_field = db.schema.get_field("id").unwrap();
-    let body_field = db.schema.get_field("body").unwrap();
-    let file_field = db.schema.get_field("file").unwrap();
+// fn add_node_internal(
+//     db: &mut ServerState,
+//     title: String,
+//     id: String,
+//     body: String,
+//     file: String,
+// ) -> Result<(), Box<dyn Error>> {
+//     let title_field = db._schema.get_field("title").unwrap();
+//     let id_field = db._schema.get_field("id").unwrap();
+//     let body_field = db._schema.get_field("body").unwrap();
+//     let file_field = db._schema.get_field("file").unwrap();
 
-    let mut document = TantivyDocument::new();
-    document.add_text(title_field, title.as_str());
-    document.add_text(id_field, id);
-    document.add_text(body_field, body);
-    document.add_text(file_field, file);
+//     let mut document = TantivyDocument::new();
+//     document.add_text(title_field, title.as_str());
+//     document.add_text(id_field, id);
+//     document.add_text(body_field, body);
+//     document.add_text(file_field, file);
 
-    db.index_writer.add_document(document)?;
+//     db._index_writer.add_document(document)?;
 
-    info!("Written document: {}.", &title);
+//     info!("Written document: {}.", &title);
 
-    db.index_writer.commit()?;
+//     db._index_writer.commit()?;
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 #[derive(Serialize)]
 pub struct GetNodesResult {
@@ -139,50 +139,50 @@ pub struct GetNodesResult {
     title: String,
 }
 
-#[derive(Serialize)]
-pub struct GetNodesResultWrapper {
-    results: Vec<GetNodesResult>,
-}
+// #[derive(Serialize)]
+// pub struct GetNodesResultWrapper {
+//     results: Vec<GetNodesResult>,
+// }
 
-fn get_nodes_internal(
-    db: &mut ServerState,
-    search: String,
-    num_results: usize,
-) -> Result<GetNodesResultWrapper, Box<dyn Error>> {
-    let reader = db.index.reader()?;
+// fn get_nodes_internal(
+//     db: &mut ServerState,
+//     search: String,
+//     num_results: usize,
+// ) -> Result<GetNodesResultWrapper, Box<dyn Error>> {
+//     let reader = db.index.reader()?;
 
-    let searcher = reader.searcher();
+//     let searcher = reader.searcher();
 
-    let title_field = db.schema.get_field("title").unwrap();
-    let id_field = db.schema.get_field("id").unwrap();
-    let body_field = db.schema.get_field("body").unwrap();
+//     let title_field = db.schema.get_field("title").unwrap();
+//     let id_field = db.schema.get_field("id").unwrap();
+//     let body_field = db.schema.get_field("body").unwrap();
 
-    let query_parser = QueryParser::for_index(&db.index, vec![title_field, id_field, body_field]);
+//     let query_parser = QueryParser::for_index(&db.index, vec![title_field, id_field, body_field]);
 
-    let query = query_parser.parse_query(search.as_str())?;
+//     let query = query_parser.parse_query(search.as_str())?;
 
-    let top_docs: Vec<(Score, DocAddress)> =
-        searcher.search(&query, &TopDocs::with_limit(num_results))?;
+//     let top_docs: Vec<(Score, DocAddress)> =
+//         searcher.search(&query, &TopDocs::with_limit(num_results))?;
 
-    let mut results = Vec::with_capacity(num_results);
+//     let mut results = Vec::with_capacity(num_results);
 
-    for (_score, address) in top_docs {
-        let retrieved_doc = searcher.doc::<TantivyDocument>(address)?;
-        let title = retrieved_doc
-            .get_first(title_field)
-            .unwrap()
-            .as_str()
-            .unwrap()
-            .to_string();
-        let id = retrieved_doc
-            .get_first(id_field)
-            .unwrap()
-            .as_str()
-            .unwrap()
-            .to_string();
+//     for (_score, address) in top_docs {
+//         let retrieved_doc = searcher.doc::<TantivyDocument>(address)?;
+//         let title = retrieved_doc
+//             .get_first(title_field)
+//             .unwrap()
+//             .as_str()
+//             .unwrap()
+//             .to_string();
+//         let id = retrieved_doc
+//             .get_first(id_field)
+//             .unwrap()
+//             .as_str()
+//             .unwrap()
+//             .to_string();
 
-        results.push(GetNodesResult { id, title })
-    }
+//         results.push(GetNodesResult { id, title })
+//     }
 
-    Ok(GetNodesResultWrapper { results })
-}
+//     Ok(GetNodesResultWrapper { results })
+// }
