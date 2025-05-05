@@ -9,6 +9,8 @@ use std::thread::JoinHandle;
 
 use orgize::Org;
 use rouille::{router, Response, Server};
+use serde::Deserialize;
+use serde::Serialize;
 
 use crate::api::types::GraphData;
 use crate::api::types::RoamLink;
@@ -21,6 +23,11 @@ use crate::latex;
 use crate::search::Search;
 use crate::sqlite::SqliteConnection;
 use crate::ServerState;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ServerConfiguration {
+    pub root: String,
+}
 
 pub struct ServerRuntime {
     handle: JoinHandle<()>,
@@ -36,11 +43,12 @@ impl ServerRuntime {
 
 pub fn start_server(
     url: String,
-    root: String,
+    conf: ServerConfiguration,
     calls: APICalls,
     _global: ServerState,
 ) -> Result<ServerRuntime, Box<dyn Error>> {
-    let root: &'static str = Box::leak(Box::new(root));
+    tracing::info!("Using server configuration: {conf:?}");
+    let conf: &'static ServerConfiguration = Box::leak(Box::new(conf));
 
     tracing::info!(
         "Using HTML settings: {}",
@@ -53,7 +61,7 @@ pub fn start_server(
         let mut global = lock.lock().unwrap();
         router!(request,
             (GET) (/)  => {
-                (calls.default_route)(&mut global, root.to_string(), None)
+                (calls.default_route)(&mut global, conf.root.to_string(), None)
             },
             (GET) (/org) => {
                 match request.get_param("title") {
@@ -81,7 +89,7 @@ pub fn start_server(
                     None => Response::empty_404(),
                 }
             },
-            _ => (calls.default_route)(&mut global, root.to_string(), Some(request.url()))
+            _ => (calls.default_route)(&mut global, conf.root.to_string(), Some(request.url()))
         )
     })
     .unwrap();
@@ -104,14 +112,26 @@ pub fn default_route_content(_db: &mut ServerState, root: String, url: Option<St
             "html" => "text/html",
             "js" => "text/javascript",
             "css" => "text/css",
-            _ => return Response::empty_404(),
+            _ => {
+                tracing::error!("Unsupported file extension.");
+                return Response::empty_404();
+            }
         },
-        _ => return Response::empty_404(),
+        _ => {
+            tracing::error!("No file extension provided.");
+            return Response::empty_404();
+        }
     };
 
-    let file = match File::open(path) {
-        Ok(file) => file,
-        Err(_) => return Response::empty_404(),
+    let file = match File::open(&path) {
+        Ok(file) => {
+            tracing::info!("Serving file {path:?}");
+            file
+        }
+        Err(_) => {
+            tracing::error!("File not found: {path:?}");
+            return Response::empty_404();
+        }
     };
 
     Response::from_file(mime, file)

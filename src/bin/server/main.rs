@@ -1,7 +1,7 @@
 mod cli;
 mod conf;
 
-use std::{env, panic, path::PathBuf, process::ExitCode, str::FromStr};
+use std::{env, fs, panic, path::PathBuf, process::ExitCode, str::FromStr};
 
 use anyhow::Result;
 use cli::run_cli_server;
@@ -75,9 +75,29 @@ fn main() -> Result<ExitCode> {
             .unwrap();
     }
 
+    let server_conf_path = {
+        let assemble = |s| {
+            let mut p = PathBuf::from_str(s).unwrap();
+            p.push("server_conf.json");
+            p
+        };
+        let path = assemble(conf::CONFIG_PATH);
+        if !path.exists() {
+            assemble("./")
+        } else {
+            path
+        }
+    };
+
+    info!("Using config path {server_conf_path:?}");
+
+    let server_conf_serialized = fs::read_to_string(server_conf_path).unwrap();
+
+    let server_configuration = serde_json::from_str(server_conf_serialized.as_str()).unwrap();
+
     let runtime = start_server(
         configuration.get_url(false),
-        "web/".to_string(),
+        server_configuration,
         calls,
         global,
     )
