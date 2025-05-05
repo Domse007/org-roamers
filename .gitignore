@@ -1,5 +1,4 @@
 /target
 *.so
 node_modules
-web
-/web2/dist/
+/web/dist/
