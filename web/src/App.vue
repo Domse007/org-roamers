@@ -15,7 +15,7 @@ const updatePreviewID = (id: string) => {
   <header></header>
   <main>
     <Search @open-node="updatePreviewID"></Search>
-    <Graph></Graph>
+    <Graph @open-node="updatePreviewID"></Graph>
     <Preview :id="previewID"></Preview>
   </main>
 </template>

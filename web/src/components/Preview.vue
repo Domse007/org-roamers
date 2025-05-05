@@ -83,12 +83,26 @@ const katexOptions = {
 // like src_java[:exports code]{ void main() } which has no <pre></pre>.
 hljs.configure({ cssSelector: "code" });
 
+const configureIDLinks = () => {
+  Array.from(document.getElementsByClassName("org-preview-id-link")).forEach(
+    (elem: Element) =>
+      elem.addEventListener("click", (elem) => {
+        if (!elem.target) return;
+        const target = <HTMLElement>elem.target;
+        preview(target.id);
+      }),
+  );
+};
+
+const collapseIcon = () => shown.value == "none" ? "<" : ">";
+
 watch(props, () => preview(props.id));
 watch(rendered, async () => {
   await nextTick();
   hljs.highlightAll();
   console.log(`Ref: ${preview_ref}`);
   renderMathInElement(preview_ref.value!, katexOptions);
+  configureIDLinks();
 });
 </script>
 
@@ -97,9 +111,8 @@ watch(rendered, async () => {
     class="collapse-btn"
     tabindex="1"
     :onclick="resize"
-    :style="{ position: 'absolute', right: '0px' }"
-  >
-    >
+    :style="{ position: 'absolute', right: '0px' }">
+  {{ collapseIcon() }}
   </div>
   <div class="org-preview-outerframe" :style="{ display: shown }">
     <div class="collapse-btn" tabindex="1" :onclick="resize">></div>
@@ -257,5 +270,9 @@ table {
 /* this might be broken for some svgs. */
 svg {
   fill: var(--text);
+}
+
+.org-preview-id-link {
+  cursor: pointer;
 }
 </style>

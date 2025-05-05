@@ -106,14 +106,11 @@ function setupGraph() {
     labelColor: { color: textColor },
   });
 
-  sigma.on("downNode", (e) => {
-    const node = e.node;
-    console.log(node);
-    // preview(node);
-  });
+  sigma.on("downNode", (e) => emit("openNode", e.node));
 }
 
 onMounted(updateGraph);
+const emit = defineEmits(["openNode"]);
 </script>
 
 <template>

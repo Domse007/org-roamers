@@ -113,7 +113,11 @@ pub fn default_route_content(_db: &mut ServerState, root: String, url: Option<St
             "js" => "text/javascript",
             "css" => "text/css",
             _ => {
-                tracing::error!("Unsupported file extension.");
+                tracing::error!(
+                    "Unsupported file extension: {:?} ({:?})",
+                    path.extension(),
+                    path
+                );
                 return Response::empty_404();
             }
         },
