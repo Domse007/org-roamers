@@ -174,7 +174,21 @@ fn insert_row_formatter<const I: usize>(table: &str, cols: [&str; I], vals: [&st
     )
 }
 
-pub(super) fn iter_files<P: AsRef<Path>>(con: &mut Connection, roam_path: P) -> Result<()> {
+#[derive(Default)]
+pub(crate) struct IterFilesStats {
+    pub num_files: usize,
+    pub num_nodes: usize,
+    pub num_links: usize,
+    pub num_tags: usize,
+}
+
+pub(super) fn iter_files<P: AsRef<Path>>(
+    con: &mut Connection,
+    roam_path: P,
+    stats: &mut IterFilesStats,
+) -> Result<()> {
+    let inc = |n: &mut usize| *n += 1;
+
     for entry in fs::read_dir(roam_path)? {
         let entry = if entry.is_ok() {
             entry.unwrap()
@@ -183,13 +197,14 @@ pub(super) fn iter_files<P: AsRef<Path>>(con: &mut Connection, roam_path: P) -> 
         };
         let metadata = entry.metadata()?;
         if metadata.is_dir() {
-            iter_files(con, entry.path())?;
+            iter_files(con, entry.path(), stats)?;
         }
 
         if metadata.is_file() && entry.path().extension() == Some(OsStr::new("org")) {
-            tracing::info!("Adding file {:?}", entry.path());
+            inc(&mut stats.num_files);
             let nodes = org::get_nodes_from_file(entry.path())?;
             for node in nodes {
+                inc(&mut stats.num_nodes);
                 self::insert_node(
                     con,
                     &node.uuid,
@@ -206,10 +221,11 @@ pub(super) fn iter_files<P: AsRef<Path>>(con: &mut Connection, roam_path: P) -> 
                     SqliteConnection::into_olp_string(node.actual_olp).as_str(),
                 )?;
                 for tag in node.tags {
+                    inc(&mut stats.num_tags);
                     insert_tag(con, &node.uuid, &tag)?;
                 }
                 for link in node.links {
-                    tracing::info!("    {} -> {}", node.uuid, link.0);
+                    inc(&mut stats.num_links);
                     insert_link(con, &node.uuid, &link.0)?;
                 }
                 // TODO: add files. For this title is required, which is the

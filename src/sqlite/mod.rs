@@ -2,6 +2,7 @@ use std::fmt::Write;
 use std::{collections::HashMap, path::Path};
 
 use anyhow::{bail, Result};
+use rebuild::IterFilesStats;
 use rusqlite::Connection;
 use tracing::info;
 
@@ -71,7 +72,14 @@ impl SqliteConnection {
     }
 
     pub fn insert_files<P: AsRef<Path>>(&mut self, roam_path: P) -> Result<()> {
-        rebuild::iter_files(&mut self.connection, roam_path)
+        let mut stats = IterFilesStats::default();
+        let res = rebuild::iter_files(&mut self.connection, roam_path, &mut stats);
+        #[rustfmt::skip]
+        tracing::info!(
+            "Indexed {} nodes over {} files containing {} links and {} tags",
+            stats.num_nodes, stats.num_files, stats.num_links, stats.num_tags
+        );
+        res
     }
 
     pub fn get_links_from(&mut self, id: &str) -> HashMap<String, String> {
