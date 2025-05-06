@@ -13,7 +13,7 @@ const preview_ref = useTemplateRef("preview-ref");
 const preview = (id: string) => {
   current_id = id;
   console.log(`Previewing ${id}`);
-  fetch(`/org?title=${id}`)
+  fetch(`/org?id=${id}`)
     .then((response) => {
       return response.text();
     })

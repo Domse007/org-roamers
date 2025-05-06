@@ -13,8 +13,10 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::api::types::GraphData;
+use crate::api::types::RoamID;
 use crate::api::types::RoamLink;
 use crate::api::types::RoamNode;
+use crate::api::types::RoamTitle;
 use crate::api::types::SearchResponse;
 use crate::api::types::SearchResponseProvider;
 use crate::api::APICalls;
@@ -64,10 +66,16 @@ pub fn start_server(
                 (calls.default_route)(&mut global, conf.root.to_string(), None)
             },
             (GET) (/org) => {
-                match request.get_param("title") {
-                    Some(title) => (calls.get_org_as_html)(&mut global, title),
-                    None => Response::empty_404(),
-                }
+                let query = match request.get_param("id") {
+                    Some(id) => Query::ById(id.into()),
+                    None => {
+                        match request.get_param("title") {
+                            Some(title) => Query::ByTitle(title.into()),
+                            None => return Response::empty_404(),
+                        }
+                    }
+                };
+                (calls.get_org_as_html)(&mut global, query)
             },
             (GET) (/search) => {
                 match request.get_param("q") {
@@ -141,12 +149,20 @@ pub fn default_route_content(_db: &mut ServerState, root: String, url: Option<St
     Response::from_file(mime, file)
 }
 
-pub fn get_org_as_html(db: &mut ServerState, name: String) -> Response {
+pub enum Query {
+    ByTitle(RoamTitle),
+    ById(RoamID),
+}
+
+pub fn get_org_as_html(db: &mut ServerState, query: Query) -> Response {
     let [_title, _id, file] = match db
         .sqlite
         .get_all_nodes(["title", "id", "file"])
         .into_iter()
-        .filter(|[title, node, _]| title.contains(&name) || node.contains(&name))
+        .filter(|[title, node, _]| match &query {
+            Query::ByTitle(name) => title.contains(name.title()),
+            Query::ById(id) => node.contains(id.id()),
+        })
         .next()
     {
         Some(node) => node,
