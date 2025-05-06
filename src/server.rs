@@ -120,6 +120,7 @@ pub fn default_route_content(_db: &mut ServerState, root: String, url: Option<St
             "html" => "text/html",
             "js" => "text/javascript",
             "css" => "text/css",
+            "ico" => "image/x-icon",
             _ => {
                 tracing::error!(
                     "Unsupported file extension: {:?} ({:?})",
