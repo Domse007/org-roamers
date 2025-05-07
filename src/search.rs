@@ -61,14 +61,28 @@ impl<'a> ForNode<'a> {
                     result.push(SearchResponseElement {
                         display: element.1[1..element.1.len() - 1].to_string(),
                         id: element.0.into(),
+                        tags: tags.collect(),
                     });
                 }
             }
         } else {
             result = elements
-                .map(|row| SearchResponseElement {
-                    display: row.1[1..row.1.len() - 1].to_string(),
-                    id: row.0.into(),
+                .map(|row| {
+                    let to_query = &row.0;
+                    let stmnt = "SELECT node_id, tag FROM tags WHERE node_id = ?1";
+                    let mut stmnt = con.prepare(stmnt).unwrap();
+                    let tags = stmnt
+                        .query_map(rusqlite::params![to_query], |row| {
+                            Ok(row.get_unwrap::<usize, String>(1))
+                        })
+                        .unwrap()
+                        .map(Result::unwrap)
+                        .collect();
+                    SearchResponseElement {
+                        display: row.1[1..row.1.len() - 1].to_string(),
+                        id: row.0.into(),
+                        tags: tags,
+                    }
                 })
                 .collect();
         }
@@ -102,21 +116,27 @@ impl<'a> ForTag<'a> {
             params
         );
         let mut stmnt = con.prepare(stmnt.as_str())?;
-        let ids = stmnt
+        let (ids, tags): (Vec<String>, Vec<String>) = stmnt
             .query_map([], |row| {
-                Ok(row.get_unwrap::<usize, String>(0).to_lowercase())
+                Ok((
+                    row.get_unwrap::<usize, String>(0).to_lowercase(),
+                    row.get_unwrap::<usize, String>(1).to_lowercase(),
+                ))
             })?
-            .map(Result::unwrap);
+            .map(Result::unwrap)
+            .unzip();
         let mut res = HashSet::new();
         const STMNT: &str = "SELECT id, title FROM nodes WHERE id = ?1";
         let mut stmnt = con.prepare(STMNT)?;
         for id in ids {
+            let tags = tags.clone();
             let elem = stmnt
                 .query_map([id], |row| {
                     let display: String = row.get_unwrap(1);
                     Ok(SearchResponseElement {
                         display: display[1..display.len() - 1].to_string(),
                         id: row.get_unwrap::<usize, String>(0).into(),
+                        tags: tags.clone(),
                     })
                 })?
                 .map(Result::unwrap)

@@ -16,6 +16,7 @@ export interface SearchResponse {
     results: {
       display: string;
       id: string;
+      tags: string[];
     }[];
   }[];
 }

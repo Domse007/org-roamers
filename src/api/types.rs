@@ -120,6 +120,7 @@ impl Into<Response> for GraphData {
 pub struct SearchResponseElement {
     pub display: String,
     pub id: RoamID,
+    pub tags: Vec<String>,
 }
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
@@ -218,13 +219,15 @@ mod tests {
                 results: vec![SearchResponseElement {
                     display: "Vec<T>".to_string(),
                     id: RoamID("bcb77e31-b4c6-4cf9-a05d-47b766349e57".to_string()),
+                    tags: vec!["rust".to_string()],
                 }],
             }],
         };
 
         let expected = concat!(
             "{\"providers\":[{\"source\":\"sqlite\",\"results\":[{\"display\"",
-            ":\"Vec<T>\",\"id\":\"bcb77e31-b4c6-4cf9-a05d-47b766349e57\"}]}]}"
+            ":\"Vec<T>\",\"id\":\"bcb77e31-b4c6-4cf9-a05d-47b766349e57\",",
+            "\"tags\":[\"rust\"]}]}]}"
         );
 
         assert_eq!(serde_json::to_string(&data).unwrap(), expected);

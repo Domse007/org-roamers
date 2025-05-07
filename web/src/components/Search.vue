@@ -3,7 +3,9 @@ import { ref, type Ref } from "vue";
 import { type SearchResponse } from "../types.ts";
 import SearchSuggestion from "./SearchSuggestion.vue";
 
-const searchSuggestions: Ref<{ display: string; id: string }[]> = ref([]);
+const searchSuggestions: Ref<
+  { display: string; id: string; tags: string[] }[]
+> = ref([]);
 const searchterm: Ref<string> = ref("");
 const showSuggestions: Ref<boolean> = ref(false);
 
@@ -46,6 +48,7 @@ const searchOnLeave = () => {
         v-for="item in searchSuggestions"
         :display="item.display"
         :id="item.id"
+        :tags="item.tags"
       >
       </SearchSuggestion>
     </div>
