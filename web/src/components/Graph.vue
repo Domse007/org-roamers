@@ -6,11 +6,12 @@ import FA2Layout from "graphology-layout-forceatlas2/worker";
 import Sigma from "sigma";
 import { NodeBorderProgram } from "@sigma/node-border";
 import type GraphData from "@/types";
-import { onMounted } from "vue";
+import { onMounted, watch } from "vue";
 
 const randomNumber = (min: number, max: number) =>
   Math.random() * (max - min) + min;
-const graph = new MultiGraph();
+let graph = new MultiGraph();
+let sigma = null;
 
 const updateGraph = () => {
   const style = window.getComputedStyle(document.body);
@@ -98,7 +99,7 @@ function setupGraph() {
   const style = window.getComputedStyle(document.body);
   const textColor = style.getPropertyValue("--text");
   console.log(`text color: ${textColor}`);
-  const sigma = new Sigma(graph, element, {
+  sigma = new Sigma(graph, element, {
     defaultNodeType: "bordered",
     nodeProgramClasses: {
       bordered: NodeBorderProgram,
@@ -108,6 +109,15 @@ function setupGraph() {
 
   sigma.on("downNode", (e) => emit("openNode", e.node));
 }
+
+const prop = defineProps<{ count: number }>();
+watch(prop, () => {
+  console.log("Trying to update");
+  graph = new MultiGraph();
+  sigma = null;
+  document.getElementById("graph")!.innerHTML = "";
+  updateGraph();
+});
 
 onMounted(updateGraph);
 const emit = defineEmits(["openNode"]);

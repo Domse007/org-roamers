@@ -50,6 +50,7 @@ const katexOptions = {
     { left: "\\begin{align*}", right: "\\end{align*}", display: true },
     { left: "\\begin{alignat}", right: "\\end{alignat}", display: true },
     { left: "\\begin{gather}", right: "\\end{gather}", display: true },
+    { left: "\\begin{gather*}", right: "\\end{gather*}", display: true },
     { left: "\\begin{CD}", right: "\\end{CD}", display: true },
     { left: "\\begin{algorithm}", right: "\\end{algorithm}", display: true },
     {
@@ -94,7 +95,7 @@ const configureIDLinks = () => {
   );
 };
 
-const collapseIcon = () => shown.value == "none" ? "<" : ">";
+const collapseIcon = () => (shown.value == "none" ? "<" : ">");
 
 watch(props, () => preview(props.id));
 watch(rendered, async () => {
@@ -111,8 +112,9 @@ watch(rendered, async () => {
     class="collapse-btn"
     tabindex="1"
     :onclick="resize"
-    :style="{ position: 'absolute', right: '0px' }">
-  {{ collapseIcon() }}
+    :style="{ position: 'absolute', right: '0px' }"
+  >
+    {{ collapseIcon() }}
   </div>
   <div class="org-preview-outerframe" :style="{ display: shown }">
     <div class="collapse-btn" tabindex="1" :onclick="resize">></div>
