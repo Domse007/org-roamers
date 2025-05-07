@@ -8,6 +8,7 @@ pub mod parser;
 pub mod search;
 pub mod server;
 pub mod sqlite;
+pub mod subtree;
 
 use export::HtmlExportSettings;
 use serde::Serialize;

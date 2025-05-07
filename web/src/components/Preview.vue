@@ -2,6 +2,7 @@
 import hljs from "highlight.js";
 import { nextTick, ref, useTemplateRef, watch, type Ref } from "vue";
 import renderMathInElement from "katex/contrib/auto-render";
+import { getScope } from "../settings.ts";
 
 const props = defineProps<{ id: string }>();
 const shown: Ref<"none" | "flex"> = ref("none");
@@ -13,7 +14,8 @@ const preview_ref = useTemplateRef("preview-ref");
 const preview = (id: string) => {
   current_id = id;
   console.log(`Previewing ${id}`);
-  fetch(`/org?id=${id}`)
+  const scope: "file" | "node" = getScope();
+  fetch(`/org?id=${id}&scope=${scope}`)
     .then((response) => {
       return response.text();
     })

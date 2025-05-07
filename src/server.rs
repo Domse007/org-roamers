@@ -24,6 +24,7 @@ use crate::export::HtmlExport;
 use crate::latex;
 use crate::search::Search;
 use crate::sqlite::SqliteConnection;
+use crate::subtree::Subtree;
 use crate::ServerState;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -66,6 +67,8 @@ pub fn start_server(
                 (calls.default_route)(&mut global, conf.root.to_string(), None)
             },
             (GET) (/org) => {
+                let scope = request.get_param("scope")
+                    .unwrap_or_else(|| "file".to_string());
                 let query = match request.get_param("id") {
                     Some(id) => Query::ById(id.into()),
                     None => {
@@ -75,7 +78,7 @@ pub fn start_server(
                         }
                     }
                 };
-                (calls.get_org_as_html)(&mut global, query)
+                (calls.get_org_as_html)(&mut global, query, scope)
             },
             (GET) (/search) => {
                 match request.get_param("q") {
@@ -155,8 +158,8 @@ pub enum Query {
     ById(RoamID),
 }
 
-pub fn get_org_as_html(db: &mut ServerState, query: Query) -> Response {
-    let [_title, _id, file] = match db
+pub fn get_org_as_html(db: &mut ServerState, query: Query, scope: String) -> Response {
+    let [_title, id, file] = match db
         .sqlite
         .get_all_nodes(["title", "id", "file"])
         .into_iter()
@@ -174,6 +177,12 @@ pub fn get_org_as_html(db: &mut ServerState, query: Query) -> Response {
     let contents = match std::fs::read_to_string(file.replace('"', "")) {
         Ok(f) => f,
         Err(_) => return Response::text("Could not get file contents."),
+    };
+
+    let contents = if scope == "file" {
+        contents
+    } else {
+        Subtree::new(id.into(), contents.as_str()).unwrap_or(contents)
     };
 
     let mut handler = HtmlExport::new(&db.html_export_settings);
