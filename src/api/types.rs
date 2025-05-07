@@ -8,6 +8,17 @@ impl RoamID {
     pub fn id(&self) -> &str {
         &self.0
     }
+
+    /// ```rust
+    /// use org_roamers::api::types::RoamID;
+    ///
+    /// let id: RoamID = "t t".into();
+    /// assert_eq!(id.with_quotes(3), "\"\"\"t t\"\"\"");
+    /// ```
+    pub fn with_quotes(&self, num: usize) -> String {
+        let quotes = "\"".repeat(num);
+        format!("{}{}{}", quotes, self.0, quotes)
+    }
 }
 
 impl From<&str> for RoamID {

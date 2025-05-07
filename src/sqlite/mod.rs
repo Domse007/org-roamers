@@ -335,7 +335,17 @@ impl SqliteConnection {
         olp_s
     }
 
-    pub(crate) fn parse_olp(olp: String) -> anyhow::Result<Vec<String>> {
+    /// Parse an olp string.
+    /// ```rust
+    /// use org_roamers::sqlite::SqliteConnection;
+    ///
+    /// assert_eq!(
+    ///     SqliteConnection::parse_olp(
+    ///         "(\"VLIW\" \"Instruction\" )".to_string()
+    ///     ).unwrap(),
+    ///     vec!["VLIW".to_string(), "Instruction".to_string()]
+    /// );
+    pub fn parse_olp(olp: String) -> anyhow::Result<Vec<String>> {
         let mut parser = Parser::new(&olp);
         let whitespace = |parser: &mut Parser| {
             let mut attempt = parser.attempt();

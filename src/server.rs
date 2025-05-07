@@ -207,7 +207,7 @@ pub fn get_graph_data(mut db: &mut ServerState) -> Response {
     let olp = |s: String, db: &mut ServerState| {
         (!s.is_empty())
             .then(|| {
-                SqliteConnection::parse_olp(s)
+                SqliteConnection::parse_olp(s[1..s.len() - 1].to_string())
                     .unwrap_or_default()
                     .pop()
                     .unwrap_or_default()
@@ -231,7 +231,7 @@ pub fn get_graph_data(mut db: &mut ServerState) -> Response {
     let mut links = db.sqlite.get_all_links();
 
     for node in &nodes {
-        if let Some(parent_id) = db.sqlite.get_parent_for_id(node.id.id()) {
+        if let Some(parent_id) = db.sqlite.get_parent_for_id(&node.id.id()) {
             links.push(RoamLink {
                 from: parent_id.into(),
                 to: node.id.clone(),
