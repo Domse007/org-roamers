@@ -256,6 +256,12 @@ impl<'a> Traverser for HtmlExport<'a> {
                 self.output += "</table>";
             }
             Event::Enter(Container::OrgTableRow(row)) => {
+                if let Some(child) = row.syntax().first_child() {
+                    if child.text().to_string().trim() == "/" {
+                        ctx.skip();
+                        return;
+                    }
+                }
                 if row.is_rule() {
                     match self.table_row {
                         TableRow::Body => {
@@ -387,4 +393,50 @@ impl<'a> Traverser for HtmlExport<'a> {
             _ => {}
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use orgize::Org;
+
+    use super::*;
+    #[test]
+    fn test_org_table_export_advice_header() {
+        let org = concat!(
+            "| / | <>    |   |\n",
+            "|---+-------+---|\n",
+            "|   | hello | 1 |\n",
+            "|---+-------+---|\n",
+            "|   | world | 2 |\n"
+        );
+        let exp = concat!(
+            "<div><section><table><thead>",
+            "<tr><td>hello</td><td>1</td></tr></thead>",
+            "<tbody><tr><td>world</td><td>2</td></tr></tbody>",
+            "</table></section></div>"
+        );
+        let settings = HtmlExportSettings::default();
+        let mut handler = HtmlExport::new(&settings);
+        Org::parse(org).traverse(&mut handler);
+        assert_eq!(handler.finish(), exp);
+    }
+    // #[test]
+    // fn test_org_table_export_empty_cells() {
+    //     let org = concat!(
+    //         "|-------+---|\n",
+    //         "|       | 1 |\n",
+    //         "|-------+---|\n",
+    //         "| world |   |\n"
+    //     );
+    //     let exp = concat!(
+    //         "<div><section><table><thead>",
+    //         "<tr><td></td><td>1</td></tr></thead>",
+    //         "<tbody><tr><td>world</td><td></td></tr></tbody>",
+    //         "</table></section></div>"
+    //     );
+    //     let settings = HtmlExportSettings::default();
+    //     let mut handler = HtmlExport::new(&settings);
+    //     Org::parse(org).traverse(&mut handler);
+    //     assert_eq!(handler.finish(), exp);
+    // }
 }

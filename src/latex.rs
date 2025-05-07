@@ -55,7 +55,7 @@ pub fn get_image(latex: String, color: String, headers: Vec<String>) -> anyhow::
     if let Ok(mut file) = File::open(existing_path.as_path()) {
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
-        info!("Found preexisting content for {hash}.");
+        info!("Found preexisting content for {hash} ({:?})", existing_path);
         return Ok(contents);
     }
 
