@@ -1,9 +1,9 @@
-#+title: org-roamers
-
-#+begin_center
+#+html: <div align="center">
+* *org-roamers*
 *NOTE:* /This is in very early development and not ready for actual
 usage./
-#+end_center
+#+html: </div>
+-----
 
 org-roamers is an addition to [[https://github.com/org-roam/org-roam][org-roam]] and a replacement for
 [[https://github.com/org-roam/org-roam-ui][org-roam-ui]].

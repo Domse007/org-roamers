@@ -7,6 +7,7 @@ import Sigma from "sigma";
 import { NodeBorderProgram } from "@sigma/node-border";
 import type GraphData from "@/types";
 import { onMounted, watch } from "vue";
+import { generalSettings } from "../settings.ts";
 
 const randomNumber = (min: number, max: number) =>
   Math.random() * (max - min) + min;
@@ -108,6 +109,10 @@ function setupGraph() {
   });
 
   sigma.on("downNode", (e) => emit("openNode", e.node));
+
+  if (generalSettings.stopLayoutAfter != null) {
+    setTimeout(() => layout.stop(), generalSettings.stopLayoutAfter * 1000);
+  }
 }
 
 const prop = defineProps<{ count: number }>();

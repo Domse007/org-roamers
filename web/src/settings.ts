@@ -1,9 +1,11 @@
 export interface GeneralSettings {
   showEntireFile: boolean;
+  stopLayoutAfter: number | null;
 }
 
 export let generalSettings: GeneralSettings = {
   showEntireFile: false,
+  stopLayoutAfter: 15,
 };
 
 export const getScope = () => {

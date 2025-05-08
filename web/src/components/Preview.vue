@@ -97,7 +97,7 @@ const configureIDLinks = () => {
   );
 };
 
-const collapseIcon = () => (shown.value == "none" ? "<" : ">");
+const collapseIcon = () => (shown.value == "none" ? "🗁" : "🗀");
 
 watch(props, () => preview(props.id));
 watch(rendered, async () => {
@@ -119,7 +119,7 @@ watch(rendered, async () => {
     {{ collapseIcon() }}
   </div>
   <div class="org-preview-outerframe" :style="{ display: shown }">
-    <div class="collapse-btn" tabindex="1" :onclick="resize">></div>
+    <div class="collapse-btn" tabindex="1" :onclick="resize">&#128448;</div>
     <div id="org-preview-frame">
       <div id="org-preview" ref="preview-ref" v-html="rendered"></div>
     </div>
@@ -146,8 +146,10 @@ watch(rendered, async () => {
   min-height: 42px;
   margin: 12px;
   background-color: var(--clickable);
+  font-size: 30px;
   display: flex;
-  text-align: center;
+  align-items: center;
+  justify-content: center;
   right: 0px;
   top: 0px;
 }
