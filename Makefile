@@ -9,7 +9,12 @@ all: website native
 
 .PHONY: website
 website:
-	$(MAKE) -C web
+	$(MAKE) -C web all
+
+.PHONY: format
+format:
+	$(CARGO) fmt
+	$(MAKE) -C web format
 
 .PHONY: native
 native:

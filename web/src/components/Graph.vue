@@ -25,7 +25,12 @@ const updateGraph = () => {
     .then((text) => JSON.parse(text))
     .then((json: GraphData) => {
       json.nodes.forEach(
-        (node: { title: string; id: string; parent: string; num_links: number }) => {
+        (node: {
+          title: string;
+          id: string;
+          parent: string;
+          num_links: number;
+        }) => {
           graph.addNode(node.id, {
             label: node.title,
             x: randomNumber(1, 100),
@@ -63,9 +68,11 @@ const updateGraph = () => {
     });
 };
 
+let layout: FA2Layout;
+
 function setupGraph() {
   const settings = forceAtlas2.inferSettings(graph);
-  const layout = new FA2Layout(graph, {
+  layout = new FA2Layout(graph, {
     settings: settings,
   });
 
@@ -114,14 +121,24 @@ function setupGraph() {
     setTimeout(() => layout.stop(), generalSettings.stopLayoutAfter * 1000);
   }
 }
+const prop = defineProps<{ count: number; toggleLayouter: boolean }>();
 
-const prop = defineProps<{ count: number }>();
+let old_count = 0;
+let old_layout_state = false;
+
 watch(prop, () => {
-  console.log("Trying to update");
-  graph = new MultiGraph();
-  sigma = null;
-  document.getElementById("graph")!.innerHTML = "";
-  updateGraph();
+  if (old_count != prop.count) {
+    console.log("Trying to update");
+    graph = new MultiGraph();
+    sigma = null;
+    document.getElementById("graph")!.innerHTML = "";
+    updateGraph();
+    old_count = prop.count;
+  }
+  if (old_layout_state != prop.toggleLayouter) {
+    layout.isRunning() ? layout.stop() : layout.start();
+    old_layout_state = prop.toggleLayouter;
+  }
 });
 
 onMounted(updateGraph);

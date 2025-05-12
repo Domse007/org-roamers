@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, type Ref } from "vue";
 import { generalSettings } from "../../settings.ts";
+import StyledButton from "../basic/StyledButton.vue";
 const previewScopeChange = () => {
   generalSettings.showEntireFile = !generalSettings.showEntireFile;
 };
@@ -18,12 +19,14 @@ watch([timeoutEnabled, timeoutTime], () => {
 
 <template>
   <div id="theme-settings">
-    <b style="margin-bottom: 5px">General settings:</b>
     <div>
+      <b style="margin-bottom: 5px">Preview Settings:</b>
       <div>
         <input type="checkbox" :onchange="previewScopeChange" />
         Fetch full file
       </div>
+      <hr :style="{ color: 'var(--highlight)' }" />
+      <b style="margin-bottom: 5px">Graph Settings:</b>
       <div style="display: flex">
         <input type="checkbox" v-model="timeoutEnabled" />
         <div>
@@ -32,6 +35,16 @@ watch([timeoutEnabled, timeoutTime], () => {
           secs
         </div>
       </div>
+      <div :style="{ padding: '5px' }">
+        <StyledButton
+          text="Restart layout"
+          bg="var(--clickable)"
+          fg="var(--text)"
+          @button-clicked="$emit('toggleLayouter')"
+        >
+        </StyledButton>
+      </div>
+      <hr :style="{ color: 'var(--highlight)' }" />
     </div>
   </div>
 </template>

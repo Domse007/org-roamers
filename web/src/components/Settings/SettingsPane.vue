@@ -61,7 +61,10 @@ const switchSettingsPage = (page: any) => {
           v-if="activePage == 'Theme'"
           @redraw-graph="$emit('redrawGraph')"
         ></SettingsTheme>
-        <SettingsGeneral v-if="activePage == 'General'"></SettingsGeneral>
+        <SettingsGeneral
+          v-if="activePage == 'General'"
+          @toggle-layouter="$emit('toggleLayouter')"
+        ></SettingsGeneral>
         <SettingsFilter v-if="activePage == 'Filter'"></SettingsFilter>
       </div>
     </div>

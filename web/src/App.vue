@@ -5,6 +5,11 @@ import Search from "./components/Search.vue";
 import SettingsPane from "./components/Settings/SettingsPane.vue";
 import { type Ref, ref } from "vue";
 
+const toggleLayouterRef: Ref<boolean> = ref(false);
+const toggleLayouter = () => {
+  toggleLayouterRef.value = !toggleLayouterRef.value;
+};
+
 const previewID: Ref<string> = ref("");
 const updatePreviewID = (id: string) => {
   console.log(`Updating ${previewID.value} to ${id}`);
@@ -21,9 +26,16 @@ const redrawGraph = () => {
   <header></header>
   <main>
     <Search @open-node="updatePreviewID"></Search>
-    <Graph @open-node="updatePreviewID" :count="graphUpdateCount"></Graph>
+    <Graph
+      @open-node="updatePreviewID"
+      :count="graphUpdateCount"
+      :toggle-layouter="toggleLayouterRef"
+    ></Graph>
     <Preview :id="previewID"></Preview>
-    <SettingsPane @redraw-graph="redrawGraph"></SettingsPane>
+    <SettingsPane
+      @redraw-graph="redrawGraph"
+      @toggle-layouter="toggleLayouter"
+    ></SettingsPane>
   </main>
 </template>
 
