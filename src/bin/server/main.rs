@@ -45,7 +45,7 @@ fn main() -> Result<ExitCode> {
         sqlite_path: sqlite_path.cloned(),
         html_export_path: html_path,
         roam_path: path.to_string(),
-        ip_addr: "localhost".to_string(),
+        ip_addr: "0.0.0.0".to_string(),
         port: 5000,
     };
 
