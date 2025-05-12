@@ -25,12 +25,12 @@ const updateGraph = () => {
     .then((text) => JSON.parse(text))
     .then((json: GraphData) => {
       json.nodes.forEach(
-        (node: { title: string; id: string; parent: string }) => {
+        (node: { title: string; id: string; parent: string; num_links: number }) => {
           graph.addNode(node.id, {
             label: node.title,
             x: randomNumber(1, 100),
             y: randomNumber(1, 100),
-            size: 5,
+            size: node.num_links / 2 <= 5 ? 5 : node.num_links / 2,
             color: nodeColor,
             borderColor: nodeBorderColor,
           });

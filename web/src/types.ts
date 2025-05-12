@@ -3,6 +3,7 @@ export default interface GraphData {
     title: string;
     id: string;
     parent: string;
+    num_links: number;
   }[];
   links: {
     from: string;

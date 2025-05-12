@@ -9,6 +9,7 @@ use std::thread::JoinHandle;
 
 use orgize::Org;
 use rouille::{router, Response, Server};
+use rusqlite::fallible_streaming_iterator::FallibleStreamingIterator;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -226,7 +227,7 @@ pub fn get_graph_data(mut db: &mut ServerState) -> Response {
             .unwrap_or_default()
     };
 
-    let nodes = db
+    let mut nodes = db
         .sqlite
         .get_all_nodes(["id", "title", "actual_olp"])
         .into_iter()
@@ -234,8 +235,23 @@ pub fn get_graph_data(mut db: &mut ServerState) -> Response {
             title: e[1].to_string().into(),
             id: e[0].to_string().into(),
             parent: olp(e[2].to_string(), &mut db).into(),
+            num_links: 0,
         })
         .collect::<Vec<RoamNode>>();
+
+    const STMNT: &str = concat!(
+        "SELECT source, dest, type\n",
+        "FROM links\n",
+        "WHERE type = '\"id\"'\n",
+        "AND (dest = ?1 OR source = ?1)"
+    );
+    let mut stmnt = db.sqlite.connection().prepare(STMNT).unwrap();
+    for node in &mut nodes {
+        let num = stmnt.query([node.id.with_quotes(1)]).unwrap().count().unwrap();
+        node.num_links = num;
+    }
+
+    drop(stmnt);
 
     let mut links = db.sqlite.get_all_links();
 

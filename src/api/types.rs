@@ -77,6 +77,7 @@ pub struct RoamNode {
     pub title: RoamTitle,
     pub id: RoamID,
     pub parent: RoamID,
+    pub num_links: usize,
 }
 
 /// Response structure for transmitting graph information.
@@ -163,11 +164,13 @@ mod tests {
                     title: RoamTitle("Rust".to_string()),
                     id: RoamID("a64477aa-d900-476d-b500-b8ab0b03c17d".to_string()),
                     parent: RoamID("".to_string()),
+                    num_links: 1,
                 },
                 RoamNode {
                     title: RoamTitle("Vec<T>".to_string()),
                     id: RoamID("bcb77e31-b4c6-4cf9-a05d-47b766349e57".to_string()),
                     parent: RoamID("".to_string()),
+                    num_links: 1,
                 },
             ],
             links: vec![RoamLink {
@@ -178,8 +181,8 @@ mod tests {
 
         let serialized = concat!(
             "{\"nodes\":[{\"title\":\"Rust\",\"id\":\"a64477aa-d900-476d-b500-b8ab0b03c17d\",",
-            "\"parent\":\"\"},{\"title\":\"Vec<T>\",\"id\":\"bcb77e31-b4c6-4cf9-a05d-47b766349e57\",",
-            "\"parent\":\"\"}],\"links\":[{\"from\":\"bcb77e31-b4c6-4cf9-a05d-47b766349e57\",",
+            "\"parent\":\"\",\"num_links\":1},{\"title\":\"Vec<T>\",\"id\":\"bcb77e31-b4c6-4cf9-a05d-47b766349e57\",",
+            "\"parent\":\"\",\"num_links\":1}],\"links\":[{\"from\":\"bcb77e31-b4c6-4cf9-a05d-47b766349e57\",",
             "\"to\":\"a64477aa-d900-476d-b500-b8ab0b03c17d\"}]}"
         );
 
