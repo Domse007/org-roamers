@@ -8,6 +8,7 @@ anyhow = "1.0.96"
 arroy = "0.5.0"
 heed = "0.21.0"
 heed-types = "0.21.0"
+notify = "8.0.0"
 orgize = "0.10.0-alpha.10"
 reqwest = { version = "0.12.12", features = ["blocking", "json"] }
 rouille = "3.6.2"
@@ -18,7 +19,7 @@ tantivy = "0.22.0"
 tempfile = "3.14.0"
 thiserror = "2.0.12"
 tracing = { version = "0.1.41", features = ["log"] }
-tracing-subscriber = "0.3.19"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 
 [profile.dev]
 debug = 0

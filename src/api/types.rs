@@ -153,6 +153,18 @@ impl Into<Response> for SearchResponse {
     }
 }
 
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub struct ServerStatus {
+    /// is true, when files changed on disk.
+    pub pending_changes: bool,
+}
+
+impl Into<Response> for ServerStatus {
+    fn into(self) -> Response {
+        Response::json(&serde_json::to_string(&self).unwrap())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,5 +246,14 @@ mod tests {
         );
 
         assert_eq!(serde_json::to_string(&data).unwrap(), expected);
+    }
+
+    #[test]
+    fn test_server_status_serialization() {
+        let status = ServerStatus {
+            pending_changes: true,
+        };
+        let expected = "{\"pending_changes\":true}";
+        assert_eq!(serde_json::to_string(&status).unwrap(), expected);
     }
 }

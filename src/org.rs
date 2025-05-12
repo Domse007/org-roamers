@@ -5,8 +5,12 @@ use orgize::{
     export::{Container, Event, Traverser},
     Org, SyntaxElement,
 };
+use rusqlite::Connection;
 
-use crate::database::datamodel::Timestamps;
+use crate::{
+    database::datamodel::Timestamps,
+    sqlite::{rebuild, SqliteConnection},
+};
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct NodeFromOrg {
@@ -24,6 +28,18 @@ pub struct NodeFromOrg {
     pub(crate) links: Vec<(String, String)>,
     pub(crate) refs: Vec<String>,
     pub(crate) cites: Vec<String>,
+}
+
+impl NodeFromOrg {
+    #[rustfmt::skip]
+    pub fn insert_into(&self, con: &mut Connection, with_replace: bool) -> anyhow::Result<()> {
+        rebuild::insert_node(
+            con, with_replace, &self.uuid, self.file.as_str(), self.level, 0,
+            false, 0, "", "", self.title.as_str(), "",
+            SqliteConnection::into_olp_string(self.olp.clone()).as_str(),
+            SqliteConnection::into_olp_string(self.actual_olp.clone()).as_str(),
+        )
+    }
 }
 
 fn get_orgize<P: AsRef<Path>>(path: P) -> anyhow::Result<Org> {

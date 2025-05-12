@@ -21,3 +21,7 @@ export interface SearchResponse {
     }[];
   }[];
 }
+
+export interface ServerStatus {
+  pending_changes: boolean;
+}

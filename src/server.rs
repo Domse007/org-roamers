@@ -20,16 +20,19 @@ use crate::api::types::RoamNode;
 use crate::api::types::RoamTitle;
 use crate::api::types::SearchResponse;
 use crate::api::types::SearchResponseProvider;
+use crate::api::types::ServerStatus;
 use crate::api::APICalls;
 use crate::export::HtmlExport;
 use crate::latex;
 use crate::search::Search;
 use crate::sqlite::SqliteConnection;
 use crate::subtree::Subtree;
+use crate::watcher;
 use crate::ServerState;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ServerConfiguration {
+    /// Root path to the website files. e.g. .js / .html / .css
     pub root: String,
 }
 
@@ -50,6 +53,8 @@ pub fn start_server(
     conf: ServerConfiguration,
     calls: APICalls,
     _global: ServerState,
+    // TODO: move to some struct.
+    sqlite_path: PathBuf,
 ) -> Result<ServerRuntime, Box<dyn Error>> {
     tracing::info!("Using server configuration: {conf:?}");
     let conf: &'static ServerConfiguration = Box::leak(Box::new(conf));
@@ -60,6 +65,9 @@ pub fn start_server(
     );
 
     let lock = Arc::new(Mutex::new(_global));
+
+    let (watcher, changes_flag) = watcher::watcher(sqlite_path.clone())?;
+    watcher::default_watcher_runtime(lock.clone(), watcher, sqlite_path);
 
     let server = Server::new(url, move |request| {
         let mut global = lock.lock().unwrap();
@@ -100,6 +108,9 @@ pub fn start_server(
                     ),
                     None => Response::empty_404(),
                 }
+            },
+            (GET) (/status) => {
+                get_status_data(&mut global, changes_flag.clone()).into()
             },
             _ => (calls.default_route)(&mut global, conf.root.to_string(), Some(request.url()))
         )
@@ -247,7 +258,11 @@ pub fn get_graph_data(mut db: &mut ServerState) -> Response {
     );
     let mut stmnt = db.sqlite.connection().prepare(STMNT).unwrap();
     for node in &mut nodes {
-        let num = stmnt.query([node.id.with_quotes(1)]).unwrap().count().unwrap();
+        let num = stmnt
+            .query([node.id.with_quotes(1)])
+            .unwrap()
+            .count()
+            .unwrap();
         node.num_links = num;
     }
 
@@ -287,4 +302,13 @@ pub fn get_latex_svg(db: &mut ServerState, tex: String, color: String, id: Strin
         Ok(svg) => Response::svg(svg),
         Err(err) => Response::text(format!("Could not generate svg: {:#?}", err)),
     }
+}
+
+pub fn get_status_data(_db: &mut ServerState, changes_flag: Arc<Mutex<bool>>) -> ServerStatus {
+    let mut changes = changes_flag.lock().unwrap();
+    let status = ServerStatus {
+        pending_changes: *changes,
+    };
+    *changes = false;
+    status
 }

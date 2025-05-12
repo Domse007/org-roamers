@@ -77,6 +77,7 @@ pub fn init_tags(con: &mut Connection) -> Result<()> {
 
 pub fn insert_node(
     con: &mut Connection,
+    with_replace: bool,
     id: &str,
     file: &str,
     level: u64,
@@ -111,18 +112,24 @@ pub fn insert_node(
             s(scheduled).as_str(), s(deadline).as_str(), s(title).as_str(), s(properties).as_str(),
             s(olp).as_str(), s(actual_olp).as_str(),
         ],
+        with_replace
     )?;
     Ok(())
 }
 
-pub fn insert_tag(con: &mut Connection, id: &str, tag: &str) -> Result<()> {
+pub fn insert_tag(con: &mut Connection, id: &str, tag: &str, with_replace: bool) -> Result<()> {
     let id = format!("\"\"\"{id}\"\"\"");
     let tag = format!("\"{tag}\"");
-    insert_row(con, "tags", ["node_id", "tag"], [&id, &tag])?;
+    insert_row(con, "tags", ["node_id", "tag"], [&id, &tag], with_replace)?;
     Ok(())
 }
 
-pub fn insert_link(con: &mut Connection, source: &str, dest: &str) -> Result<()> {
+pub fn insert_link(
+    con: &mut Connection,
+    source: &str,
+    dest: &str,
+    with_replace: bool,
+) -> Result<()> {
     const TYPE: &str = "id";
     const PROPERTIES: &str = "";
     const POS: usize = 0;
@@ -139,6 +146,7 @@ pub fn insert_link(con: &mut Connection, source: &str, dest: &str) -> Result<()>
             quotify(TYPE).as_str(),
             s(PROPERTIES).as_str(),
         ],
+        with_replace,
     )?;
     Ok(())
 }
@@ -148,13 +156,19 @@ pub fn insert_row<const I: usize>(
     table: &str,
     cols: [&str; I],
     vals: [&str; I],
+    with_replace: bool,
 ) -> Result<()> {
-    let stmnt = insert_row_formatter(table, cols, vals);
+    let stmnt = insert_row_formatter(table, cols, vals, with_replace);
     con.execute(&stmnt, [])?;
     Ok(())
 }
 
-fn insert_row_formatter<const I: usize>(table: &str, cols: [&str; I], vals: [&str; I]) -> String {
+fn insert_row_formatter<const I: usize>(
+    table: &str,
+    cols: [&str; I],
+    vals: [&str; I],
+    with_replace: bool,
+) -> String {
     let formatter = |cols: [&str; I]| -> String {
         let mut s = String::new();
         let mut iter = cols.iter();
@@ -168,7 +182,8 @@ fn insert_row_formatter<const I: usize>(table: &str, cols: [&str; I], vals: [&st
         s
     };
     format!(
-        "INSERT INTO {table} {}\nVALUES {}",
+        "INSERT {}INTO {table} {}\nVALUES {}",
+        if with_replace { "OR REPLACE " } else { "" },
         formatter(cols),
         formatter(vals)
     )
@@ -207,6 +222,7 @@ pub(super) fn iter_files<P: AsRef<Path>>(
                 inc(&mut stats.num_nodes);
                 self::insert_node(
                     con,
+                    false,
                     &node.uuid,
                     node.file.as_str(),
                     node.level,
@@ -222,11 +238,11 @@ pub(super) fn iter_files<P: AsRef<Path>>(
                 )?;
                 for tag in node.tags {
                     inc(&mut stats.num_tags);
-                    insert_tag(con, &node.uuid, &tag)?;
+                    insert_tag(con, &node.uuid, &tag, false)?;
                 }
                 for link in node.links {
                     inc(&mut stats.num_links);
-                    insert_link(con, &node.uuid, &link.0)?;
+                    insert_link(con, &node.uuid, &link.0, false)?;
                 }
                 // TODO: add files. For this title is required, which is the
                 // toplevel `#+title` tile.
@@ -245,9 +261,21 @@ mod tests {
         let cols = ["id", "file", "title"];
         let vals = ["\"aa\"", "\"t.org\"", "\"test\""];
         assert_eq!(
-            insert_row_formatter("nodes", cols, vals),
+            insert_row_formatter("nodes", cols, vals, false),
             concat!(
                 "INSERT INTO nodes (id, file, title)\n",
+                "VALUES (\"aa\", \"t.org\", \"test\")"
+            )
+        );
+    }
+    #[test]
+    fn test_insert_row_formatter_with_replace() {
+        let cols = ["id", "file", "title"];
+        let vals = ["\"aa\"", "\"t.org\"", "\"test\""];
+        assert_eq!(
+            insert_row_formatter("nodes", cols, vals, true),
+            concat!(
+                "INSERT OR REPLACE INTO nodes (id, file, title)\n",
                 "VALUES (\"aa\", \"t.org\", \"test\")"
             )
         );

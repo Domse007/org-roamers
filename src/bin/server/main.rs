@@ -12,10 +12,11 @@ use org_roamers::{
     server::{self, start_server},
 };
 use tracing::{error, info};
-use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 fn main() -> Result<ExitCode> {
     tracing_subscriber::registry()
+        .with(EnvFilter::new("debug"))
         .with(fmt::layer())
         .try_init()
         .unwrap();
@@ -100,6 +101,7 @@ fn main() -> Result<ExitCode> {
         server_configuration,
         calls,
         global,
+        configuration.roam_path.clone().into(),
     )
     .unwrap();
 
