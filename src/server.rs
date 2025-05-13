@@ -14,6 +14,8 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::api::types::GraphData;
+use crate::api::types::OrgAsHTMLResponse;
+use crate::api::types::OutgoingLink;
 use crate::api::types::RoamID;
 use crate::api::types::RoamLink;
 use crate::api::types::RoamNode;
@@ -88,7 +90,7 @@ pub fn start_server(
                         }
                     }
                 };
-                (calls.get_org_as_html)(&mut global, query, scope)
+                (calls.get_org_as_html)(&mut global, query, scope).into()
             },
             (GET) (/search) => {
                 match request.get_param("q") {
@@ -171,7 +173,7 @@ pub enum Query {
     ById(RoamID),
 }
 
-pub fn get_org_as_html(db: &mut ServerState, query: Query, scope: String) -> Response {
+pub fn get_org_as_html(db: &mut ServerState, query: Query, scope: String) -> OrgAsHTMLResponse {
     let [_title, id, file] =
         match helpers::get_all_nodes(db.sqlite.connection(), ["title", "id", "file"])
             .into_iter()
@@ -182,13 +184,12 @@ pub fn get_org_as_html(db: &mut ServerState, query: Query, scope: String) -> Res
             .next()
         {
             Some(node) => node,
-            None => return Response::text("Did not get node."),
+            None => return OrgAsHTMLResponse::simple("Did not get node."),
         };
 
-    // FIXME: This does not narrow to the node, but only to the file.
     let contents = match std::fs::read_to_string(file.replace('"', "")) {
         Ok(f) => f,
-        Err(_) => return Response::text("Could not get file contents."),
+        Err(_) => return OrgAsHTMLResponse::simple("Could not get file contents."),
     };
 
     let contents = if scope == "file" {
@@ -200,7 +201,30 @@ pub fn get_org_as_html(db: &mut ServerState, query: Query, scope: String) -> Res
     let mut handler = HtmlExport::new(&db.html_export_settings);
     Org::parse(contents).traverse(&mut handler);
 
-    Response::text(handler.finish())
+    let (org, outgoing_links) = handler.finish();
+
+    let links = outgoing_links
+        .iter()
+        .map(|bare| {
+            let bare = format!("\"{}\"", bare);
+            const STMNT: &str = "SELECT id, title FROM nodes WHERE id = ?1";
+            db.sqlite.query_one(STMNT, [bare], |row| {
+                Ok(OutgoingLink {
+                    display: row.get::<usize, String>(1).unwrap().into(),
+                    id: row.get::<usize, String>(0).unwrap().into(),
+                })
+            })
+        })
+        .filter_map(|res| match res {
+            Ok(link) => Some(link),
+            Err(err) => {
+                tracing::error!("An error occured: {err:?}");
+                None
+            }
+        })
+        .collect();
+
+    OrgAsHTMLResponse { org, links }
 }
 
 pub fn search(db: &mut ServerState, query: String) -> Response {

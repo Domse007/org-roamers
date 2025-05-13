@@ -3,7 +3,7 @@ use std::{
     str::FromStr,
 };
 
-use org_roamers::sqlite::SqliteConnection;
+use org_roamers::sqlite::{helpers, SqliteConnection};
 use rusqlite::Connection;
 
 const COLUMNS: [&'static str; 11] = [
@@ -32,8 +32,8 @@ fn cmp_emacs_roamers_db() {
     roamers_db.insert_files(roam_path).unwrap();
 
     // nodes table...
-    let mut emacs_nodes = emacs_db.get_all_nodes(COLUMNS);
-    let mut roamers_nodes = roamers_db.get_all_nodes(COLUMNS);
+    let mut emacs_nodes = helpers::get_all_nodes(emacs_db.connection(), COLUMNS);
+    let mut roamers_nodes = helpers::get_all_nodes(roamers_db.connection(), COLUMNS);
 
     assert!(emacs_nodes.len() > 0);
     assert!(roamers_nodes.len() > 0);

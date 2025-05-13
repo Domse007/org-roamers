@@ -1,6 +1,7 @@
 pub mod types;
 
 use rouille::Response;
+use types::OrgAsHTMLResponse;
 
 use crate::{server::Query, ServerState};
 
@@ -12,7 +13,7 @@ pub struct APICalls {
     /// What the server should return if the graph is requested.
     pub get_graph_data: fn(&mut ServerState) -> Response,
     /// What the server should return if some node is requested as html.
-    pub get_org_as_html: fn(&mut ServerState, Query, String) -> Response,
+    pub get_org_as_html: fn(&mut ServerState, Query, String) -> OrgAsHTMLResponse,
     /// What the server should return for some query.
     pub serve_search_results: fn(&mut ServerState, String) -> Response,
     /// What the server should return if some inline latex should be rendered.

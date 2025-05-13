@@ -37,6 +37,7 @@ pub struct HtmlExport<'a> {
     table_row: TableRow,
     in_descriptive_list: Vec<bool>,
     in_special_block: bool,
+    outgoing_id_links: Vec<String>,
 }
 
 impl<'a> HtmlExport<'a> {
@@ -47,6 +48,7 @@ impl<'a> HtmlExport<'a> {
             table_row: TableRow::default(),
             in_descriptive_list: vec![],
             in_special_block: false,
+            outgoing_id_links: vec![],
         }
     }
 }
@@ -61,8 +63,8 @@ enum TableRow {
 }
 
 impl<'a> HtmlExport<'a> {
-    pub fn finish(self) -> String {
-        self.output
+    pub fn finish(self) -> (String, Vec<String>) {
+        (self.output, self.outgoing_id_links)
     }
 }
 
@@ -322,6 +324,7 @@ impl<'a> Traverser for HtmlExport<'a> {
                         r#"<a id="{}" class="org-preview-id-link">"#,
                         HtmlEscape(&id),
                     );
+                    self.outgoing_id_links.push(id);
                 } else {
                     let _ = write!(&mut self.output, r#"<a href="{}">"#, HtmlEscape(&path));
                 }
@@ -418,7 +421,7 @@ mod tests {
         let settings = HtmlExportSettings::default();
         let mut handler = HtmlExport::new(&settings);
         Org::parse(org).traverse(&mut handler);
-        assert_eq!(handler.finish(), exp);
+        assert_eq!(handler.finish().0, exp);
     }
     // #[test]
     // fn test_org_table_export_empty_cells() {

@@ -165,6 +165,43 @@ impl Into<Response> for ServerStatus {
     }
 }
 
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub struct OutgoingLink {
+    pub display: RoamTitle,
+    pub id: RoamID,
+}
+
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub struct OrgAsHTMLResponse {
+    pub org: String,
+    pub links: Vec<OutgoingLink>,
+}
+
+/// # Example
+/// ```json
+/// {
+///     "org": "<h1>title</h1>",
+///     "links": [{
+///         "display": "t",
+///         "id": "id"
+///     }]
+/// }
+/// ```
+impl OrgAsHTMLResponse {
+    pub fn simple(text: impl ToString) -> Self {
+        Self {
+            org: text.to_string(),
+            links: vec![],
+        }
+    }
+}
+
+impl Into<Response> for OrgAsHTMLResponse {
+    fn into(self) -> Response {
+        Response::json(&serde_json::to_string(&self).unwrap())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -255,5 +292,21 @@ mod tests {
         };
         let expected = "{\"pending_changes\":true}";
         assert_eq!(serde_json::to_string(&status).unwrap(), expected);
+    }
+
+    #[test]
+    fn test_org_as_html_serialization() {
+        let resp = OrgAsHTMLResponse {
+            org: "<h1>title</h1>".to_string(),
+            links: vec![OutgoingLink {
+                display: "t".into(),
+                id: "id".into(),
+            }],
+        };
+        let expected = concat!(
+            "{\"org\":\"<h1>title</h1>\",",
+            "\"links\":[{\"display\":\"t\",\"id\":\"id\"}]}"
+        );
+        assert_eq!(serde_json::to_string(&resp).unwrap(), expected);
     }
 }

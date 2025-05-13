@@ -25,10 +25,10 @@ pub(crate) fn into_olp_string(olp: Vec<String>) -> String {
 
 /// Parse an olp string.
 /// ```rust
-/// use org_roamers::sqlite::SqliteConnection;
+/// use org_roamers::sqlite::olp;
 ///
 /// assert_eq!(
-///     SqliteConnection::parse_olp(
+///     olp::parse_olp(
 ///         "(\"VLIW\" \"Instruction\" )".to_string()
 ///     ).unwrap(),
 ///     vec!["VLIW".to_string(), "Instruction".to_string()]

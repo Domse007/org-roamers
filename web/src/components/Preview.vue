@@ -3,9 +3,11 @@ import hljs from "highlight.js";
 import { nextTick, ref, useTemplateRef, watch, type Ref } from "vue";
 import renderMathInElement from "katex/contrib/auto-render";
 import { getScope } from "../settings.ts";
+import { type OrgAsHTMLResponse } from "../types.ts";
 
 const props = defineProps<{ id: string }>();
 const shown: Ref<"none" | "flex"> = ref("none");
+const links: Ref<{ display: string; id: string }[]> = ref([]);
 
 const rendered = ref("");
 let current_id: string = "";
@@ -16,11 +18,11 @@ const preview = (id: string) => {
   console.log(`Previewing ${id}`);
   const scope: "file" | "node" = getScope();
   fetch(`/org?id=${id}&scope=${scope}`)
-    .then((response) => {
-      return response.text();
-    })
-    .then((html) => {
-      rendered.value = html;
+    .then((response) => response.json())
+    .then((text) => JSON.parse(text))
+    .then((resp: OrgAsHTMLResponse) => {
+      rendered.value = resp.org;
+      links.value = resp.links;
       expand();
     });
 };
@@ -86,14 +88,13 @@ const katexOptions = {
 // like src_java[:exports code]{ void main() } which has no <pre></pre>.
 hljs.configure({ cssSelector: "code" });
 
-const configureIDLinks = () => {
-  Array.from(document.getElementsByClassName("org-preview-id-link")).forEach(
-    (elem: Element) =>
-      elem.addEventListener("click", (elem) => {
-        if (!elem.target) return;
-        const target = <HTMLElement>elem.target;
-        preview(target.id);
-      }),
+const configureIDLinks = (_class: string) => {
+  Array.from(document.getElementsByClassName(_class)).forEach((elem: Element) =>
+    elem.addEventListener("click", (elem) => {
+      if (!elem.target) return;
+      const target = <HTMLElement>elem.target;
+      preview(target.id);
+    }),
   );
 };
 
@@ -105,7 +106,8 @@ watch(rendered, async () => {
   hljs.highlightAll();
   console.log(`Ref: ${preview_ref}`);
   renderMathInElement(preview_ref.value!, katexOptions);
-  configureIDLinks();
+  configureIDLinks("org-preview-id-link");
+  configureIDLinks("org-preview-footer-link");
 });
 </script>
 
@@ -122,6 +124,18 @@ watch(rendered, async () => {
     <div class="collapse-btn" tabindex="1" :onclick="resize">&#128448;</div>
     <div id="org-preview-frame">
       <div id="org-preview" ref="preview-ref" v-html="rendered"></div>
+      <div id="org-preview-footer" v-if="links.length != 0">
+        <div id="org-preview-footer-title">
+          Outgoing links:
+          <hr />
+        </div>
+        <a
+          class="org-preview-footer-link"
+          v-for="link in links"
+          :id="link.id"
+          >{{ link.display }}</a
+        >
+      </div>
     </div>
   </div>
 </template>
@@ -280,5 +294,36 @@ svg {
 
 .org-preview-id-link {
   cursor: pointer;
+}
+
+#org-preview-footer {
+  margin: 10px;
+  border-radius: 5px;
+  background-color: var(--base);
+  font-family: var(--font);
+  display: flex;
+  flex-direction: column;
+}
+
+.org-preview-footer-link {
+  color: var(--clickable);
+  padding: 5px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.org-preview-footer-link:hover {
+  filter: brightness(125%);
+}
+
+.org-preview-footer-link:active {
+  filter: brightness(75%);
+}
+
+#org-preview-footer-title {
+  padding-top: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  color: var(--highlight);
 }
 </style>

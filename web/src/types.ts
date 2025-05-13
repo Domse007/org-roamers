@@ -25,3 +25,11 @@ export interface SearchResponse {
 export interface ServerStatus {
   pending_changes: boolean;
 }
+
+export interface OrgAsHTMLResponse {
+  org: string;
+  links: {
+    display: string;
+    id: string;
+  }[];
+}
