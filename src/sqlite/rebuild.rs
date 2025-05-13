@@ -3,9 +3,8 @@ use std::{ffi::OsStr, fs, path::Path};
 use anyhow::Result;
 use rusqlite::Connection;
 
+use super::olp;
 use crate::org;
-
-use super::SqliteConnection;
 
 pub fn init_version(con: &mut Connection, version: usize) -> Result<()> {
     con.execute(format!("PRAGMA user_version = {}", version).as_str(), [])?;
@@ -233,8 +232,8 @@ pub(super) fn iter_files<P: AsRef<Path>>(
                     "",
                     node.title.as_str(),
                     "",
-                    SqliteConnection::into_olp_string(node.olp).as_str(),
-                    SqliteConnection::into_olp_string(node.actual_olp).as_str(),
+                    olp::into_olp_string(node.olp).as_str(),
+                    olp::into_olp_string(node.actual_olp).as_str(),
                 )?;
                 for tag in node.tags {
                     inc(&mut stats.num_tags);

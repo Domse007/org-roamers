@@ -1,26 +1,14 @@
-use std::fmt::Write;
-use std::{collections::HashMap, path::Path};
+use std::path::Path;
 
 use anyhow::{bail, Result};
 use rebuild::IterFilesStats;
-use rusqlite::Connection;
+use rusqlite::{Connection, Params};
 use tracing::info;
 
-use crate::{
-    api::types::RoamLink, database::datamodel::Timestamps, org::NodeFromOrg, parser::Parser,
-};
+use crate::error::ServerError;
 
+pub mod olp;
 pub mod rebuild;
-
-#[derive(thiserror::Error, Debug)]
-pub enum OlpError {
-    #[error("StringParseError on char. Already extracted: {0:?}")]
-    StringParseError(Vec<String>),
-    #[error("Character '{0}' was not expected.")]
-    InvalidChar(char),
-    #[error("No more characters to consume.")]
-    IteratorExhaustion,
-}
 
 pub struct SqliteConnection {
     connection: Connection,
@@ -67,6 +55,32 @@ impl SqliteConnection {
         Ok(this)
     }
 
+    pub fn query_many<P, T, F>(
+        &self,
+        sql: &str,
+        params: P,
+        map_fn: F,
+    ) -> Result<Vec<T>, ServerError>
+    where
+        F: FnMut(&rusqlite::Row<'_>) -> rusqlite::Result<T>,
+        P: Params,
+    {
+        let mut stmt = self.connection.prepare(sql)?;
+        let rows = stmt.query_map(params, map_fn)?;
+        rows.collect::<Result<Vec<T>, rusqlite::Error>>()
+            .map_err(Into::into)
+    }
+
+    pub fn query_one<P, T, F>(&self, sql: &str, params: P, map_fn: F) -> Result<T, ServerError>
+    where
+        P: Params,
+        F: FnOnce(&rusqlite::Row<'_>) -> rusqlite::Result<T>,
+    {
+        self.connection
+            .query_row(sql, params, map_fn)
+            .map_err(Into::into)
+    }
+
     pub fn connection(&mut self) -> &mut Connection {
         &mut self.connection
     }
@@ -81,159 +95,18 @@ impl SqliteConnection {
         );
         res
     }
+}
 
-    pub fn get_links_from(&mut self, id: &str) -> HashMap<String, String> {
-        let stmnt = format!(
-            "SELECT DISTINCT source, dest FROM links
-             WHERE source = '{}';",
-            id
-        );
-
-        let links = {
-            let mut stmt = self.connection.prepare(&stmnt).unwrap();
-            stmt.query_map([], |row| {
-                Ok((
-                    row.get::<usize, String>(0).unwrap(),
-                    row.get::<usize, String>(1).unwrap(),
-                ))
-            })
-            .unwrap()
-            .map(Result::unwrap)
-            .collect::<Vec<(String, String)>>()
-        };
-
-        info!("Got elements {}", links.len());
-
-        let mut hm = HashMap::new();
-
-        for (source, dest) in links {
-            let dest = dest.to_string();
-            let name = self.get_name_by_id(&dest).unwrap_or(dest);
-            hm.insert(source, name);
-        }
-
-        hm
-    }
-
-    pub fn get_name_by_id(&mut self, id: &str) -> Option<String> {
-        let stmnt = format!(
-            "SELECT id, title FROM nodes
-             WHERE id = '{id}';"
-        );
-        let mut stmt = self.connection.prepare(&stmnt).unwrap();
-        let res = stmt
-            .query_map([], |row| Ok(row.get(1).unwrap()))
-            .unwrap()
-            .map(Result::unwrap)
-            .next();
-
-        res
-    }
-
-    pub fn get_parent_for_id(&mut self, id: &str) -> Option<String> {
-        let stmnt = format!(
-            "SELECT file, id, level FROM nodes
-             WHERE id = '\"{}\"'
-             AND level = 1;",
-            id
-        );
-        let mut stmt = self.connection.prepare(&stmnt).unwrap();
-        let file_for = match stmt
-            .query_map([], |row| {
-                Ok(row.get::<usize, String>(0).unwrap().to_string())
-            })
-            .unwrap()
-            .next()
-        {
-            Some(file) => file.unwrap(),
-            None => return None,
-        };
-
-        let stmnt = format!(
-            "SELECT file, id, level FROM nodes
-             WHERE file = '{}'
-             AND level = 0;",
-            file_for
-        );
-        let mut stmt = self.connection.prepare(&stmnt).unwrap();
-
-        let res = stmt
-            .query_map([], |row| {
-                Ok(row.get::<usize, String>(1).unwrap().to_string())
-            })
-            .unwrap()
-            .next()
-            .map(Result::unwrap);
-
-        res
-    }
-
-    pub fn get_id_by_title(&mut self, title: &str) -> Option<String> {
-        let stmnt = format!(
-            "SELECT title, id
-             FROM nodes WHERE title = '\"{}\"';",
-            title
-        );
-        let mut stmt = self.connection.prepare(&stmnt).unwrap();
-        let res = stmt
-            .query_map([], |row| Ok(row.get(1).unwrap()))
-            .unwrap()
-            .next()
-            .map(Result::unwrap);
-        res
-    }
-
-    /// # Return
-    /// It returs Vec of tuples where the first element is the name of the node
-    /// pointing to `dest` and the second elemet is the id of the node.
-    pub fn get_backlinks(&mut self, dest: String) -> Vec<(String, String)> {
-        let stmnt = format!(
-            "SELECT DISTINCT source, dest, pos, properties
-             FROM links WHERE dest = '\"{}\"'
-             AND type = '\"id\"'
-             GROUP BY source
-             HAVING min(pos);",
-            dest
-        );
-
-        let mut stmt = self.connection.prepare(&stmnt).unwrap();
-
-        stmt.query_map([], |row| Ok((row.get(0).unwrap(), row.get(3).unwrap())))
-            .unwrap()
-            .map(|e| e.unwrap())
-            .collect()
-    }
-
-    pub fn get_all_links(&mut self) -> Vec<RoamLink> {
-        const STMNT: &'static str = "
-            SELECT links.source, links.dest, links.type
-            FROM links
-            WHERE links.type = '\"id\"';";
-        let mut stmnt = self.connection.prepare(STMNT).unwrap();
-
-        stmnt
-            .query_map([], |row| {
-                Ok((
-                    row.get::<usize, String>(0).unwrap(),
-                    row.get::<usize, String>(1).unwrap(),
-                ))
-            })
-            .unwrap()
-            .map(|e| e.unwrap())
-            .map(|(from, to)| RoamLink {
-                from: from.into(),
-                to: to.into(),
-            })
-            .collect()
-    }
+pub mod helpers {
+    use rusqlite::Connection;
 
     pub fn get_all_nodes<const PARAMS: usize>(
-        &mut self,
+        con: &Connection,
         params: [&'static str; PARAMS],
     ) -> Vec<[String; PARAMS]> {
         let params = params.join(", ");
         let stmnt = format!("SELECT {} FROM nodes;", params);
-        let mut stmnt = self.connection.prepare(&stmnt).unwrap();
+        let mut stmnt = con.prepare(&stmnt).unwrap();
         stmnt
             .query_map([], |row| {
                 let mut curr: [String; PARAMS] = [const { String::new() }; PARAMS];
@@ -245,143 +118,6 @@ impl SqliteConnection {
             .unwrap()
             .map(|e| e.unwrap())
             .collect()
-    }
-
-    pub fn get_aliases_for_node(&mut self, id: &str) -> Vec<String> {
-        let stmnt = format!("SELECT node_id, alias FROM aliases WHERE node_id == '\"{id}\"'");
-        let mut stmnt = self.connection.prepare(&stmnt).unwrap();
-        stmnt
-            .query_map([], |row| Ok(row.get(1).unwrap()))
-            .unwrap()
-            .map(|r| r.unwrap())
-            .collect()
-    }
-
-    pub fn get_tags_for_node(&mut self, id: &str) -> Vec<String> {
-        let stmnt = format!("SELECT node_id, tag FROM tags WHERE node_id == '\"{id}\"';");
-        let mut stmnt = self.connection.prepare(&stmnt).unwrap();
-        stmnt
-            .query_map([], |row| Ok(row.get(1).unwrap()))
-            .unwrap()
-            .map(|r| r.unwrap())
-            .collect()
-    }
-
-    /// Parse nodes from org-roam database and turn them into `NodeFromOrg` to
-    /// embed them into the databases of org-roamers.
-    ///
-    /// # Future
-    /// Depending on the future of this project, it might be beneficial to
-    /// remove this function (or the entire file).
-    pub fn nodes_from_org(&mut self) -> Vec<NodeFromOrg> {
-        // TODO: tags must be fetched from tags table
-        self.get_all_nodes(["id", "title", "file", "level", "olp", "actual_olp"])
-            .into_iter()
-            .map(|[uuid, title, file, level, olp, actual_olp]| {
-                let tags = self.get_tags_for_node(&uuid);
-                let aliases = self.get_aliases_for_node(&uuid);
-                Self::into_node_from_org(uuid, title, file, level, olp, actual_olp, tags, aliases)
-            })
-            .collect()
-    }
-
-    pub(super) fn into_node_from_org(
-        uuid: String,
-        title: String,
-        file: String,
-        level: String,
-        olp: String,
-        actual_olp: String,
-        tags: Vec<String>,
-        aliases: Vec<String>,
-    ) -> NodeFromOrg {
-        let content = String::new();
-        let ctime = String::new();
-        let mtime = Vec::new();
-        let timestamps = Some(Timestamps::new(ctime, mtime));
-        let links = Vec::new();
-        let level = level.parse::<u64>().unwrap_or(0);
-        let olp = Self::parse_olp(olp).unwrap();
-        let actual_olp = Self::parse_olp(actual_olp).unwrap();
-        NodeFromOrg {
-            uuid,
-            title,
-            content,
-            file,
-            level,
-            olp,
-            actual_olp,
-            tags,
-            aliases,
-            timestamps,
-            parent: None,
-            links,
-            // TODO: Handle references
-            refs: Vec::new(),
-            // TODO: Citations
-            cites: Vec::new(),
-        }
-    }
-
-    pub(crate) fn into_olp_string(olp: Vec<String>) -> String {
-        if olp.is_empty() {
-            return "".to_string();
-        }
-        let mut olp_s = "(".to_string();
-        for elem in olp {
-            let _ = write!(olp_s, "\"\"{}\"\" ", elem);
-        }
-        olp_s.push(')');
-        olp_s
-    }
-
-    /// Parse an olp string.
-    /// ```rust
-    /// use org_roamers::sqlite::SqliteConnection;
-    ///
-    /// assert_eq!(
-    ///     SqliteConnection::parse_olp(
-    ///         "(\"VLIW\" \"Instruction\" )".to_string()
-    ///     ).unwrap(),
-    ///     vec!["VLIW".to_string(), "Instruction".to_string()]
-    /// );
-    pub fn parse_olp(olp: String) -> anyhow::Result<Vec<String>> {
-        let mut parser = Parser::new(&olp);
-        let whitespace = |parser: &mut Parser| {
-            let mut attempt = parser.attempt();
-            attempt.consume_whitespace();
-            parser.sync(attempt);
-        };
-
-        whitespace(&mut parser);
-
-        let mut attempt = parser.attempt();
-        if let None = attempt.consume_char('(') {
-            return Err(OlpError::InvalidChar('(').into());
-        }
-        parser.sync(attempt);
-
-        let mut paths = vec![];
-
-        loop {
-            let mut attempt = parser.attempt();
-            match attempt.consume_string() {
-                Some(path) => paths.push(path),
-                None => {
-                    whitespace(&mut parser);
-                    let mut attempt = parser.attempt();
-                    if let Some(_) = attempt.consume_char(')') {
-                        return Ok(paths);
-                    } else {
-                        break;
-                    }
-                }
-            }
-            parser.sync(attempt);
-            whitespace(&mut parser);
-        }
-
-        Err(OlpError::StringParseError(paths).into())
     }
 }
 
@@ -421,25 +157,5 @@ mod tests {
                 cites: Vec::new()
             }
         )
-    }
-
-    #[test]
-    fn test_olp_parser_correct() {
-        const OLP: &'static str = "(\"This is a test\" \"How about that\")";
-        let res = SqliteConnection::parse_olp(OLP.to_string());
-        // assert!(res.is_ok(), "An error occured in the parsing process.");
-        assert_eq!(
-            res.unwrap(),
-            vec!["This is a test".to_string(), "How about that".to_string()]
-        );
-    }
-
-    #[test]
-    fn test_olp_deserialize_serialize() {
-        let olp = "(\"test\" \"other\")";
-        let arr = SqliteConnection::parse_olp(olp.to_string()).unwrap();
-        assert_eq!(arr, vec!["test".to_string(), "other".to_string()]);
-        let s = SqliteConnection::into_olp_string(arr);
-        assert_eq!(s, "(\"\"test\"\" \"\"other\"\" )");
     }
 }

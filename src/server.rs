@@ -25,7 +25,8 @@ use crate::api::APICalls;
 use crate::export::HtmlExport;
 use crate::latex;
 use crate::search::Search;
-use crate::sqlite::SqliteConnection;
+use crate::sqlite::helpers;
+use crate::sqlite::olp;
 use crate::subtree::Subtree;
 use crate::watcher;
 use crate::ServerState;
@@ -171,19 +172,18 @@ pub enum Query {
 }
 
 pub fn get_org_as_html(db: &mut ServerState, query: Query, scope: String) -> Response {
-    let [_title, id, file] = match db
-        .sqlite
-        .get_all_nodes(["title", "id", "file"])
-        .into_iter()
-        .filter(|[title, node, _]| match &query {
-            Query::ByTitle(name) => title.contains(name.title()),
-            Query::ById(id) => node.contains(id.id()),
-        })
-        .next()
-    {
-        Some(node) => node,
-        None => return Response::text("Did not get node."),
-    };
+    let [_title, id, file] =
+        match helpers::get_all_nodes(db.sqlite.connection(), ["title", "id", "file"])
+            .into_iter()
+            .filter(|[title, node, _]| match &query {
+                Query::ByTitle(name) => title.contains(name.title()),
+                Query::ById(id) => node.contains(id.id()),
+            })
+            .next()
+        {
+            Some(node) => node,
+            None => return Response::text("Did not get node."),
+        };
 
     // FIXME: This does not narrow to the node, but only to the file.
     let contents = match std::fs::read_to_string(file.replace('"', "")) {
@@ -225,22 +225,27 @@ pub fn search(db: &mut ServerState, query: String) -> Response {
 }
 
 pub fn get_graph_data(mut db: &mut ServerState) -> Response {
-    let olp = |s: String, db: &mut ServerState| {
+    let olp = |s: String, db: &mut ServerState| -> String {
         (!s.is_empty())
             .then(|| {
-                SqliteConnection::parse_olp(s[1..s.len() - 1].to_string())
+                olp::parse_olp(s[1..s.len() - 1].to_string())
                     .unwrap_or_default()
                     .pop()
                     .unwrap_or_default()
             })
-            .map(|parent| db.sqlite.get_id_by_title(parent.as_str()))
-            .unwrap_or_default()
+            .map(|parent| {
+                let stmnt = "SELECT title, id FROM nodes WHERE title = ?1;";
+                // TODO: fix at some point
+                let parent = format!("\"{}\"", parent);
+                db.sqlite.query_one(stmnt, [parent], |row| {
+                    Ok(row.get::<usize, String>(1).unwrap())
+                })
+            })
+            .unwrap_or(Ok(String::new()))
             .unwrap_or_default()
     };
 
-    let mut nodes = db
-        .sqlite
-        .get_all_nodes(["id", "title", "actual_olp"])
+    let mut nodes = helpers::get_all_nodes(db.sqlite.connection(), ["id", "title", "actual_olp"])
         .into_iter()
         .map(|e| RoamNode {
             title: e[1].to_string().into(),
@@ -256,6 +261,7 @@ pub fn get_graph_data(mut db: &mut ServerState) -> Response {
         "WHERE type = '\"id\"'\n",
         "AND (dest = ?1 OR source = ?1)"
     );
+
     let mut stmnt = db.sqlite.connection().prepare(STMNT).unwrap();
     for node in &mut nodes {
         let num = stmnt
@@ -268,10 +274,30 @@ pub fn get_graph_data(mut db: &mut ServerState) -> Response {
 
     drop(stmnt);
 
-    let mut links = db.sqlite.get_all_links();
+    const ALL_LINKS: &str = concat!(
+        "SELECT source, dest, type\n",
+        "FROM links\n",
+        "WHERE type = '\"id\"';"
+    );
+
+    let mut links: Vec<RoamLink> = db
+        .sqlite
+        .query_many(ALL_LINKS, [], |row| {
+            Ok(RoamLink {
+                from: row.get::<usize, String>(0).unwrap().into(),
+                to: row.get::<usize, String>(1).unwrap().into(),
+            })
+        })
+        .unwrap()
+        .into_iter()
+        .collect();
+
+    const PARENT_STMNT: &str = "SELECT id, title FROM nodes WHERE id = ?1;";
 
     for node in &nodes {
-        if let Some(parent_id) = db.sqlite.get_parent_for_id(&node.id.id()) {
+        if let Ok(parent_id) = db.sqlite.query_one(PARENT_STMNT, [&node.id.id()], |row| {
+            row.get::<usize, String>(0)
+        }) {
             links.push(RoamLink {
                 from: parent_id.into(),
                 to: node.id.clone(),
@@ -283,9 +309,7 @@ pub fn get_graph_data(mut db: &mut ServerState) -> Response {
 }
 
 pub fn get_latex_svg(db: &mut ServerState, tex: String, color: String, id: String) -> Response {
-    let node = db
-        .sqlite
-        .get_all_nodes(["file", "id"])
+    let node = helpers::get_all_nodes(db.sqlite.connection(), ["file", "id"])
         .into_iter()
         .filter(|[_, c_id]| c_id.contains(&id))
         .next();

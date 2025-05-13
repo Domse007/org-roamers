@@ -9,7 +9,7 @@ use rusqlite::Connection;
 
 use crate::{
     database::datamodel::Timestamps,
-    sqlite::{rebuild, SqliteConnection},
+    sqlite::{olp, rebuild},
 };
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -36,8 +36,8 @@ impl NodeFromOrg {
         rebuild::insert_node(
             con, with_replace, &self.uuid, self.file.as_str(), self.level, 0,
             false, 0, "", "", self.title.as_str(), "",
-            SqliteConnection::into_olp_string(self.olp.clone()).as_str(),
-            SqliteConnection::into_olp_string(self.actual_olp.clone()).as_str(),
+            olp::into_olp_string(self.olp.clone()).as_str(),
+            olp::into_olp_string(self.actual_olp.clone()).as_str(),
         )
     }
 }

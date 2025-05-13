@@ -6,4 +6,5 @@ format:
 
 .PHONY: all
 all:
+	$(NPM) install
 	$(NPM) run build

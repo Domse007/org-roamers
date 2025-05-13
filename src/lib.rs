@@ -1,6 +1,7 @@
 pub mod api;
 #[allow(warnings)]
 pub mod database;
+pub mod error;
 mod export;
 mod latex;
 pub mod org;
