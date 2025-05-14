@@ -1,4 +1,4 @@
-use std::{fs::File, io::Read, path::Path};
+use std::{collections::HashSet, fs::File, io::Read, path::Path};
 
 use orgize::{
     ast::{Document, Keyword, Link},
@@ -67,6 +67,7 @@ pub struct RoamersTraverser {
     file: String,
     nodes: Vec<NodeFromOrg>,
     id_stack: Vec<(String, String)>,
+    tags_stack: Vec<Vec<String>>,
     olp: Vec<String>,
     actual_olp: Vec<String>,
 }
@@ -85,6 +86,19 @@ impl RoamersTraverser {
 
     pub fn current_actual_olp(&self) -> Vec<String> {
         self.actual_olp.clone()
+    }
+
+    pub fn get_tags(&self) -> Vec<String> {
+        let mut tags = self
+            .tags_stack
+            .iter()
+            .flatten()
+            .cloned()
+            .collect::<HashSet<String>>()
+            .into_iter()
+            .collect::<Vec<String>>();
+        tags.sort();
+        tags
     }
 }
 
@@ -108,7 +122,7 @@ impl Traverser for RoamersTraverser {
                             uuid: id.clone(),
                             content,
                             level: 0,
-                            tags,
+                            tags: tags.clone(),
                             file: self.file.to_string(),
                             aliases,
                             parent: None,
@@ -118,6 +132,7 @@ impl Traverser for RoamersTraverser {
                         };
 
                         self.nodes.push(node);
+                        self.tags_stack.push(tags);
 
                         self.id_stack.push((title, id));
                     }
@@ -130,6 +145,7 @@ impl Traverser for RoamersTraverser {
             }
             Event::Leave(Container::Document(_)) => {
                 let _ = self.id_stack.pop();
+                let _ = self.tags_stack.pop();
                 let _ = self.olp.pop();
             }
             Event::Enter(Container::Headline(headline)) => {
@@ -141,7 +157,7 @@ impl Traverser for RoamersTraverser {
                             .map(parse_aliases)
                             .unwrap_or_default();
 
-                        let tags = headline
+                        let tags: Vec<String> = headline
                             .tags()
                             .map(|t| t.to_string())
                             .filter(|t| !t.trim().is_empty())
@@ -168,13 +184,17 @@ impl Traverser for RoamersTraverser {
 
                         content.push_str(&subheading);
 
+                        // NOTE: this derives from the org-roam implemementation to prevent
+                        // additional queries when computing inherited tags.
+                        self.tags_stack.push(tags);
+
                         let node = NodeFromOrg {
                             title,
                             uuid: id,
                             content,
                             level,
                             parent: my_parent,
-                            tags,
+                            tags: self.get_tags(),
                             file: self.file.to_string(),
                             olp,
                             actual_olp,
@@ -196,6 +216,7 @@ impl Traverser for RoamersTraverser {
                         if let Some((_, id_from_stack)) = self.id_stack.last() {
                             if id == *id_from_stack {
                                 let _ = self.id_stack.pop();
+                                let _ = self.tags_stack.pop();
                             }
                         }
                     }
@@ -542,7 +563,11 @@ some text
                     content: String::new(),
                     level: 1,
                     parent: Some("e655725f-97db-4eec-925a-b80d66ad97e8".to_string()),
-                    tags: vec!["test1".to_string(), "test2".to_string()],
+                    tags: vec![
+                        "test1".to_string(),
+                        "test2".to_string(),
+                        "test3".to_string(),
+                    ],
                     olp: vec![],
                     actual_olp: vec!["Test".to_string()],
                     ..Default::default()

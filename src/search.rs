@@ -4,7 +4,7 @@ use anyhow::Result;
 use rusqlite::Connection;
 use tracing::info;
 
-use crate::api::types::SearchResponseElement;
+use crate::{api::types::SearchResponseElement, transform::title::TitleSanitizer};
 
 #[derive(PartialEq, Debug)]
 pub struct ForNode<'a> {
@@ -29,7 +29,11 @@ impl<'a> ForNode<'a> {
         }
     }
 
-    fn search(&self, con: &mut Connection) -> Result<Vec<SearchResponseElement>> {
+    fn search<F: Fn(&str) -> String>(
+        &self,
+        con: &mut Connection,
+        title_sanitizer: F,
+    ) -> Result<Vec<SearchResponseElement>> {
         let param = format_search_param(&self.node_search);
         let stmnt = "SELECT id, title FROM nodes WHERE LOWER(title) LIKE ?1";
         let mut stmnt = con.prepare(stmnt)?;
@@ -59,7 +63,7 @@ impl<'a> ForNode<'a> {
                 });
                 if p {
                     result.push(SearchResponseElement {
-                        display: element.1[1..element.1.len() - 1].to_string(),
+                        display: title_sanitizer(&element.1[1..element.1.len() - 1]),
                         id: element.0.into(),
                         tags: tags.collect(),
                     });
@@ -79,9 +83,9 @@ impl<'a> ForNode<'a> {
                         .map(Result::unwrap)
                         .collect();
                     SearchResponseElement {
-                        display: row.1[1..row.1.len() - 1].to_string(),
+                        display: title_sanitizer(&row.1[1..row.1.len() - 1]),
                         id: row.0.into(),
-                        tags: tags,
+                        tags,
                     }
                 })
                 .collect();
@@ -109,7 +113,11 @@ impl<'a> ForTag<'a> {
         Self { tag_search: search }
     }
 
-    fn search(&self, con: &mut Connection) -> Result<Vec<SearchResponseElement>> {
+    fn search<F: Fn(&str) -> String>(
+        &self,
+        con: &mut Connection,
+        title_sanitizer: F,
+    ) -> Result<Vec<SearchResponseElement>> {
         let params = format_tag_param(&self.tag_search);
         let stmnt = format!(
             "SELECT node_id, tag FROM tags WHERE LOWER(tag) IN {}",
@@ -134,7 +142,7 @@ impl<'a> ForTag<'a> {
                 .query_map([id], |row| {
                     let display: String = row.get_unwrap(1);
                     Ok(SearchResponseElement {
-                        display: display[1..display.len() - 1].to_string(),
+                        display: title_sanitizer(&display[1..display.len() - 1]),
                         id: row.get_unwrap::<usize, String>(0).into(),
                         tags: tags.clone(),
                     })
@@ -193,9 +201,13 @@ impl<'a> Search<'a> {
 
     pub fn search(&self, con: &mut Connection) -> Result<Vec<SearchResponseElement>> {
         let before = Instant::now();
+        let title_sanitizer = |title: &str| {
+            let sanitier = TitleSanitizer::new();
+            sanitier.process(title)
+        };
         let res = match self {
-            Self::ForNode(node) => node.search(con),
-            Self::ForTag(tag) => tag.search(con),
+            Self::ForNode(node) => node.search(con, title_sanitizer),
+            Self::ForTag(tag) => tag.search(con, title_sanitizer),
         };
         let delta = Instant::now() - before;
         info!("Search query took {}ms.", delta.as_millis());

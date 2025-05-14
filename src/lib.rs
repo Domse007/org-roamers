@@ -10,6 +10,7 @@ pub mod search;
 pub mod server;
 pub mod sqlite;
 pub mod subtree;
+pub mod transform;
 pub mod watcher;
 
 use export::HtmlExportSettings;

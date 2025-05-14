@@ -6,6 +6,7 @@ use std::sync::mpsc::Sender;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread::JoinHandle;
+use std::time::Instant;
 
 use orgize::Org;
 use rouille::{router, Response, Server};
@@ -30,6 +31,7 @@ use crate::search::Search;
 use crate::sqlite::helpers;
 use crate::sqlite::olp;
 use crate::subtree::Subtree;
+use crate::transform::title::TitleSanitizer;
 use crate::watcher;
 use crate::ServerState;
 
@@ -174,6 +176,8 @@ pub enum Query {
 }
 
 pub fn get_org_as_html(db: &mut ServerState, query: Query, scope: String) -> OrgAsHTMLResponse {
+    let before = Instant::now();
+
     let [_title, id, file] =
         match helpers::get_all_nodes(db.sqlite.connection(), ["title", "id", "file"])
             .into_iter()
@@ -224,6 +228,9 @@ pub fn get_org_as_html(db: &mut ServerState, query: Query, scope: String) -> Org
         })
         .collect();
 
+    let delta = Instant::now() - before;
+    tracing::info!("Translating org to HTML took {}ms.", delta.as_millis());
+
     OrgAsHTMLResponse { org, links }
 }
 
@@ -249,6 +256,8 @@ pub fn search(db: &mut ServerState, query: String) -> Response {
 }
 
 pub fn get_graph_data(mut db: &mut ServerState) -> Response {
+    let before = Instant::now();
+
     let olp = |s: String, db: &mut ServerState| -> String {
         (!s.is_empty())
             .then(|| {
@@ -269,10 +278,15 @@ pub fn get_graph_data(mut db: &mut ServerState) -> Response {
             .unwrap_or_default()
     };
 
+    let title_sanitizer = |title: &str| {
+        let sanitier = TitleSanitizer::new();
+        sanitier.process(title)
+    };
+
     let mut nodes = helpers::get_all_nodes(db.sqlite.connection(), ["id", "title", "actual_olp"])
         .into_iter()
         .map(|e| RoamNode {
-            title: e[1].to_string().into(),
+            title: title_sanitizer(&e[1]).into(),
             id: e[0].to_string().into(),
             parent: olp(e[2].to_string(), &mut db).into(),
             num_links: 0,
@@ -328,6 +342,9 @@ pub fn get_graph_data(mut db: &mut ServerState) -> Response {
             });
         }
     }
+
+    let delta = Instant::now() - before;
+    tracing::info!("Building graph response took {}ms.", delta.as_millis());
 
     GraphData { nodes, links }.into()
 }
