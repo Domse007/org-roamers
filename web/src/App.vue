@@ -3,6 +3,7 @@ import Preview from "./components/Preview.vue";
 import Graph from "./components/Graph.vue";
 import Search from "./components/Search.vue";
 import SettingsPane from "./components/Settings/SettingsPane.vue";
+import ErrorDialog from "./components/ErrorDialog.vue";
 import { onMounted, type Ref, ref } from "vue";
 import { type ServerStatus } from "./types.ts";
 import { STATUS_INTERVAL } from "./settings.ts";
@@ -33,14 +34,24 @@ onMounted(() => {
         if (json.pending_changes) {
           redrawGraph();
         }
+      })
+      .catch((error) => {
+        console.log(error);
+        errorMessage.value = "Failed to get response from server.";
       });
   }, STATUS_INTERVAL);
 });
+
+const errorMessage: Ref<string | null> = ref(null);
+const closeError = () => (errorMessage.value = null);
 </script>
 
 <template>
   <header></header>
   <main>
+    <ErrorDialog v-if="errorMessage != null" @dialog-close="closeError">{{
+      errorMessage
+    }}</ErrorDialog>
     <Search @open-node="updatePreviewID"></Search>
     <Graph
       @open-node="updatePreviewID"
