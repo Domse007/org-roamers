@@ -4,7 +4,7 @@ use anyhow::Result;
 use rusqlite::Connection;
 
 use super::olp;
-use crate::org;
+use crate::transform::org;
 
 pub fn init_version(con: &mut Connection, version: usize) -> Result<()> {
     con.execute(format!("PRAGMA user_version = {}", version).as_str(), [])?;

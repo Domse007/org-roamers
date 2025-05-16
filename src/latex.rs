@@ -10,7 +10,7 @@ use std::{
 use anyhow::bail;
 use tracing::info;
 
-use crate::org;
+use crate::transform::org;
 
 const PREAMBLE: &'static str = "\\documentclass{article}
 \\usepackage[T1]{fontenc}

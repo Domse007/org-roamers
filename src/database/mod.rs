@@ -13,7 +13,7 @@ use datamodel::*;
 use search::Search;
 use store::Store;
 
-use crate::org::NodeFromOrg;
+use crate::transform::org::NodeFromOrg;
 
 pub struct Database {
     store: Store,

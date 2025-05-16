@@ -7,7 +7,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use tantivy::{schema::{Field, Schema}, Document, TantivyDocument};
 
-use crate::org::NodeFromOrg;
+use crate::transform::org::NodeFromOrg;
 
 pub type Key = u64;
 

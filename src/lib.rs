@@ -1,19 +1,29 @@
+//! org-roamers is in first and for all a server binary that can create the
+//! same graph as [org-roam](https://github.com/org-roam/org-roam). It also has
+//! routines for a clone of [org-roam-ui](https://github.com/org-roam/org-roam-ui)
+//! latex previews and a lot more.
+//!
+//! <div class="warning">
+//! org-roamers is split into a lib/bin architecture to enable customization of
+//! the server. This crate most likely is only useful if some server feature 
+//! does not fit your org-roam usage. Otherwise just use the supplied server.
+//! </div>
+//!
+//! See: the provided server implementation `org_roamers::bin::server::main.rs`.
+
 pub mod api;
 #[allow(warnings)]
 pub mod database;
 pub mod error;
-mod export;
 mod latex;
-pub mod org;
 pub mod parser;
 pub mod search;
 pub mod server;
 pub mod sqlite;
-pub mod subtree;
 pub mod transform;
 pub mod watcher;
 
-use export::HtmlExportSettings;
+use transform::export::HtmlExportSettings;
 use serde::Serialize;
 use sqlite::SqliteConnection;
 use tempfile::TempDir;

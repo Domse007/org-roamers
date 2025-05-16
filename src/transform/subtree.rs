@@ -10,7 +10,7 @@ use crate::api::types::RoamID;
 
 /// Get the subtree of a given node.
 /// ```rust
-/// use org_roamers::subtree::Subtree;
+/// use org_roamers::transform::subtree::Subtree;
 ///
 /// let org = concat!(
 ///     "* Hello World\n:PROPERTIES:\n:ID:       ",
