@@ -5,7 +5,7 @@
 //!
 //! <div class="warning">
 //! org-roamers is split into a lib/bin architecture to enable customization of
-//! the server. This crate most likely is only useful if some server feature 
+//! the server. This crate most likely is only useful if some server feature
 //! does not fit your org-roam usage. Otherwise just use the supplied server.
 //! </div>
 //!
@@ -17,17 +17,18 @@ pub mod database;
 pub mod error;
 mod latex;
 pub mod parser;
+mod perf;
 pub mod search;
 pub mod server;
 pub mod sqlite;
 pub mod transform;
 pub mod watcher;
 
-use transform::export::HtmlExportSettings;
 use serde::Serialize;
 use sqlite::SqliteConnection;
 use tempfile::TempDir;
 use tracing::info;
+use transform::export::HtmlExportSettings;
 
 use std::error::Error;
 use std::fs;

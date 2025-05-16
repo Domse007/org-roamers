@@ -6,7 +6,6 @@ use std::sync::mpsc::Sender;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread::JoinHandle;
-use std::time::Instant;
 
 use orgize::Org;
 use rouille::{router, Response, Server};
@@ -25,11 +24,12 @@ use crate::api::types::SearchResponse;
 use crate::api::types::SearchResponseProvider;
 use crate::api::types::ServerStatus;
 use crate::api::APICalls;
-use crate::transform::export::HtmlExport;
+use crate::api::APICallsInternal;
 use crate::latex;
 use crate::search::Search;
 use crate::sqlite::helpers;
 use crate::sqlite::olp;
+use crate::transform::export::HtmlExport;
 use crate::transform::subtree::Subtree;
 use crate::transform::title::TitleSanitizer;
 use crate::watcher;
@@ -70,15 +70,17 @@ pub fn start_server(
     );
 
     let lock = Arc::new(Mutex::new(_global));
+    let calls: Arc<Mutex<APICallsInternal>> = Arc::new(Mutex::new(calls.into()));
 
     let (watcher, changes_flag) = watcher::watcher(sqlite_path.clone())?;
     watcher::default_watcher_runtime(lock.clone(), watcher, sqlite_path);
 
     let server = Server::new(url, move |request| {
         let mut global = lock.lock().unwrap();
+        let mut calls = calls.lock().unwrap();
         router!(request,
             (GET) (/)  => {
-                (calls.default_route)(&mut global, conf.root.to_string(), None)
+                calls.default_route(&mut global, conf.root.to_string(), None)
             },
             (GET) (/org) => {
                 let scope = request.get_param("scope")
@@ -92,20 +94,20 @@ pub fn start_server(
                         }
                     }
                 };
-                (calls.get_org_as_html)(&mut global, query, scope).into()
+                calls.get_org_as_html(&mut global, query, scope).into()
             },
             (GET) (/search) => {
                 match request.get_param("q") {
-                    Some(query) => (calls.serve_search_results)(&mut global, query),
+                    Some(query) => calls.serve_search_results(&mut global, query).into(),
                     None => Response::empty_404(),
                 }
             },
             (GET) (/graph) => {
-                get_graph_data(&mut global)
+                calls.get_graph_data(&mut global).into()
             },
             (GET) (/latex) => {
                 match request.get_param("tex") {
-                    Some(tex) => (calls.serve_latex_svg)(
+                    Some(tex) => calls.serve_latex_svg(
                         &mut global,
                         tex,
                         request.get_param("color").unwrap(),
@@ -115,9 +117,9 @@ pub fn start_server(
                 }
             },
             (GET) (/status) => {
-                get_status_data(&mut global, changes_flag.clone()).into()
+                calls.get_status_data(&mut global, changes_flag.clone()).into()
             },
-            _ => (calls.default_route)(&mut global, conf.root.to_string(), Some(request.url()))
+            _ => calls.default_route(&mut global, conf.root.to_string(), Some(request.url()))
         )
     })
     .unwrap();
@@ -176,8 +178,6 @@ pub enum Query {
 }
 
 pub fn get_org_as_html(db: &mut ServerState, query: Query, scope: String) -> OrgAsHTMLResponse {
-    let before = Instant::now();
-
     let [_title, id, file] =
         match helpers::get_all_nodes(db.sqlite.connection(), ["title", "id", "file"])
             .into_iter()
@@ -228,13 +228,10 @@ pub fn get_org_as_html(db: &mut ServerState, query: Query, scope: String) -> Org
         })
         .collect();
 
-    let delta = Instant::now() - before;
-    tracing::info!("Translating org to HTML took {}ms.", delta.as_millis());
-
     OrgAsHTMLResponse { org, links }
 }
 
-pub fn search(db: &mut ServerState, query: String) -> Response {
+pub fn search(db: &mut ServerState, query: String) -> SearchResponse {
     let search = Search::new(query.as_str());
     let res = search.search(db.sqlite.connection());
 
@@ -242,7 +239,7 @@ pub fn search(db: &mut ServerState, query: String) -> Response {
         Ok(res) => res,
         Err(err) => {
             tracing::error!("An error occured while prividing search: {err}");
-            return SearchResponse { providers: vec![] }.into();
+            return SearchResponse { providers: vec![] };
         }
     };
 
@@ -252,12 +249,9 @@ pub fn search(db: &mut ServerState, query: String) -> Response {
             results: nodes,
         }],
     }
-    .into()
 }
 
-pub fn get_graph_data(mut db: &mut ServerState) -> Response {
-    let before = Instant::now();
-
+pub fn get_graph_data(mut db: &mut ServerState) -> GraphData {
     let olp = |s: String, db: &mut ServerState| -> String {
         (!s.is_empty())
             .then(|| {
@@ -342,9 +336,6 @@ pub fn get_graph_data(mut db: &mut ServerState) -> Response {
             });
         }
     }
-
-    let delta = Instant::now() - before;
-    tracing::info!("Building graph response took {}ms.", delta.as_millis());
 
     GraphData { nodes, links }.into()
 }

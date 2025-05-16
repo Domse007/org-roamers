@@ -1,8 +1,7 @@
-use std::{collections::HashSet, time::Instant};
+use std::collections::HashSet;
 
 use anyhow::Result;
 use rusqlite::Connection;
-use tracing::info;
 
 use crate::{api::types::SearchResponseElement, transform::title::TitleSanitizer};
 
@@ -200,7 +199,6 @@ impl<'a> Search<'a> {
     }
 
     pub fn search(&self, con: &mut Connection) -> Result<Vec<SearchResponseElement>> {
-        let before = Instant::now();
         let title_sanitizer = |title: &str| {
             let sanitier = TitleSanitizer::new();
             sanitier.process(title)
@@ -209,8 +207,6 @@ impl<'a> Search<'a> {
             Self::ForNode(node) => node.search(con, title_sanitizer),
             Self::ForTag(tag) => tag.search(con, title_sanitizer),
         };
-        let delta = Instant::now() - before;
-        info!("Search query took {}ms.", delta.as_millis());
         res
     }
 }

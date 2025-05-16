@@ -55,6 +55,7 @@ fn main() -> Result<ExitCode> {
         get_org_as_html: server::get_org_as_html,
         serve_search_results: server::search,
         serve_latex_svg: server::get_latex_svg,
+        get_status_data: server::get_status_data,
     };
 
     let mut global = match prepare_internal(
