@@ -3,6 +3,7 @@ import SettingsTheme from "./SettingsTheme.vue";
 import SettingsGeneral from "./SettingsGeneral.vue";
 import SettingsFilter from "./SettingsFilter.vue";
 import { ref, type Ref } from "vue";
+import BigButton from "../basic/BigButton.vue";
 
 const settingsPages: string[] = ["General", "Theme", "Filter"];
 const activePage: Ref<string> = ref(settingsPages[0]);
@@ -30,14 +31,20 @@ const switchSettingsPage = (page: any) => {
 </script>
 
 <template>
-  <div
-    class="settings-button"
-    id="settings-open-button"
+  <BigButton
+    fg="var(--base)"
+    bg="var(--clickable)"
     :onclick="resize"
-    :style="{ display: inv_shown() }"
+    :style="{
+      display: inv_shown(),
+      bottom: '10px',
+      left: '10px',
+      position: 'absolute',
+      margin: '0px',
+    }"
   >
-    ⚙
-  </div>
+    &#9881;
+  </BigButton>
   <div id="settings-pane" :style="{ display: shown }">
     <div id="settings-pane-header">
       <b>Settings</b>

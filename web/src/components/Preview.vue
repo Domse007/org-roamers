@@ -4,6 +4,8 @@ import { nextTick, ref, useTemplateRef, watch, type Ref } from "vue";
 import renderMathInElement from "katex/contrib/auto-render";
 import { getScope } from "../settings.ts";
 import { type OrgAsHTMLResponse } from "../types.ts";
+import { History } from "../history.ts";
+import BigButton from "./basic/BigButton.vue";
 
 const props = defineProps<{ id: string }>();
 const shown: Ref<"none" | "flex"> = ref("none");
@@ -13,6 +15,8 @@ const rendered = ref("");
 let current_id: string = "";
 const preview_ref = useTemplateRef("preview-ref");
 
+const history = new History<string>();
+
 const preview = (id: string) => {
   current_id = id;
   console.log(`Previewing ${id}`);
@@ -21,6 +25,7 @@ const preview = (id: string) => {
     .then((response) => response.json())
     .then((text) => JSON.parse(text))
     .then((resp: OrgAsHTMLResponse) => {
+      history.push(id);
       rendered.value = resp.org;
       links.value = resp.links;
       expand();
@@ -112,17 +117,54 @@ watch(rendered, async () => {
 </script>
 
 <template>
-  <div
-    class="collapse-btn"
-    tabindex="1"
+  <BigButton
+    fg="var(--base)"
+    bg="var(--clickable)"
     :onclick="resize"
-    :style="{ position: 'absolute', right: '0px' }"
+    :style="{ position: 'absolute', right: '0px', top: '0px' }"
   >
     {{ collapseIcon() }}
-  </div>
+  </BigButton>
   <div class="org-preview-outerframe" :style="{ display: shown }">
-    <div class="collapse-btn" tabindex="1" :onclick="resize">&#128448;</div>
+    <BigButton fg="var(--base)" bg="var(--clickable)" :onclick="resize">
+      &#128448;
+    </BigButton>
     <div id="org-preview-frame">
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          border-bottom: 2px solid var(--clickable);
+          background-color: var(--base);
+        "
+      >
+        <div style="display: flex">
+          <BigButton
+            :style="{ visibility: history.canGoBack() ? 'visible' : 'hidden' }"
+            fg="var(--base)"
+            bg="var(--clickable)"
+            @button-clicked="preview(history.back()!)"
+          >
+            &hookleftarrow;
+          </BigButton>
+          <BigButton
+            :style="{
+              visibility: history.canGoForward() ? 'visible' : 'hidden',
+            }"
+            fg="var(--base)"
+            bg="var(--clickable)"
+            @button-clicked="preview(history.forward()!)"
+          >
+            &hookrightarrow;
+          </BigButton>
+        </div>
+        <BigButton
+          fg="var(--base)"
+          bg="var(--clickable)"
+          @button-clicked="preview(current_id)"
+          >&circlearrowleft;
+        </BigButton>
+      </div>
       <div id="org-preview" ref="preview-ref" v-html="rendered"></div>
       <div id="org-preview-footer" v-if="links.length != 0">
         <div id="org-preview-footer-title">
@@ -149,31 +191,6 @@ watch(rendered, async () => {
   z-index: 50;
   display: flex;
   width: 50%;
-}
-
-.collapse-btn {
-  border-radius: 5px;
-  padding: 2px;
-  width: 42px;
-  min-width: 42px;
-  height: 42px;
-  min-height: 42px;
-  margin: 12px;
-  background-color: var(--clickable);
-  font-size: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  right: 0px;
-  top: 0px;
-}
-
-.collapse-btn:hover {
-  filter: brightness(125%);
-}
-
-.collapse-btn:active {
-  filter: brightness(75%);
 }
 
 #org-preview-frame {
