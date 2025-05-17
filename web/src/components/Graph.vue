@@ -8,11 +8,12 @@ import { NodeBorderProgram } from "@sigma/node-border";
 import type GraphData from "@/types";
 import { onMounted, watch } from "vue";
 import { generalSettings } from "../settings.ts";
+import drawHover from "../sigma_helpers.ts";
 
 const randomNumber = (min: number, max: number) =>
   Math.random() * (max - min) + min;
 let graph = new MultiGraph();
-let sigma = null;
+let sigma: Sigma | null = null;
 
 const updateGraph = () => {
   const style = window.getComputedStyle(document.body);
@@ -112,19 +113,62 @@ function setupGraph() {
     nodeProgramClasses: {
       bordered: NodeBorderProgram,
     },
+    defaultDrawNodeHover: drawHover,
     labelColor: { color: textColor },
   });
 
-  sigma.on("downNode", (e) => emit("openNode", e.node));
+  sigma.on("downNode", (e) => {
+    zoomOnto(e.node, old_node);
+    emit("openNode", e.node);
+  });
 
   if (generalSettings.stopLayoutAfter != null) {
     setTimeout(() => layout.stop(), generalSettings.stopLayoutAfter * 1000);
   }
 }
-const prop = defineProps<{ count: number; toggleLayouter: boolean }>();
+
+const zoomOnto = (id: string, old_id: string) => {
+  const c = (v: string) =>
+    getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  // reset old highlighted node edges
+  if (old_id.length != 0) highlightEdgesFromNode(old_id, c("--overlay"));
+
+  const ratio = 0.2;
+  // NOTE: 0.4 was chosen because it worked on my machine. Don't know about others.
+  const graphOffset = 0.4 * ratio;
+  const position = sigma!.getNodeDisplayData(id)!;
+
+  sigma!.getCamera().animate(
+    {
+      x: position.x + graphOffset,
+      y: position.y,
+      ratio: ratio,
+    },
+    {
+      duration: 1000,
+    },
+  );
+  highlightEdgesFromNode(id, c("--highlight-2"));
+};
+
+function highlightEdgesFromNode(sourceNode: unknown, color: string) {
+  graph.forEachEdge(
+    sourceNode,
+    (edge, _attr, _src, _trgt, _srcAttr, _trgtAttr) => {
+      graph.setEdgeAttribute(edge, "color", color);
+    },
+  );
+}
+
+const prop = defineProps<{
+  count: number;
+  toggleLayouter: boolean;
+  zoomNode: string;
+}>();
 
 let old_count = 0;
 let old_layout_state = false;
+let old_node = "";
 
 watch(prop, () => {
   if (old_count != prop.count) {
@@ -138,6 +182,10 @@ watch(prop, () => {
   if (old_layout_state != prop.toggleLayouter) {
     layout.isRunning() ? layout.stop() : layout.start();
     old_layout_state = prop.toggleLayouter;
+  }
+  if (old_node != prop.zoomNode) {
+    zoomOnto(prop.zoomNode, old_node);
+    old_node = prop.zoomNode;
   }
 });
 

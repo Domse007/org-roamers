@@ -57,8 +57,9 @@ const closeError = () => (errorMessage.value = null);
       @open-node="updatePreviewID"
       :count="graphUpdateCount"
       :toggle-layouter="toggleLayouterRef"
+      :zoom-node="previewID"
     ></Graph>
-    <Preview :id="previewID"></Preview>
+    <Preview :id="previewID" @preview-switch="updatePreviewID"></Preview>
     <SettingsPane
       @redraw-graph="redrawGraph"
       @toggle-layouter="toggleLayouter"

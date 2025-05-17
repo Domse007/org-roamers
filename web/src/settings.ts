@@ -5,7 +5,7 @@ export interface GeneralSettings {
   stopLayoutAfter: number | null;
 }
 
-export let generalSettings: GeneralSettings = {
+export const generalSettings: GeneralSettings = {
   showEntireFile: false,
   stopLayoutAfter: 15,
 };

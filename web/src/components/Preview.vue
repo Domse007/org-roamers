@@ -18,6 +18,7 @@ const preview_ref = useTemplateRef("preview-ref");
 const history = new History<string>();
 
 const preview = (id: string) => {
+  emit("previewSwitch", id);
   current_id = id;
   console.log(`Previewing ${id}`);
   const scope: "file" | "node" = getScope();
@@ -68,8 +69,7 @@ const katexOptions = {
       display: true,
     },
     { left: "\\begin{center}", right: "\\end{center}", display: true },
-    { left: "\\begin{tikpicture}", right: "\\end{tikzpicture}", display: true },
-    { left: "\\begin{center}", right: "\\end{center}", display: true },
+    { left: "\\begin{tikzpicture}", right: "\\end{tikzpicture}", display: true },
     { left: "\\[", right: "\\]", display: true },
   ],
   errorCallback: (message: string, _stack: unknown) => {
@@ -114,6 +114,7 @@ watch(rendered, async () => {
   configureIDLinks("org-preview-id-link");
   configureIDLinks("org-preview-footer-link");
 });
+const emit = defineEmits(["previewSwitch"]);
 </script>
 
 <template>
