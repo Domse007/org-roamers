@@ -71,10 +71,9 @@ fn main() -> Result<ExitCode> {
     };
 
     if configuration.sqlite_path.is_none() {
-        global
-            .sqlite
-            .insert_files(&configuration.roam_path)
-            .unwrap();
+        if let Err(err) = global.sqlite.insert_files(&configuration.roam_path) {
+            tracing::error!("An error occured: {err}");
+        }
     }
 
     let server_conf_path = {
