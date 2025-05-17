@@ -117,7 +117,8 @@ pub fn prepare_internal<P: AsRef<Path>>(
         _index: index,
         _schema: schema,
         sqlite: sqlite_con,
-        html_export_settings: HtmlExportSettings::new(html_export_settings_path).unwrap(),
+        html_export_settings: HtmlExportSettings::new(html_export_settings_path)
+            .unwrap_or_default(),
     })
 }
 
