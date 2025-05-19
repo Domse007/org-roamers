@@ -23,6 +23,7 @@ export interface SearchResponse {
 }
 
 export interface ServerStatus {
+  visited_node: string | null;
   pending_changes: boolean;
 }
 

@@ -7,11 +7,10 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread::JoinHandle;
 
+use emacs::route_emacs_traffic;
 use orgize::Org;
 use rouille::{router, Response, Server};
 use rusqlite::fallible_streaming_iterator::FallibleStreamingIterator;
-use serde::Deserialize;
-use serde::Serialize;
 
 use crate::api::types::GraphData;
 use crate::api::types::OrgAsHTMLResponse;
@@ -27,6 +26,7 @@ use crate::api::APICalls;
 use crate::api::APICallsInternal;
 use crate::latex;
 use crate::search::Search;
+use crate::server::emacs::EmacsRequest;
 use crate::sqlite::helpers;
 use crate::sqlite::olp;
 use crate::transform::export::HtmlExport;
@@ -35,11 +35,7 @@ use crate::transform::title::TitleSanitizer;
 use crate::watcher;
 use crate::ServerState;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ServerConfiguration {
-    /// Root path to the website files. e.g. .js / .html / .css
-    pub root: String,
-}
+pub mod emacs;
 
 pub struct ServerRuntime {
     handle: JoinHandle<()>,
@@ -55,32 +51,32 @@ impl ServerRuntime {
 
 pub fn start_server(
     url: String,
-    conf: ServerConfiguration,
     calls: APICalls,
-    _global: ServerState,
-    // TODO: move to some struct.
-    sqlite_path: PathBuf,
+    state: ServerState,
 ) -> Result<ServerRuntime, Box<dyn Error>> {
-    tracing::info!("Using server configuration: {conf:?}");
-    let conf: &'static ServerConfiguration = Box::leak(Box::new(conf));
+    tracing::info!("Using server configuration: {:?}", state.static_conf);
 
     tracing::info!(
         "Using HTML settings: {}",
-        serde_json::to_string(&_global.html_export_settings).unwrap()
+        serde_json::to_string(&state.html_export_settings).unwrap()
     );
 
-    let lock = Arc::new(Mutex::new(_global));
     let calls: Arc<Mutex<APICallsInternal>> = Arc::new(Mutex::new(calls.into()));
 
-    let (watcher, changes_flag) = watcher::watcher(sqlite_path.clone())?;
-    watcher::default_watcher_runtime(lock.clone(), watcher, sqlite_path);
+    let org_roam_db_path = state.org_roam_db_path.clone();
+
+    let lock = Arc::new(Mutex::new(state));
+
+    let (watcher, changes_flag) = watcher::watcher(org_roam_db_path.clone())?;
+    watcher::default_watcher_runtime(lock.clone(), watcher, org_roam_db_path);
 
     let server = Server::new(url, move |request| {
-        let mut global = lock.lock().unwrap();
+        let mut state = lock.lock().unwrap();
         let mut calls = calls.lock().unwrap();
         router!(request,
             (GET) (/)  => {
-                calls.default_route(&mut global, conf.root.to_string(), None)
+                let conf = state.static_conf.root.to_string();
+                calls.default_route(&mut state, conf, None)
             },
             (GET) (/org) => {
                 let scope = request.get_param("scope")
@@ -94,21 +90,21 @@ pub fn start_server(
                         }
                     }
                 };
-                calls.get_org_as_html(&mut global, query, scope).into()
+                calls.get_org_as_html(&mut state, query, scope).into()
             },
             (GET) (/search) => {
                 match request.get_param("q") {
-                    Some(query) => calls.serve_search_results(&mut global, query).into(),
+                    Some(query) => calls.serve_search_results(&mut state, query).into(),
                     None => Response::empty_404(),
                 }
             },
             (GET) (/graph) => {
-                calls.get_graph_data(&mut global).into()
+                calls.get_graph_data(&mut state).into()
             },
             (GET) (/latex) => {
                 match request.get_param("tex") {
                     Some(tex) => calls.serve_latex_svg(
-                        &mut global,
+                        &mut state,
                         tex,
                         request.get_param("color").unwrap(),
                         request.get_param("id").unwrap(),
@@ -117,9 +113,29 @@ pub fn start_server(
                 }
             },
             (GET) (/status) => {
-                calls.get_status_data(&mut global, changes_flag.clone()).into()
+                calls.get_status_data(&mut state, changes_flag.clone()).into()
             },
-            _ => calls.default_route(&mut global, conf.root.to_string(), Some(request.url()))
+            (POST) (/emacs) => {
+                tracing::debug!("{}", request.raw_url());
+                match route_emacs_traffic(request) {
+                    Ok(req) => {
+                        match req {
+                            EmacsRequest::BufferOpened(id) => {
+                                state.dynamic_state.update_working_id(id.into());
+                            }
+                            EmacsRequest::BufferModified(_file) => {
+                                todo!()
+                            }
+                        }
+                        Response::empty_204()
+                    }
+                    Err(err) => err.handle(),
+                }
+            },
+            _ => {
+                let conf = state.static_conf.root.to_string();
+                calls.default_route(&mut state, conf, Some(request.url()))
+            }
         )
     })
     .unwrap();
@@ -360,10 +376,11 @@ pub fn get_latex_svg(db: &mut ServerState, tex: String, color: String, id: Strin
     }
 }
 
-pub fn get_status_data(_db: &mut ServerState, changes_flag: Arc<Mutex<bool>>) -> ServerStatus {
+pub fn get_status_data(state: &mut ServerState, changes_flag: Arc<Mutex<bool>>) -> ServerStatus {
     let mut changes = changes_flag.lock().unwrap();
     let status = ServerStatus {
-        pending_changes: *changes,
+        visited_node: state.dynamic_state.get_working_id().cloned(),
+        pending_changes: *changes || state.dynamic_state.pending_reload,
     };
     *changes = false;
     status

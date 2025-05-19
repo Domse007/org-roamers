@@ -8,7 +8,7 @@ pub const CONFIG_PATH: &'static str = "/etc/org-roamers/";
 #[derive(Serialize, Deserialize)]
 pub struct Configuration {
     pub html_export_path: PathBuf,
-    pub roam_path: String,
+    pub roam_path: PathBuf,
     pub ip_addr: String,
     pub port: u16,
 }

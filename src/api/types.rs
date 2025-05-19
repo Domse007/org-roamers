@@ -156,6 +156,7 @@ impl Into<Response> for SearchResponse {
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct ServerStatus {
     /// is true, when files changed on disk.
+    pub visited_node: Option<RoamID>,
     pub pending_changes: bool,
 }
 
@@ -288,9 +289,10 @@ mod tests {
     #[test]
     fn test_server_status_serialization() {
         let status = ServerStatus {
+            visited_node: None,
             pending_changes: true,
         };
-        let expected = "{\"pending_changes\":true}";
+        let expected = "{\"visited_node\":null,\"pending_changes\":true}";
         assert_eq!(serde_json::to_string(&status).unwrap(), expected);
     }
 

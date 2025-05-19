@@ -34,6 +34,9 @@ onMounted(() => {
         if (json.pending_changes) {
           redrawGraph();
         }
+        if (json.visited_node != null) {
+          updatePreviewID(json.visited_node);
+        }
       })
       .catch((error) => {
         console.log(error);

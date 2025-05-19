@@ -8,8 +8,8 @@ use cli::run_cli_server;
 use conf::Configuration;
 use org_roamers::{
     api::APICalls,
-    prepare_internal,
     server::{self, start_server},
+    ServerState,
 };
 use tracing::{error, info};
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -41,7 +41,7 @@ fn main() -> Result<ExitCode> {
 
     let configuration = Configuration {
         html_export_path: html_path,
-        roam_path: path.to_string(),
+        roam_path: path.into(),
         ip_addr: "0.0.0.0".to_string(),
         port: 5000,
     };
@@ -54,18 +54,6 @@ fn main() -> Result<ExitCode> {
         serve_latex_svg: server::get_latex_svg,
         get_status_data: server::get_status_data,
     };
-
-    let mut global = match prepare_internal(configuration.html_export_path.as_path()) {
-        Ok(g) => g,
-        Err(e) => {
-            tracing::error!("An error occured: {e}");
-            return Ok(ExitCode::FAILURE);
-        }
-    };
-
-    if let Err(err) = global.sqlite.insert_files(&configuration.roam_path) {
-        tracing::error!("An error occured: {err}");
-    }
 
     let server_conf_path = {
         let assemble = |s| {
@@ -80,21 +68,27 @@ fn main() -> Result<ExitCode> {
             path
         }
     };
-
     info!("Using config path {server_conf_path:?}");
-
     let server_conf_serialized = fs::read_to_string(server_conf_path).unwrap();
-
     let server_configuration = serde_json::from_str(server_conf_serialized.as_str()).unwrap();
 
-    let runtime = start_server(
-        configuration.get_url(false),
+    let mut global = match ServerState::new(
+        configuration.html_export_path.as_path(),
+        configuration.roam_path.as_path(),
         server_configuration,
-        calls,
-        global,
-        configuration.roam_path.clone().into(),
-    )
-    .unwrap();
+    ) {
+        Ok(g) => g,
+        Err(e) => {
+            tracing::error!("An error occured: {e}");
+            return Ok(ExitCode::FAILURE);
+        }
+    };
+
+    if let Err(err) = global.sqlite.insert_files(&configuration.roam_path) {
+        tracing::error!("An error occured: {err}");
+    }
+
+    let runtime = start_server(configuration.get_url(false), calls, global).unwrap();
 
     info!("Starting CLI...");
 
