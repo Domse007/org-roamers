@@ -69,7 +69,11 @@ const katexOptions = {
       display: true,
     },
     { left: "\\begin{center}", right: "\\end{center}", display: true },
-    { left: "\\begin{tikzpicture}", right: "\\end{tikzpicture}", display: true },
+    {
+      left: "\\begin{tikzpicture}",
+      right: "\\end{tikzpicture}",
+      display: true,
+    },
     { left: "\\[", right: "\\]", display: true },
   ],
   errorCallback: (message: string, _stack: unknown) => {
