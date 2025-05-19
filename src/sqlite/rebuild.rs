@@ -1,17 +1,20 @@
-use std::{ffi::OsStr, fs, path::Path};
+use std::{
+    ffi::OsStr,
+    fs::{self, DirEntry},
+    path::Path,
+};
 
-use anyhow::Result;
 use rusqlite::Connection;
 
 use super::olp;
 use crate::transform::org;
 
-pub fn init_version(con: &mut Connection, version: usize) -> Result<()> {
+pub fn init_version(con: &mut Connection, version: usize) -> anyhow::Result<()> {
     con.execute(format!("PRAGMA user_version = {}", version).as_str(), [])?;
     Ok(())
 }
 
-pub fn init_files_table(con: &mut Connection) -> Result<()> {
+pub fn init_files_table(con: &mut Connection) -> anyhow::Result<()> {
     const STMNT: &'static str = concat!(
         "CREATE TABLE files (file UNIQUE PRIMARY KEY, title,",
         "hash NOT NULL, atime NOT NULL, mtime NOT NULL);"
@@ -31,7 +34,7 @@ pub fn init_files_table(con: &mut Connection) -> Result<()> {
 ///
 /// The reference org-roam implementation constructs no olp, while actual_olp
 /// generates `("Maintitle")`.
-pub fn init_nodes_table(con: &mut Connection) -> Result<()> {
+pub fn init_nodes_table(con: &mut Connection) -> anyhow::Result<()> {
     const STMNT: &'static str = concat!(
         "CREATE TABLE nodes (id NOT NULL PRIMARY KEY, file NOT NULL,",
         "level NOT NULL, pos NOT NULL, todo, priority, scheduled text,",
@@ -42,7 +45,7 @@ pub fn init_nodes_table(con: &mut Connection) -> Result<()> {
     Ok(())
 }
 
-pub fn init_links_table(con: &mut Connection) -> Result<()> {
+pub fn init_links_table(con: &mut Connection) -> anyhow::Result<()> {
     const STMNT: &str = concat!(
         "CREATE TABLE links (pos NOT NULL, source NOT NULL, dest NOT NULL,",
         "type NOT NULL, properties NOT NULL, FOREIGN KEY (source)",
@@ -52,7 +55,7 @@ pub fn init_links_table(con: &mut Connection) -> Result<()> {
     Ok(())
 }
 
-pub fn init_aliases(con: &mut Connection) -> Result<()> {
+pub fn init_aliases(con: &mut Connection) -> anyhow::Result<()> {
     const STMNT_ALIASES: &'static str = concat!(
         "CREATE TABLE aliases (node_id NOT NULL, alias,",
         "FOREIGN KEY (node_id) REFERENCES nodes (id) ON DELETE CASCADE);"
@@ -63,7 +66,7 @@ pub fn init_aliases(con: &mut Connection) -> Result<()> {
     Ok(())
 }
 
-pub fn init_tags(con: &mut Connection) -> Result<()> {
+pub fn init_tags(con: &mut Connection) -> anyhow::Result<()> {
     let stmnt_tags: &'static str = concat!(
         "CREATE TABLE tags (node_id NOT NULL, tag,",
         "FOREIGN KEY (node_id) REFERENCES nodes (id) ON DELETE CASCADE);"
@@ -89,7 +92,7 @@ pub fn insert_node(
     properties: &str,
     olp: &str,
     actual_olp: &str,
-) -> Result<()> {
+) -> anyhow::Result<()> {
     let s = |s: &str| {
         if s.is_empty() {
             "\"\"".to_string()
@@ -116,7 +119,12 @@ pub fn insert_node(
     Ok(())
 }
 
-pub fn insert_tag(con: &mut Connection, id: &str, tag: &str, with_replace: bool) -> Result<()> {
+pub fn insert_tag(
+    con: &mut Connection,
+    id: &str,
+    tag: &str,
+    with_replace: bool,
+) -> anyhow::Result<()> {
     let id = format!("\"\"\"{id}\"\"\"");
     let tag = format!("\"{tag}\"");
     insert_row(con, "tags", ["node_id", "tag"], [&id, &tag], with_replace)?;
@@ -128,7 +136,7 @@ pub fn insert_link(
     source: &str,
     dest: &str,
     with_replace: bool,
-) -> Result<()> {
+) -> anyhow::Result<()> {
     const TYPE: &str = "id";
     const PROPERTIES: &str = "";
     const POS: usize = 0;
@@ -156,7 +164,7 @@ pub fn insert_row<const I: usize>(
     cols: [&str; I],
     vals: [&str; I],
     with_replace: bool,
-) -> Result<()> {
+) -> anyhow::Result<()> {
     let stmnt = insert_row_formatter(table, cols, vals, with_replace);
     con.execute(&stmnt, [])?;
     Ok(())
@@ -196,30 +204,54 @@ pub(crate) struct IterFilesStats {
     pub num_tags: usize,
 }
 
+#[derive(thiserror::Error, Debug)]
+pub struct IterFilesError {
+    entry: DirEntry,
+    error: Box<dyn std::error::Error>,
+}
+
+impl IterFilesError {
+    pub fn new(entry: DirEntry, error: Box<dyn std::error::Error>) -> Self {
+        Self { entry, error }
+    }
+}
+
+impl std::fmt::Display for IterFilesError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?} has produced error: {}", self.entry, self.error)
+    }
+}
+
 pub(super) fn iter_files<P: AsRef<Path>>(
     con: &mut Connection,
     roam_path: P,
     stats: &mut IterFilesStats,
-) -> Result<()> {
+) -> Result<(), IterFilesError> {
     let inc = |n: &mut usize| *n += 1;
 
-    for entry in fs::read_dir(roam_path)? {
-        let entry = if entry.is_ok() {
-            entry.unwrap()
-        } else {
-            continue;
+    for entry in fs::read_dir(roam_path).unwrap() {
+        let entry = entry.unwrap();
+
+        let metadata = match entry.metadata() {
+            Ok(metadata) => metadata,
+            Err(err) => return Err(IterFilesError::new(entry, Box::new(err))),
         };
-        let metadata = entry.metadata()?;
+
         if metadata.is_dir() {
             iter_files(con, entry.path(), stats)?;
         }
 
         if metadata.is_file() && entry.path().extension() == Some(OsStr::new("org")) {
             inc(&mut stats.num_files);
-            let nodes = org::get_nodes_from_file(entry.path())?;
+
+            let nodes = match org::get_nodes_from_file(entry.path()) {
+                Ok(nodes) => nodes,
+                Err(err) => return Err(IterFilesError::new(entry, err.into())),
+            };
+
             for node in nodes {
                 inc(&mut stats.num_nodes);
-                self::insert_node(
+                let res = self::insert_node(
                     con,
                     false,
                     &node.uuid,
@@ -234,14 +266,23 @@ pub(super) fn iter_files<P: AsRef<Path>>(
                     "",
                     olp::into_olp_string(node.olp).as_str(),
                     olp::into_olp_string(node.actual_olp).as_str(),
-                )?;
+                );
+
+                if let Err(err) = res {
+                    return Err(IterFilesError::new(entry, err.into()));
+                }
+
                 for tag in node.tags {
                     inc(&mut stats.num_tags);
-                    insert_tag(con, &node.uuid, &tag, false)?;
+                    if let Err(err) = insert_tag(con, &node.uuid, &tag, false) {
+                        return Err(IterFilesError::new(entry, err.into()));
+                    }
                 }
                 for link in node.links {
                     inc(&mut stats.num_links);
-                    insert_link(con, &node.uuid, &link.0, false)?;
+                    if let Err(err) = insert_link(con, &node.uuid, &link.0, false) {
+                        return Err(IterFilesError::new(entry, err.into()));
+                    }
                 }
                 // TODO: add files. For this title is required, which is the
                 // toplevel `#+title` tile.

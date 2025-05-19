@@ -6,11 +6,21 @@ use orgize::{
     Org, SyntaxElement,
 };
 use rusqlite::Connection;
+use serde::{Deserialize, Serialize};
 
-use crate::{
-    database::datamodel::Timestamps,
-    sqlite::{olp, rebuild},
-};
+use crate::sqlite::{olp, rebuild};
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct Timestamps {
+    ctime: String,
+    mtime: Vec<String>,
+}
+
+impl Timestamps {
+    pub fn new(ctime: String, mtime: Vec<String>) -> Self {
+        Self { ctime, mtime }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct NodeFromOrg {
@@ -53,13 +63,19 @@ fn get_orgize<P: AsRef<Path>>(path: P) -> anyhow::Result<Org> {
 pub fn get_nodes_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<NodeFromOrg>> {
     let org = get_orgize(path.as_ref())?;
 
-    get_nodes_from_document(org, path.as_ref().to_str().unwrap())
+    Ok(get_nodes_from_document(
+        org,
+        path.as_ref()
+            .to_str()
+            .ok_or(anyhow::anyhow!("Invalid path"))?
+            .into(),
+    ))
 }
 
-pub fn get_nodes_from_document(org: Org, file: &str) -> anyhow::Result<Vec<NodeFromOrg>> {
+pub fn get_nodes_from_document(org: Org, file: &str) -> Vec<NodeFromOrg> {
     let mut traverser = RoamersTraverser::new(file.to_string());
     org.traverse(&mut traverser);
-    Ok(traverser.nodes)
+    traverser.nodes
 }
 
 #[derive(Default)]
@@ -321,7 +337,7 @@ Welcome
 some text
 ";
         let org = Org::parse(ORG);
-        let res = get_nodes_from_document(org, "").unwrap();
+        let res = get_nodes_from_document(org, "");
         assert_eq!(
             res,
             vec![
@@ -367,7 +383,7 @@ Welcome
 some text
 ";
         let org = Org::parse(ORG);
-        let res = get_nodes_from_document(org, "").unwrap();
+        let res = get_nodes_from_document(org, "");
         assert_eq!(
             res,
             vec![
@@ -421,7 +437,7 @@ Welcome
 some text
 ";
         let org = Org::parse(ORG);
-        let res = get_nodes_from_document(org, "").unwrap();
+        let res = get_nodes_from_document(org, "");
         assert_eq!(
             res,
             vec![
@@ -474,7 +490,7 @@ test
 some text
 ";
         let org = Org::parse(ORG);
-        let res = get_nodes_from_document(org, "").unwrap();
+        let res = get_nodes_from_document(org, "");
         assert_eq!(
             res,
             vec![
@@ -542,7 +558,7 @@ some text
         let org = Org::parse(ORG);
         let res = get_nodes_from_document(org, "");
         assert_eq!(
-            res.unwrap(),
+            res,
             vec![
                 NodeFromOrg {
                     uuid: "e655725f-97db-4eec-925a-b80d66ad97e8".to_string(),
@@ -588,7 +604,7 @@ some text
 :END:
 Linking to [[id:e655725f-97db-4eec-925a-b80d66ad97e8][Test]]";
         let org = Org::parse(ORG);
-        let res = get_nodes_from_document(org, "").unwrap();
+        let res = get_nodes_from_document(org, "");
         assert_eq!(res[0].links, vec![]);
         assert_eq!(
             res[1].links,
@@ -608,7 +624,7 @@ Linking to [[id:e655725f-97db-4eec-925a-b80d66ad97e8][Test]]";
 * other
 Linking to [[id:e655725f-97db-4eec-925a-b80d66ad97e8][Test]]";
         let org = Org::parse(ORG);
-        let res = get_nodes_from_document(org, "").unwrap();
+        let res = get_nodes_from_document(org, "");
         assert_eq!(
             res[0].links,
             vec![(
@@ -631,7 +647,7 @@ Linking to [[id:e655725f-97db-4eec-925a-b80d66ad97e8][Test]]";
 :ROAM_ALIASES: test3 test4
 :END:";
         let org = Org::parse(ORG);
-        let res = get_nodes_from_document(org, "").unwrap();
+        let res = get_nodes_from_document(org, "");
         assert_eq!(
             res[0].aliases,
             vec!["test1".to_string(), "test2".to_string()]

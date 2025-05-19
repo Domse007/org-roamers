@@ -1,9 +1,8 @@
 use std::path::Path;
 
 use anyhow::{bail, Result};
-use rebuild::IterFilesStats;
+use rebuild::{IterFilesError, IterFilesStats};
 use rusqlite::{Connection, Params};
-use tracing::info;
 
 use crate::error::ServerError;
 
@@ -17,22 +16,16 @@ pub struct SqliteConnection {
 impl SqliteConnection {
     const MIN_VERSION: usize = 20;
 
-    pub fn init<P: AsRef<Path>>(path: Option<P>) -> Result<Self> {
-        let this = match path {
-            Some(ref path) => Self {
-                connection: Connection::open(path)?,
-            },
-            None => {
-                info!("No path supplied. Building own db.");
-                let mut connection = Connection::open_in_memory()?;
-                rebuild::init_version(&mut connection, Self::MIN_VERSION)?;
-                rebuild::init_files_table(&mut connection)?;
-                rebuild::init_nodes_table(&mut connection)?;
-                rebuild::init_links_table(&mut connection)?;
-                rebuild::init_aliases(&mut connection)?;
-                rebuild::init_tags(&mut connection)?;
-                Self { connection }
-            }
+    pub fn init() -> Result<Self> {
+        let this = {
+            let mut connection = Connection::open_in_memory()?;
+            rebuild::init_version(&mut connection, Self::MIN_VERSION)?;
+            rebuild::init_files_table(&mut connection)?;
+            rebuild::init_nodes_table(&mut connection)?;
+            rebuild::init_links_table(&mut connection)?;
+            rebuild::init_aliases(&mut connection)?;
+            rebuild::init_tags(&mut connection)?;
+            Self { connection }
         };
 
         let version: usize = this
@@ -85,7 +78,7 @@ impl SqliteConnection {
         &mut self.connection
     }
 
-    pub fn insert_files<P: AsRef<Path>>(&mut self, roam_path: P) -> Result<()> {
+    pub fn insert_files<P: AsRef<Path>>(&mut self, roam_path: P) -> Result<(), IterFilesError> {
         let mut stats = IterFilesStats::default();
         let res = rebuild::iter_files(&mut self.connection, roam_path, &mut stats);
         #[rustfmt::skip]

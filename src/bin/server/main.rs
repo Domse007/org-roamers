@@ -33,8 +33,6 @@ fn main() -> Result<ExitCode> {
         }
     };
 
-    let sqlite_path = args.get(1);
-
     let html_path = {
         let mut path = PathBuf::from_str(conf::CONFIG_PATH).unwrap();
         path.push("html_settings.json");
@@ -42,7 +40,6 @@ fn main() -> Result<ExitCode> {
     };
 
     let configuration = Configuration {
-        sqlite_path: sqlite_path.cloned(),
         html_export_path: html_path,
         roam_path: path.to_string(),
         ip_addr: "0.0.0.0".to_string(),
@@ -58,11 +55,7 @@ fn main() -> Result<ExitCode> {
         get_status_data: server::get_status_data,
     };
 
-    let mut global = match prepare_internal(
-        configuration.roam_path.as_str(),
-        configuration.sqlite_path.as_ref().map(|s| s.as_str()),
-        configuration.html_export_path.as_path(),
-    ) {
+    let mut global = match prepare_internal(configuration.html_export_path.as_path()) {
         Ok(g) => g,
         Err(e) => {
             tracing::error!("An error occured: {e}");
@@ -70,10 +63,8 @@ fn main() -> Result<ExitCode> {
         }
     };
 
-    if configuration.sqlite_path.is_none() {
-        if let Err(err) = global.sqlite.insert_files(&configuration.roam_path) {
-            tracing::error!("An error occured: {err}");
-        }
+    if let Err(err) = global.sqlite.insert_files(&configuration.roam_path) {
+        tracing::error!("An error occured: {err}");
     }
 
     let server_conf_path = {
