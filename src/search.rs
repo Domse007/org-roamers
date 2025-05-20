@@ -81,8 +81,14 @@ impl<'a> ForNode<'a> {
                         .unwrap()
                         .map(Result::unwrap)
                         .collect();
+                    let title = if row.1.len() == 0{
+                        tracing::error!("Title is empty: {:?}", row);
+                        String::new()
+                    } else {
+                        title_sanitizer(&row.1[1..row.1.len() - 1])
+                    };
                     SearchResponseElement {
-                        display: title_sanitizer(&row.1[1..row.1.len() - 1]),
+                        display: title,
                         id: row.0.into(),
                         tags,
                     }
