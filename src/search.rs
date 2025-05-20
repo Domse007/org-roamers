@@ -81,7 +81,7 @@ impl<'a> ForNode<'a> {
                         .unwrap()
                         .map(Result::unwrap)
                         .collect();
-                    let title = if row.1.len() == 0{
+                    let title = if row.1.len() == 0 {
                         tracing::error!("Title is empty: {:?}", row);
                         String::new()
                     } else {

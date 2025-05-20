@@ -1,6 +1,5 @@
 use std::io::Read;
 use std::process::Command;
-use std::process::Stdio;
 use std::{
     fs::File,
     io::Write,
@@ -13,13 +12,18 @@ use tracing::info;
 use crate::file::OrgFile;
 use crate::transform::org;
 
-const PREAMBLE: &'static str = "\\documentclass{article}
-\\usepackage[T1]{fontenc}
-\\usepackage[active,tightpage]{preview}
-\\usepackage{amsmath}
-\\usepackage{amssymb}
-[PACKAGES]
-\\usepackage{xcolor}";
+#[cfg(not(target_os = "windows"))]
+const TEMP_PATH: &'static str = "/tmp/org-roamers/";
+
+const PREAMBLE: &'static str = concat!(
+    "\\documentclass{article}\n",
+    "\\usepackage[T1]{fontenc}\n",
+    "\\usepackage[active,tightpage]{preview}\n",
+    "\\usepackage{amsmath}\n",
+    "\\usepackage{amssymb}\n",
+    "[PACKAGES]\n",
+    "\\usepackage{xcolor}\n"
+);
 
 fn preamble(headers: Vec<String>) -> String {
     PREAMBLE.replace(
@@ -47,7 +51,7 @@ pub fn get_image_with_ctx<P: AsRef<Path>>(
 pub fn get_image(latex: String, color: String, headers: Vec<String>) -> anyhow::Result<String> {
     let hash = hash(latex.as_str());
     // TODO: only works on linux.
-    let mut path = PathBuf::from("/tmp/org-roamers/");
+    let mut path = PathBuf::from(TEMP_PATH);
     std::fs::create_dir_all(path.as_path())?;
 
     // let's check if the file already exists.
@@ -71,24 +75,32 @@ pub fn get_image(latex: String, color: String, headers: Vec<String>) -> anyhow::
     file.write_all(latex.as_bytes())?;
     file.write_all("\n\\end{preview}\n\\end{document}\n".as_bytes())?;
 
-    let status = Command::new("latex")
+    let output = Command::new("latex")
         .args([
             "-interaction",
             "nonstopmode",
             in_file.as_path().to_str().unwrap(),
         ])
         .current_dir(path.as_path())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()?;
+        .output();
 
-    if !status.success() {
-        bail!("Failed to execute latex");
+    match output {
+        Ok(output) => {
+            if !output.status.success() {
+                tracing::error!("STDOUT :: {}", String::from_utf8_lossy(&output.stdout));
+                tracing::error!("STDERR :: {}", String::from_utf8_lossy(&output.stderr));
+                bail!("Failed to execute latex");
+            }
+        }
+        Err(err) => {
+            tracing::error!("latex command failed: {}", err);
+            bail!("Failed to execute latex");
+        }
     }
 
     let mut in_file = path.clone();
     in_file.push(format!("{}.dvi", hash));
-    let status = Command::new("dvisvgm")
+    let output = Command::new("dvisvgm")
         .args([
             "--optimize",
             "--clipjoin",
@@ -100,12 +112,20 @@ pub fn get_image(latex: String, color: String, headers: Vec<String>) -> anyhow::
             format!("{}.svg", hash).as_str(),
         ])
         .current_dir(path.as_path())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()?;
+        .output();
 
-    if !status.success() {
-        bail!("Failed to execute dvisvgm");
+    match output {
+        Ok(output) => {
+            if !output.status.success() {
+                tracing::error!("STDOUT :: {}", String::from_utf8_lossy(&output.stdout));
+                tracing::error!("STDERR :: {}", String::from_utf8_lossy(&output.stderr));
+                bail!("Failed to execute dvisvgm");
+            }
+        }
+        Err(err) => {
+            tracing::error!("dvisvgm command failed: {}", err);
+            bail!("Failed to execute dvisvgm");
+        }
     }
 
     path.push(format!("{}.svg", hash));

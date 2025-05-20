@@ -69,12 +69,19 @@ const katexOptions = {
       display: true,
     },
     { left: "\\begin{center}", right: "\\end{center}", display: true },
-    { left: "\\begin{tikzpicture}", right: "\\end{tikzpicture}", display: true },
+    {
+      left: "\\begin{tikzpicture}",
+      right: "\\end{tikzpicture}",
+      display: true,
+    },
     { left: "\\[", right: "\\]", display: true },
   ],
   errorCallback: (message: string, _stack: unknown) => {
     console.log("Trying to process latex on server.");
-    const latex = message.substring(36, message.length - 7);
+    let latex = message.substring(36, message.length - 7);
+    if (!latex.startsWith("\\begin")) {
+      latex = "\\( " + latex + " \\)";
+    }
     const encoded = encodeURIComponent(latex);
     const style = window.getComputedStyle(document.body);
     const textColor = style.getPropertyValue("--text");
