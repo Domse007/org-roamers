@@ -10,6 +10,7 @@ use std::{
 use anyhow::bail;
 use tracing::info;
 
+use crate::file::OrgFile;
 use crate::transform::org;
 
 const PREAMBLE: &'static str = "\\documentclass{article}
@@ -52,9 +53,8 @@ pub fn get_image(latex: String, color: String, headers: Vec<String>) -> anyhow::
     // let's check if the file already exists.
     let mut existing_path = path.clone();
     existing_path.push(format!("{}.svg", hash));
-    if let Ok(mut file) = File::open(existing_path.as_path()) {
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
+    if let Ok(mut file) = OrgFile::open(existing_path.as_path()) {
+        let contents = file.read_to_string()?;
         info!("Found preexisting content for {hash} ({:?})", existing_path);
         return Ok(contents);
     }

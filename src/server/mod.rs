@@ -209,7 +209,9 @@ pub fn get_org_as_html(db: &mut ServerState, query: Query, scope: String) -> Org
 
     let contents = match std::fs::read_to_string(file.replace('"', "")) {
         Ok(f) => f,
-        Err(_) => return OrgAsHTMLResponse::simple("Could not get file contents."),
+        Err(err) => {
+            return OrgAsHTMLResponse::simple(format!("Could not get file contents: {err}"))
+        }
     };
 
     let contents = if scope == "file" {

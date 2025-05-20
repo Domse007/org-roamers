@@ -1,4 +1,4 @@
-use std::{collections::HashSet, fs::File, io::Read, path::Path};
+use std::{collections::HashSet, path::Path};
 
 use orgize::{
     ast::{Document, Keyword, Link},
@@ -8,7 +8,10 @@ use orgize::{
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
-use crate::sqlite::{olp, rebuild};
+use crate::{
+    file::OrgFile,
+    sqlite::{olp, rebuild},
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct Timestamps {
@@ -53,9 +56,8 @@ impl NodeFromOrg {
 }
 
 fn get_orgize<P: AsRef<Path>>(path: P) -> anyhow::Result<Org> {
-    let mut content = String::new();
-    let mut file = File::open(path)?;
-    file.read_to_string(&mut content)?;
+    let mut file = OrgFile::open(path)?;
+    let content = file.read_to_string()?;
 
     Ok(Org::parse(&content))
 }

@@ -13,6 +13,7 @@
 
 pub mod api;
 pub mod error;
+pub mod file;
 mod latex;
 pub mod parser;
 mod perf;
