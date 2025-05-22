@@ -60,9 +60,9 @@ impl DynamicServerState {
                 Some(last) if *last == *current => None,
                 Some(last) => {
                     *last = current.clone();
-                    Some(&current)
+                    Some(current)
                 }
-                None => Some(&current),
+                None => Some(current),
             },
             None => None,
         }

@@ -197,11 +197,10 @@ pub fn get_org_as_html(db: &mut ServerState, query: Query, scope: String) -> Org
     let [_title, id, file] =
         match helpers::get_all_nodes(db.sqlite.connection(), ["title", "id", "file"])
             .into_iter()
-            .filter(|[title, node, _]| match &query {
+            .find(|[title, node, _]| match &query {
                 Query::ByTitle(name) => title.contains(name.title()),
                 Query::ById(id) => node.contains(id.id()),
             })
-            .next()
         {
             Some(node) => node,
             None => return OrgAsHTMLResponse::simple("Did not get node."),
@@ -217,7 +216,7 @@ pub fn get_org_as_html(db: &mut ServerState, query: Query, scope: String) -> Org
     let contents = if scope == "file" {
         contents
     } else {
-        Subtree::new(id.into(), contents.as_str()).unwrap_or(contents)
+        Subtree::get(id.into(), contents.as_str()).unwrap_or(contents)
     };
 
     let mut handler = HtmlExport::new(&db.html_export_settings);
@@ -269,7 +268,7 @@ pub fn search(db: &mut ServerState, query: String) -> SearchResponse {
     }
 }
 
-pub fn get_graph_data(mut db: &mut ServerState) -> GraphData {
+pub fn get_graph_data(db: &mut ServerState) -> GraphData {
     let olp = |s: String, db: &mut ServerState| -> String {
         (!s.is_empty())
             .then(|| {
@@ -300,7 +299,7 @@ pub fn get_graph_data(mut db: &mut ServerState) -> GraphData {
         .map(|e| RoamNode {
             title: title_sanitizer(&e[1]).into(),
             id: e[0].to_string().into(),
-            parent: olp(e[2].to_string(), &mut db).into(),
+            parent: olp(e[2].to_string(), db).into(),
             num_links: 0,
         })
         .collect::<Vec<RoamNode>>();
@@ -355,14 +354,12 @@ pub fn get_graph_data(mut db: &mut ServerState) -> GraphData {
         }
     }
 
-    GraphData { nodes, links }.into()
+    GraphData { nodes, links }
 }
 
 pub fn get_latex_svg(db: &mut ServerState, tex: String, color: String, id: String) -> Response {
     let node = helpers::get_all_nodes(db.sqlite.connection(), ["file", "id"])
-        .into_iter()
-        .filter(|[_, c_id]| c_id.contains(&id))
-        .next();
+        .into_iter().find(|[_, c_id]| c_id.contains(&id));
 
     let svg = match node {
         Some([file, _]) => {

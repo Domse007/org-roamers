@@ -13,9 +13,9 @@ use crate::file::OrgFile;
 use crate::transform::org;
 
 #[cfg(not(target_os = "windows"))]
-const TEMP_PATH: &'static str = "/tmp/org-roamers/";
+const TEMP_PATH: &str = "/tmp/org-roamers/";
 
-const PREAMBLE: &'static str = concat!(
+const PREAMBLE: &str = concat!(
     "\\documentclass{article}\n",
     "\\usepackage[T1]{fontenc}\n",
     "\\usepackage[active,tightpage]{preview}\n",

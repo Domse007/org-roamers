@@ -8,6 +8,12 @@ pub struct TitleSanitizer {
     output: String,
 }
 
+impl Default for TitleSanitizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TitleSanitizer {
     pub fn new() -> Self {
         Self {
@@ -23,11 +29,8 @@ impl TitleSanitizer {
 
 impl Traverser for TitleSanitizer {
     fn event(&mut self, event: Event, _ctx: &mut TraversalContext) {
-        match event {
-            Event::Text(text) => {
-                let _ = write!(&mut self.output, "{}", text);
-            }
-            _ => {}
+        if let Event::Text(text) = event {
+            let _ = write!(&mut self.output, "{}", text);
         }
     }
 }

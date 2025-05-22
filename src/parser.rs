@@ -62,7 +62,7 @@ impl<'a> Parser<'a> {
     }
 }
 
-impl<'a> ParserAttempt<'a> {
+impl ParserAttempt<'_> {
     pub fn consume_char(&mut self, c: char) -> Option<char> {
         if let Some(ch) = self.code.next() {
             if ch == c {
@@ -94,7 +94,7 @@ impl<'a> ParserAttempt<'a> {
         };
         let mut flag = false;
 
-        while let Some(c) = self.code.next() {
+        for c in self.code.by_ref() {
             if c == start && !flag {
                 break;
             }

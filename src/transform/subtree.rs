@@ -16,7 +16,7 @@ use crate::api::types::RoamID;
 ///     "* Hello World\n:PROPERTIES:\n:ID:       ",
 ///     "aa\n:END:\n aa"
 /// );
-/// let sub = Subtree::new("aa".into(), org);
+/// let sub = Subtree::get("aa".into(), org);
 /// assert_eq!(sub.unwrap(), org);
 /// ```
 pub struct Subtree {
@@ -26,7 +26,7 @@ pub struct Subtree {
 
 impl Subtree {
     /// Construct and get a subtree.
-    pub fn new(on: RoamID, org: &str) -> Option<String> {
+    pub fn get(on: RoamID, org: &str) -> Option<String> {
         let org = Org::parse(org);
         let mut traverser = Subtree { on, subtree: None };
         org.traverse(&mut traverser);
@@ -82,7 +82,7 @@ mod tests {
             ":END:\n",
             "some text\n"
         );
-        let res = Subtree::new("e6557233-97db-4eec-925a-b80d66ad97e8".into(), org).unwrap();
+        let res = Subtree::get("e6557233-97db-4eec-925a-b80d66ad97e8".into(), org).unwrap();
         let expected = concat!(
             "*** testing\n",
             ":PROPERTIES:\n",
@@ -105,7 +105,7 @@ mod tests {
             "* testing\n",
             "some text\n"
         );
-        let res = Subtree::new("e6557233-97db-4eec-925a-b80d66ad97e8".into(), org).unwrap();
+        let res = Subtree::get("e6557233-97db-4eec-925a-b80d66ad97e8".into(), org).unwrap();
         let expected = concat!(
             "** Hello\n",
             ":PROPERTIES:\n",
@@ -128,7 +128,7 @@ mod tests {
             "** testing\n",
             "some text\n"
         );
-        let res = Subtree::new("e6557233-97db-4eec-925a-b80d66ad97e8".into(), org).unwrap();
+        let res = Subtree::get("e6557233-97db-4eec-925a-b80d66ad97e8".into(), org).unwrap();
         assert_eq!(res, org);
     }
 }

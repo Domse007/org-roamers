@@ -55,22 +55,22 @@ impl OrgWatcher {
         match event.kind {
             EventKind::Create(kind) => {
                 if let CreateKind::File = kind {
-                    create_events(&mut org_events, event.paths, |p| OrgWatcherEvent::Create(p));
+                    create_events(&mut org_events, event.paths, OrgWatcherEvent::Create);
                 }
             }
             EventKind::Modify(kind) => {
                 if let ModifyKind::Data(_) = kind {
-                    create_events(&mut org_events, event.paths, |p| OrgWatcherEvent::Modify(p));
+                    create_events(&mut org_events, event.paths, OrgWatcherEvent::Modify);
                 }
             }
             EventKind::Remove(kind) => {
                 if let RemoveKind::File = kind {
-                    create_events(&mut org_events, event.paths, |p| OrgWatcherEvent::Remove(p));
+                    create_events(&mut org_events, event.paths, OrgWatcherEvent::Remove);
                 }
             }
             EventKind::Access(kind) => {
                 if let AccessKind::Close(_) = kind {
-                    create_events(&mut org_events, event.paths, |p| OrgWatcherEvent::Modify(p));
+                    create_events(&mut org_events, event.paths, OrgWatcherEvent::Modify);
                 }
             }
             other => {
@@ -150,7 +150,7 @@ fn handle_event(db: Arc<Mutex<ServerState>>, event: OrgWatcherEvent) -> anyhow::
             // get_nodes_from_event_path(db.lock().unwrap().sqlite.connection(), path)?
         }
     }
-    return Ok(());
+    Ok(())
 }
 
 pub fn default_watcher_runtime(
@@ -160,7 +160,9 @@ pub fn default_watcher_runtime(
 ) -> JoinHandle<()> {
     let err_handler =
         |err: Box<dyn std::error::Error>| tracing::error!("File watcher encountered error: {err}");
-    let handle = thread::spawn(move || loop {
+    
+
+    thread::spawn(move || loop {
         let path = path.clone();
         match watcher.handle(path) {
             Ok(handle) => {
@@ -175,7 +177,5 @@ pub fn default_watcher_runtime(
             }
             Err(err) => err_handler(err.into()),
         }
-    });
-
-    return handle;
+    })
 }

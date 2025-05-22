@@ -111,9 +111,9 @@ pub struct GraphData {
     pub links: Vec<RoamLink>,
 }
 
-impl Into<Response> for GraphData {
-    fn into(self) -> Response {
-        Response::json(&serde_json::to_string(&self).unwrap())
+impl From<GraphData> for Response {
+    fn from(val: GraphData) -> Self {
+        Response::json(&serde_json::to_string(&val).unwrap())
     }
 }
 
@@ -147,9 +147,9 @@ pub struct SearchResponse {
     pub providers: Vec<SearchResponseProvider>,
 }
 
-impl Into<Response> for SearchResponse {
-    fn into(self) -> Response {
-        Response::json(&serde_json::to_string(&self).unwrap())
+impl From<SearchResponse> for Response {
+    fn from(val: SearchResponse) -> Self {
+        Response::json(&serde_json::to_string(&val).unwrap())
     }
 }
 
@@ -160,9 +160,9 @@ pub struct ServerStatus {
     pub pending_changes: bool,
 }
 
-impl Into<Response> for ServerStatus {
-    fn into(self) -> Response {
-        Response::json(&serde_json::to_string(&self).unwrap())
+impl From<ServerStatus> for Response {
+    fn from(val: ServerStatus) -> Self {
+        Response::json(&serde_json::to_string(&val).unwrap())
     }
 }
 
@@ -197,9 +197,9 @@ impl OrgAsHTMLResponse {
     }
 }
 
-impl Into<Response> for OrgAsHTMLResponse {
-    fn into(self) -> Response {
-        Response::json(&serde_json::to_string(&self).unwrap())
+impl From<OrgAsHTMLResponse> for Response {
+    fn from(val: OrgAsHTMLResponse) -> Self {
+        Response::json(&serde_json::to_string(&val).unwrap())
     }
 }
 

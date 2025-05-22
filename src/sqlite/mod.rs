@@ -103,8 +103,10 @@ pub mod helpers {
         stmnt
             .query_map([], |row| {
                 let mut curr: [String; PARAMS] = [const { String::new() }; PARAMS];
-                for i in 0..PARAMS {
-                    curr[i] = row.get(i).unwrap_or_default();
+                for (i, elem) in curr.iter_mut().enumerate().take(PARAMS) {
+                    if let Ok(col) = row.get(i) {
+                        *elem = col;
+                    }
                 }
                 Ok(curr)
             })

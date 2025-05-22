@@ -14,7 +14,7 @@ impl PerfPoint {
     }
 
     fn duration(&self) -> Duration {
-        self.end.unwrap_or_else(|| Instant::now()) - self.start
+        self.end.unwrap_or_else(Instant::now) - self.start
     }
 }
 

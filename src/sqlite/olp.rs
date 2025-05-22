@@ -44,7 +44,7 @@ pub fn parse_olp(olp: String) -> anyhow::Result<Vec<String>> {
     whitespace(&mut parser);
 
     let mut attempt = parser.attempt();
-    if let None = attempt.consume_char('(') {
+    if attempt.consume_char('(').is_none() {
         return Err(OlpError::InvalidChar('(').into());
     }
     parser.sync(attempt);
@@ -58,7 +58,7 @@ pub fn parse_olp(olp: String) -> anyhow::Result<Vec<String>> {
             None => {
                 whitespace(&mut parser);
                 let mut attempt = parser.attempt();
-                if let Some(_) = attempt.consume_char(')') {
+                if attempt.consume_char(')').is_some() {
                     return Ok(paths);
                 } else {
                     break;
@@ -77,7 +77,7 @@ mod tests {
     use super::*;
     #[test]
     fn test_olp_parser_correct() {
-        const OLP: &'static str = "(\"This is a test\" \"How about that\")";
+        const OLP: &str = "(\"This is a test\" \"How about that\")";
         let res = parse_olp(OLP.to_string());
         assert_eq!(
             res.unwrap(),

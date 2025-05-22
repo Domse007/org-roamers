@@ -1,7 +1,7 @@
 use std::io::{stdin, stdout, BufRead, BufReader, Write};
 use std::net::TcpStream;
 
-const PS: &'static str = "cli> ";
+const PS: &str = "cli> ";
 
 fn main() {
     let mut tcp = match TcpStream::connect("localhost:12568") {

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 #[cfg(target_os = "linux")]
-pub const CONFIG_PATH: &'static str = "/etc/org-roamers/";
+pub const CONFIG_PATH: &str = "/etc/org-roamers/";
 
 #[derive(Serialize, Deserialize)]
 pub struct Configuration {

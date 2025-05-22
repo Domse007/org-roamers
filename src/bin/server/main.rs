@@ -25,7 +25,7 @@ fn main() -> Result<ExitCode> {
 
     let args = env::args().skip(1).collect::<Vec<String>>();
 
-    let path = match args.get(0) {
+    let path = match args.first() {
         Some(path) => path,
         None => {
             error!("Could not get path");

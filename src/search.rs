@@ -16,8 +16,8 @@ impl<'a> ForNode<'a> {
         let mut node_search = vec![];
         let mut tag_filters = vec![];
         for token in search {
-            if token.starts_with('#') {
-                tag_filters.push(&token[1..]);
+            if let Some(stripped) = token.strip_prefix('#') {
+                tag_filters.push(stripped);
             } else {
                 node_search.push(token);
             }
@@ -81,7 +81,7 @@ impl<'a> ForNode<'a> {
                         .unwrap()
                         .map(Result::unwrap)
                         .collect();
-                    let title = if row.1.len() == 0 {
+                    let title = if row.1.is_empty() {
                         tracing::error!("Title is empty: {:?}", row);
                         String::new()
                     } else {
@@ -197,7 +197,7 @@ impl<'a> Search<'a> {
                 search.push(token);
             }
         }
-        match stype.as_ref().map(|s| s.as_str()) {
+        match stype.as_deref() {
             Some("node") => Search::ForNode(ForNode::new(search)),
             Some("tag") => Search::ForTag(ForTag::new(search)),
             _ => Search::ForNode(ForNode::new(search)),
@@ -209,11 +209,11 @@ impl<'a> Search<'a> {
             let sanitier = TitleSanitizer::new();
             sanitier.process(title)
         };
-        let res = match self {
+
+        match self {
             Self::ForNode(node) => node.search(con, title_sanitizer),
             Self::ForTag(tag) => tag.search(con, title_sanitizer),
-        };
-        res
+        }
     }
 }
 

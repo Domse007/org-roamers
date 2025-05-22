@@ -69,8 +69,7 @@ pub fn get_nodes_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<NodeFr
         org,
         path.as_ref()
             .to_str()
-            .ok_or(anyhow::anyhow!("Invalid path"))?
-            .into(),
+            .ok_or(anyhow::anyhow!("Invalid path"))?,
     ))
 }
 
@@ -126,7 +125,7 @@ impl Traverser for RoamersTraverser {
             Event::Enter(Container::Document(document)) => {
                 if let Some(properties) = document.properties() {
                     if let Some(id) = properties.get("ID") {
-                        let title = document.title().unwrap_or_else(|| String::new());
+                        let title = document.title().unwrap_or_else(String::new);
                         let tags = get_tags_from_keywords(document.keywords());
                         let id = id.to_string();
                         let content = document.raw();
@@ -294,13 +293,12 @@ fn parse_link(link: Link) -> Option<(String, String)> {
 fn get_tags_from_keywords(iter: impl Iterator<Item = Keyword>) -> Vec<String> {
     iter.filter(|kw| kw.key().to_lowercase().as_str() == "filetags")
         .map(|kw| kw.value())
-        .map(|tags| {
+        .flat_map(|tags| {
             tags.split(':')
                 .map(|e| e.to_string())
                 .filter(|t| !t.trim().is_empty())
                 .collect::<Vec<String>>()
         })
-        .flatten()
         .collect()
 }
 
@@ -327,7 +325,7 @@ mod tests {
 
     #[test]
     fn test_node_gatherer_1() {
-        const ORG: &'static str = ":PROPERTIES:
+        const ORG: &str = ":PROPERTIES:
 :ID:       e655725f-97db-4eec-925a-b80d66ad97e8
 :END:
 #+title: Hello World
@@ -367,7 +365,7 @@ some text
 
     #[test]
     fn test_node_gatherer_2() {
-        const ORG: &'static str = "
+        const ORG: &str = "
 * Hello World
 :PROPERTIES:
 :ID:       e655725f-97db-4eec-925a-b80d66ad97e8
@@ -421,7 +419,7 @@ some text
 
     #[test]
     fn test_node_gatherer_deep() {
-        const ORG: &'static str = "
+        const ORG: &str = "
 * Hello World
 :PROPERTIES:
 :ID:       e655725f-97db-4eec-925a-b80d66ad97e8
@@ -477,7 +475,7 @@ some text
 
     #[test]
     fn test_node_gatherer_skipped_heading() {
-        const ORG: &'static str = "
+        const ORG: &str = "
 * Hello World
 :PROPERTIES:
 :ID:       e655725f-97db-4eec-925a-b80d66ad97e8
@@ -520,7 +518,7 @@ some text
 
     #[test]
     fn test_get_latex_header() {
-        const ORG: &'static str = "
+        const ORG: &str = "
 #+title: Test
 #+subtitle: test
 #+author: Joakim Brodén
@@ -548,7 +546,7 @@ some text
 
     #[test]
     fn test_get_tags() {
-        const ORG: &'static str = ":PROPERTIES:
+        const ORG: &str = ":PROPERTIES:
 :ID:       e655725f-97db-4eec-925a-b80d66ad97e8
 :END:
 #+title: Test
@@ -596,7 +594,7 @@ some text
 
     #[test]
     fn test_parse_links() {
-        const ORG: &'static str = ":PROPERTIES:
+        const ORG: &str = ":PROPERTIES:
 :ID:       e655725f-97db-4eec-925a-b80d66ad97e8
 :END:
 #+title: Test
@@ -619,7 +617,7 @@ Linking to [[id:e655725f-97db-4eec-925a-b80d66ad97e8][Test]]";
 
     #[test]
     fn test_inherited_linking() {
-        const ORG: &'static str = ":PROPERTIES:
+        const ORG: &str = ":PROPERTIES:
 :ID:       e655725f-97db-4eec-925a-b80d66ad97e8
 :END:
 #+title: Test
@@ -638,7 +636,7 @@ Linking to [[id:e655725f-97db-4eec-925a-b80d66ad97e8][Test]]";
 
     #[test]
     fn test_aliases() {
-        const ORG: &'static str = ":PROPERTIES:
+        const ORG: &str = ":PROPERTIES:
 :ID:       e655725f-97db-4eec-925a-b80d66ad97e8
 :ROAM_ALIASES: test1 test2
 :END:

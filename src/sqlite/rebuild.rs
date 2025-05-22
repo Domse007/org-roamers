@@ -15,7 +15,7 @@ pub fn init_version(con: &mut Connection, version: usize) -> anyhow::Result<()> 
 }
 
 pub fn init_files_table(con: &mut Connection) -> anyhow::Result<()> {
-    const STMNT: &'static str = concat!(
+    const STMNT: &str = concat!(
         "CREATE TABLE files (file UNIQUE PRIMARY KEY, title,",
         "hash NOT NULL, atime NOT NULL, mtime NOT NULL);"
     );
@@ -35,7 +35,7 @@ pub fn init_files_table(con: &mut Connection) -> anyhow::Result<()> {
 /// The reference org-roam implementation constructs no olp, while actual_olp
 /// generates `("Maintitle")`.
 pub fn init_nodes_table(con: &mut Connection) -> anyhow::Result<()> {
-    const STMNT: &'static str = concat!(
+    const STMNT: &str = concat!(
         "CREATE TABLE nodes (id NOT NULL PRIMARY KEY, file NOT NULL,",
         "level NOT NULL, pos NOT NULL, todo, priority, scheduled text,",
         "deadline text, title, properties, olp, actual_olp,",
@@ -56,11 +56,11 @@ pub fn init_links_table(con: &mut Connection) -> anyhow::Result<()> {
 }
 
 pub fn init_aliases(con: &mut Connection) -> anyhow::Result<()> {
-    const STMNT_ALIASES: &'static str = concat!(
+    const STMNT_ALIASES: &str = concat!(
         "CREATE TABLE aliases (node_id NOT NULL, alias,",
         "FOREIGN KEY (node_id) REFERENCES nodes (id) ON DELETE CASCADE);"
     );
-    const STMNT_INDEX: &'static str = concat!("CREATE INDEX alias_node_id ON aliases (node_id );");
+    const STMNT_INDEX: &str = concat!("CREATE INDEX alias_node_id ON aliases (node_id );");
     con.execute(STMNT_ALIASES, [])?;
     con.execute(STMNT_INDEX, [])?;
     Ok(())
@@ -77,6 +77,7 @@ pub fn init_tags(con: &mut Connection) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn insert_node(
     con: &mut Connection,
     with_replace: bool,

@@ -148,5 +148,5 @@ fn handle_connection_intern(
 
     info!("Client disconnected.");
 
-    return Ok(false);
+    Ok(false)
 }

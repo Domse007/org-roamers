@@ -62,13 +62,13 @@ enum TableRow {
     Body,
 }
 
-impl<'a> HtmlExport<'a> {
+impl HtmlExport<'_> {
     pub fn finish(self) -> (String, Vec<String>) {
         (self.output, self.outgoing_id_links)
     }
 }
 
-impl<'a> Traverser for HtmlExport<'a> {
+impl Traverser for HtmlExport<'_> {
     fn event(&mut self, event: Event, ctx: &mut TraversalContext) {
         match event {
             Event::Enter(Container::Document(document)) => {
