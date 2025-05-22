@@ -200,8 +200,7 @@ pub fn get_org_as_html(db: &mut ServerState, query: Query, scope: String) -> Org
             .find(|[title, node, _]| match &query {
                 Query::ByTitle(name) => title.contains(name.title()),
                 Query::ById(id) => node.contains(id.id()),
-            })
-        {
+            }) {
             Some(node) => node,
             None => return OrgAsHTMLResponse::simple("Did not get node."),
         };
@@ -359,7 +358,8 @@ pub fn get_graph_data(db: &mut ServerState) -> GraphData {
 
 pub fn get_latex_svg(db: &mut ServerState, tex: String, color: String, id: String) -> Response {
     let node = helpers::get_all_nodes(db.sqlite.connection(), ["file", "id"])
-        .into_iter().find(|[_, c_id]| c_id.contains(&id));
+        .into_iter()
+        .find(|[_, c_id]| c_id.contains(&id));
 
     let svg = match node {
         Some([file, _]) => {

@@ -160,7 +160,6 @@ pub fn default_watcher_runtime(
 ) -> JoinHandle<()> {
     let err_handler =
         |err: Box<dyn std::error::Error>| tracing::error!("File watcher encountered error: {err}");
-    
 
     thread::spawn(move || loop {
         let path = path.clone();
