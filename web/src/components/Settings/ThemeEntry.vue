@@ -31,6 +31,7 @@ const emit = defineEmits(["redrawGraph"]);
     <div class="theme-colors">
       <div
         v-for="color in themeList"
+        :key="color"
         class="theme-color"
         :style="{ backgroundColor: color }"
       ></div>

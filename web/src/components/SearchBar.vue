@@ -17,7 +17,7 @@ const search = async (query: string) => {
   return res;
 };
 
-const InputHandler = (_event: any) => {
+const InputHandler = () => {
   showSuggestions.value = true;
   search(searchterm.value).then((res: SearchResponse) => {
     searchSuggestions.value = res.providers[0].results;
@@ -42,15 +42,17 @@ const searchOnLeave = () => {
       v-model="searchterm"
     />
     <div id="search-suggestion-wrapper">
-      <SearchSuggestion
-        @open-node="(id) => $emit('openNode', id)"
-        v-if="showSuggestions"
-        v-for="item in searchSuggestions"
-        :display="item.display"
-        :id="item.id"
-        :tags="item.tags"
-      >
-      </SearchSuggestion>
+      <div v-if="showSuggestions">
+        <SearchSuggestion
+          @open-node="(id) => $emit('openNode', id)"
+          v-for="item in searchSuggestions"
+          :key="item.id"
+          :display="item.display"
+          :id="item.id"
+          :tags="item.tags"
+        >
+        </SearchSuggestion>
+      </div>
     </div>
   </div>
 </template>

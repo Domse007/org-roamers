@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import Preview from "./components/Preview.vue";
-import Graph from "./components/Graph.vue";
-import Search from "./components/Search.vue";
+import PreviewFrame from "./components/PreviewFrame.vue";
+import GraphView from "./components/GraphView.vue";
+import SearchBar from "./components/SearchBar.vue";
 import SettingsPane from "./components/Settings/SettingsPane.vue";
 import ErrorDialog from "./components/ErrorDialog.vue";
 import { onMounted, type Ref, ref } from "vue";
@@ -55,14 +55,17 @@ const closeError = () => (errorMessage.value = null);
     <ErrorDialog v-if="errorMessage != null" @dialog-close="closeError">{{
       errorMessage
     }}</ErrorDialog>
-    <Search @open-node="updatePreviewID"></Search>
-    <Graph
+    <SearchBar @open-node="updatePreviewID"></SearchBar>
+    <GraphView
       @open-node="updatePreviewID"
       :count="graphUpdateCount"
       :toggle-layouter="toggleLayouterRef"
       :zoom-node="previewID"
-    ></Graph>
-    <Preview :id="previewID" @preview-switch="updatePreviewID"></Preview>
+    ></GraphView>
+    <PreviewFrame
+      :id="previewID"
+      @preview-switch="updatePreviewID"
+    ></PreviewFrame>
     <SettingsPane
       @redraw-graph="redrawGraph"
       @toggle-layouter="toggleLayouter"

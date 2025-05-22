@@ -152,12 +152,9 @@ const zoomOnto = (id: string, old_id: string) => {
 };
 
 function highlightEdgesFromNode(sourceNode: unknown, color: string) {
-  graph.forEachEdge(
-    sourceNode,
-    (edge, _attr, _src, _trgt, _srcAttr, _trgtAttr) => {
-      graph.setEdgeAttribute(edge, "color", color);
-    },
-  );
+  graph.forEachEdge(sourceNode, (edge) => {
+    graph.setEdgeAttribute(edge, "color", color);
+  });
 }
 
 const prop = defineProps<{
@@ -180,7 +177,8 @@ watch(prop, () => {
     old_count = prop.count;
   }
   if (old_layout_state != prop.toggleLayouter) {
-    layout.isRunning() ? layout.stop() : layout.start();
+    if (layout.isRunning()) layout.stop();
+    else layout.start();
     old_layout_state = prop.toggleLayouter;
   }
   if (old_node != prop.zoomNode) {

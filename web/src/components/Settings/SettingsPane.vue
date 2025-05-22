@@ -25,8 +25,11 @@ const listButtonColor = (title: string) => {
   else return "var(--clickable)";
 };
 
-const switchSettingsPage = (page: any) => {
-  activePage.value = page.target.innerHTML;
+const switchSettingsPage = (page: MouseEvent) => {
+  if (page.target != null) {
+    const target = page.target as HTMLElement;
+    activePage.value = target.innerHTML;
+  }
 };
 </script>
 
@@ -57,6 +60,7 @@ const switchSettingsPage = (page: any) => {
         <div
           class="settings-button list-button"
           v-for="page in settingsPages"
+          :key="page"
           :style="{ backgroundColor: listButtonColor(page) }"
           :onclick="switchSettingsPage"
         >

@@ -76,7 +76,7 @@ const katexOptions = {
     },
     { left: "\\[", right: "\\]", display: true },
   ],
-  errorCallback: (message: string, _stack: unknown) => {
+  errorCallback: (message: string) => {
     console.log("Trying to process latex on server.");
     let latex = message.substring(36, message.length - 7);
     if (!latex.startsWith("\\begin")) {
@@ -181,6 +181,7 @@ const emit = defineEmits(["previewSwitch"]);
         </div>
         <a
           class="org-preview-footer-link"
+          :key="link.id"
           v-for="link in links"
           :id="link.id"
           >{{ link.display }}</a

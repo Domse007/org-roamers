@@ -1,8 +1,4 @@
-import {
-  type NodeDisplayData,
-  type PartialButFor,
-  type PlainObject,
-} from "sigma/types";
+import { type NodeDisplayData, type PartialButFor } from "sigma/types";
 import { type Settings } from "sigma/settings";
 
 const background = "--overlay";

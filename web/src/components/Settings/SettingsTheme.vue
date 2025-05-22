@@ -6,7 +6,7 @@ import ThemeEntry from "./ThemeEntry.vue";
 <template>
   <div id="theme-settings">
     <b style="margin-bottom: 5px">List of themes:</b>
-    <div v-for="theme in THEMES">
+    <div v-for="theme in THEMES" :key="theme.name">
       <ThemeEntry
         :theme="theme"
         @redraw-graph="$emit('redrawGraph')"

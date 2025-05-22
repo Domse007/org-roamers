@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const props = defineProps<{ display: string; id: string; tags: string[] }>();
+defineProps<{ display: string; id: string; tags: string[] }>();
 
 const formatTags = (taglist: string[]) => {
   return taglist.join(", ");
