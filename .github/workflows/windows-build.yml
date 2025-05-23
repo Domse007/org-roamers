@@ -34,10 +34,10 @@ jobs:
       working-directory: ./web
 
     - name: Build release binary
-      run: cargo build --release --bin server --features static_assets
+      run: cargo build --release --bin org-roamers-cli
 
     - name: Upload build artifact
       uses: actions/upload-artifact@v4
       with:
         name: windows-msvc-binary
-        path: target/release/server.exe
+        path: target/release/org-roamers-cli.exe

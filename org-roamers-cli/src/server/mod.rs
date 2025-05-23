@@ -9,9 +9,7 @@ use args::CliArgs;
 use cli::run_cli_server;
 use conf::Configuration;
 use org_roamers::{
-    ServerState,
-    api::APICalls,
-    server::{self, start_server},
+    api::APICalls, server::{self, start_server}, ServerState, StaticServerConfiguration
 };
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
@@ -65,8 +63,14 @@ pub fn entry(args: Vec<String>) -> Result<ExitCode> {
         }
     };
     info!("Using config path {server_conf_path:?}");
-    let server_conf_serialized = fs::read_to_string(server_conf_path).unwrap();
-    let server_configuration = serde_json::from_str(server_conf_serialized.as_str()).unwrap();
+
+    let server_configuration = match fs::read_to_string(server_conf_path) {
+        Ok(content) => serde_json::from_str(content.as_str()).unwrap(),
+        Err(err) => {
+            tracing::error!("Failed to load config: {err}");
+            StaticServerConfiguration::default()
+        }
+    };
 
     let mut global = match ServerState::new(
         configuration.html_export_path.as_path(),

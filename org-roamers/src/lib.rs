@@ -39,6 +39,15 @@ pub struct StaticServerConfiguration {
     pub strict: bool,
 }
 
+impl Default for StaticServerConfiguration {
+    fn default() -> Self {
+        Self {
+            root: "./web/dist/".to_string(),
+            strict: false
+        }
+    }
+}
+
 #[derive(Default)]
 pub(crate) struct DynamicServerState {
     pub working_id: Option<(RoamID, Option<RoamID>)>,
