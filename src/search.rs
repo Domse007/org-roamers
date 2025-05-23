@@ -58,11 +58,11 @@ impl<'a> ForNode<'a> {
                 let p = tags.any(|e| {
                     self.tag_filters
                         .iter()
-                        .any(|f| f.to_lowercase() == e[1..e.len() - 1].to_lowercase())
+                        .any(|f| f.to_lowercase() == e.to_lowercase())
                 });
                 if p {
                     result.push(SearchResponseElement {
-                        display: title_sanitizer(&element.1[1..element.1.len() - 1]),
+                        display: title_sanitizer(&element.1),
                         id: element.0.into(),
                         tags: tags.collect(),
                     });
@@ -85,7 +85,7 @@ impl<'a> ForNode<'a> {
                         tracing::error!("Title is empty: {:?}", row);
                         String::new()
                     } else {
-                        title_sanitizer(&row.1[1..row.1.len() - 1])
+                        title_sanitizer(&row.1)
                     };
                     SearchResponseElement {
                         display: title,
