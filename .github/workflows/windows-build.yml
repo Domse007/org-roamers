@@ -2,9 +2,9 @@ name: Build Windows Binary
 
 on:
   push:
-    branches: ["*"]
+    branches: [ "**" ]
   pull_request:
-    branches: [main]
+    branches: [ "**" ]
 
 jobs:
   build-windows:
@@ -16,13 +16,25 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Set up Rust
-      uses: actions/setup-rust@v1
+      uses: actions-rust-lang/setup-rust-toolchain@v1
       with:
         target: x86_64-pc-windows-msvc
-        toolchain: stable
 
     - name: Build release binary
       run: cargo build --release --bin server
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '22'
+
+    - name: Install dependencies
+      run: npm ci
+      working-directory: ./web
+
+    - name: Build project
+      run: npm run build
+      working-directory: ./web
 
     - name: Upload build artifact
       uses: actions/upload-artifact@v4

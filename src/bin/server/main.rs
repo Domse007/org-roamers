@@ -2,7 +2,7 @@ mod args;
 mod cli;
 mod conf;
 
-use std::{env, fs, panic, path::PathBuf, process::ExitCode, str::FromStr};
+use std::{env, fs, panic, path::PathBuf, process::ExitCode};
 
 use anyhow::Result;
 use args::CliArgs;
@@ -36,7 +36,7 @@ fn main() -> Result<ExitCode> {
     };
 
     let html_path = {
-        let mut path = PathBuf::from_str(conf::CONFIG_PATH).unwrap();
+        let mut path = conf::config_path();
         path.push("html_settings.json");
         path
     };
@@ -58,14 +58,10 @@ fn main() -> Result<ExitCode> {
     };
 
     let server_conf_path = {
-        let assemble = |s| {
-            let mut p = PathBuf::from_str(s).unwrap();
-            p.push("server_conf.json");
-            p
-        };
-        let path = assemble(conf::CONFIG_PATH);
+        let mut path = conf::config_path();
+        path.push("server_conf.json");
         if !path.exists() {
-            assemble("./")
+            PathBuf::from("./server_conf.json")
         } else {
             path
         }
