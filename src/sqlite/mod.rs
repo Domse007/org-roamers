@@ -38,6 +38,10 @@ impl SqliteConnection {
             if let Err(err) = this.connection.execute("PRAGMA foreign_keys = ON;", []) {
                 tracing::error!("Could not enable foreign_keys: {err}");
             }
+        } else {
+            if let Err(err) = this.connection.execute("PRAGMA foreign_keys = OFF;", []) {
+                tracing::error!("Could not disable foreign_keys: {err}");
+            }
         }
 
         if version != Self::MIN_VERSION {
