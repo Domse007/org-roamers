@@ -2,8 +2,15 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-#[cfg(target_os = "linux")]
-pub const CONFIG_PATH: &str = "/etc/org-roamers/";
+#[cfg(not(target_os = "windows"))]
+pub fn config_path() -> PathBuf {
+    PathBuf::from("/etc/org-roamers/")
+}
+
+#[cfg(target_os = "windows")]
+pub fn config_path() -> PathBuf {
+    std::env::var("APPDATA").map(PathBuf::from).unwrap()
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct Configuration {

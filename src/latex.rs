@@ -1,3 +1,4 @@
+use std::env;
 use std::io::Read;
 use std::process::Command;
 use std::{
@@ -12,8 +13,11 @@ use tracing::info;
 use crate::file::OrgFile;
 use crate::transform::org;
 
-#[cfg(not(target_os = "windows"))]
-const TEMP_PATH: &str = "/tmp/org-roamers/";
+fn get_temp_path() -> PathBuf {
+    let mut temp_dir = env::temp_dir();
+    temp_dir.push("org-roamers/");
+    temp_dir
+}
 
 const PREAMBLE: &str = concat!(
     "\\documentclass{article}\n",
@@ -50,8 +54,7 @@ pub fn get_image_with_ctx<P: AsRef<Path>>(
 
 pub fn get_image(latex: String, color: String, headers: Vec<String>) -> anyhow::Result<String> {
     let hash = hash(latex.as_str());
-    // TODO: only works on linux.
-    let mut path = PathBuf::from(TEMP_PATH);
+    let mut path = PathBuf::from(get_temp_path());
     std::fs::create_dir_all(path.as_path())?;
 
     // let's check if the file already exists.
