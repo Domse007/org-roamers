@@ -3,6 +3,10 @@ name = "org-roamers"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = [ ]
+static_assets = [ "include_dir" ]
+
 [dependencies]
 anyhow = "1.0.96"
 chardetng = "0.1.17"
@@ -17,6 +21,10 @@ tempfile = "3.14.0"
 thiserror = "2.0.12"
 tracing = { version = "0.1.41", features = ["log"] }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+
+[dependencies.include_dir]
+version = "0.7.4"
+optional = true
 
 [profile.dev]
 debug = 0

@@ -20,9 +20,6 @@ jobs:
       with:
         target: x86_64-pc-windows-msvc
 
-    - name: Build release binary
-      run: cargo build --release --bin server
-
     - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
@@ -35,6 +32,9 @@ jobs:
     - name: Build project
       run: npm run build
       working-directory: ./web
+
+    - name: Build release binary
+      run: cargo build --release --bin server --features static_assets
 
     - name: Upload build artifact
       uses: actions/upload-artifact@v4

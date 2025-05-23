@@ -1,14 +1,15 @@
 use std::any::Any;
 use std::error::Error;
-use std::fs::File;
 use std::path::PathBuf;
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread::JoinHandle;
 
+use data::DataLoader;
 use emacs::route_emacs_traffic;
 use orgize::Org;
+use rouille::ResponseBody;
 use rouille::{router, Response, Server};
 use rusqlite::fallible_streaming_iterator::FallibleStreamingIterator;
 
@@ -35,6 +36,7 @@ use crate::transform::title::TitleSanitizer;
 use crate::watcher;
 use crate::ServerState;
 
+pub mod data;
 pub mod emacs;
 
 pub struct ServerRuntime {
@@ -146,14 +148,14 @@ pub fn start_server(
 }
 
 pub fn default_route_content(_db: &mut ServerState, root: String, url: Option<String>) -> Response {
-    let mut path = PathBuf::from(root);
+    let root = PathBuf::from(root);
 
-    match url {
-        Some(url) => path.push(url.strip_prefix("/").unwrap()),
-        None => path.push("index.html"),
-    }
+    let rel_path = match url {
+        Some(url) => PathBuf::from(url.strip_prefix("/").unwrap()),
+        None => PathBuf::from("index.html"),
+    };
 
-    let mime = match path.extension() {
+    let mime = match rel_path.extension() {
         Some(extension) => match extension.to_str().unwrap() {
             "html" => "text/html",
             "js" => "text/javascript",
@@ -162,8 +164,8 @@ pub fn default_route_content(_db: &mut ServerState, root: String, url: Option<St
             _ => {
                 tracing::error!(
                     "Unsupported file extension: {:?} ({:?})",
-                    path.extension(),
-                    path
+                    rel_path.extension(),
+                    rel_path
                 );
                 return Response::empty_404();
             }
@@ -174,18 +176,25 @@ pub fn default_route_content(_db: &mut ServerState, root: String, url: Option<St
         }
     };
 
-    let file = match File::open(&path) {
-        Ok(file) => {
-            tracing::info!("Serving file {path:?}");
-            file
+    let asset_loader = data::get_loader(root);
+
+    let bytes = match asset_loader.load(&rel_path) {
+        Some(bytes) => {
+            tracing::info!("Serving file {rel_path:?}");
+            bytes
         }
-        Err(_) => {
-            tracing::error!("File not found: {path:?}");
+        None => {
+            tracing::error!("File not found: {rel_path:?}");
             return Response::empty_404();
         }
     };
 
-    Response::from_file(mime, file)
+    Response {
+        status_code: 200,
+        headers: vec![("Content-Type".into(), mime.into())],
+        data: ResponseBody::from_data(bytes),
+        upgrade: None,
+    }
 }
 
 pub enum Query {
@@ -280,9 +289,12 @@ pub fn get_graph_data(db: &mut ServerState) -> GraphData {
                 .pop()
                 .unwrap_or_default();
             let stmnt = "SELECT title, id FROM nodes WHERE title = ?1;";
-            let parent = db.sqlite.query_one(stmnt, [parent], |row| {
+            let parent = db
+                .sqlite
+                .query_one(stmnt, [parent], |row| {
                     Ok(row.get::<usize, String>(1).unwrap())
-                }).unwrap_or_default();
+                })
+                .unwrap_or_default();
             RoamNode {
                 title: title_sanitizer(&e[1]).into(),
                 id: e[0].to_string().into(),
