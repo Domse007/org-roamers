@@ -1,9 +1,9 @@
-use std::io::{stdin, stdout, BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Write, stdin, stdout};
 use std::net::TcpStream;
 
 const PS: &str = "cli> ";
 
-fn main() {
+pub fn entry() {
     let mut tcp = match TcpStream::connect("localhost:12568") {
         Ok(tcp) => tcp,
         Err(err) => {

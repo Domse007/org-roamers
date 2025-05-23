@@ -9,14 +9,14 @@ use args::CliArgs;
 use cli::run_cli_server;
 use conf::Configuration;
 use org_roamers::{
+    ServerState,
     api::APICalls,
     server::{self, start_server},
-    ServerState,
 };
 use tracing::{error, info};
-use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
-fn main() -> Result<ExitCode> {
+pub fn entry(args: Vec<String>) -> Result<ExitCode> {
     tracing_subscriber::registry()
         .with(EnvFilter::new("debug"))
         .with(fmt::layer())
@@ -24,8 +24,6 @@ fn main() -> Result<ExitCode> {
         .unwrap();
 
     panic::set_hook(Box::new(|info| error!("Server paniced with {info}")));
-
-    let args = env::args().skip(1).collect::<Vec<String>>();
 
     let cli_args = match CliArgs::parse(&args) {
         Ok(args) => args,

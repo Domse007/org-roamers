@@ -13,7 +13,7 @@ use tracing::error;
 use tracing::info;
 use tracing::warn;
 
-use crate::conf::Configuration;
+use super::conf::Configuration;
 
 trait CLICommand {
     fn name(&self) -> &'static str;

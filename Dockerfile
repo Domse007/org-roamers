@@ -14,7 +14,7 @@ WORKDIR /app
 
 COPY ./ ./backend
 
-RUN cd backend && cargo build --release --bin server
+RUN cd backend && cargo build --release --bin org-roamers-cli
 
 # ----------- Final stage: Runtime container ------------
 FROM debian:bookworm-slim
@@ -24,9 +24,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY --from=backend  /app/backend/target/release/server ./server
-COPY --from=backend  /app/backend/server_conf.json      ./server_conf.json
-COPY --from=frontend /app/frontend/dist                 ./web/dist/
+COPY --from=backend  /app/backend/target/release/org-roamers-cli ./server
+COPY --from=backend  /app/backend/server_conf.json               ./server_conf.json
+COPY --from=frontend /app/frontend/dist                          ./web/dist/
 
 # Expose a port (change as needed)
 EXPOSE 5000
@@ -34,4 +34,4 @@ EXPOSE 5000
 # Define a runtime argument for data directory (via env var or CMD)
 ENV DATA_DIR=/data
 
-CMD [ "./server", "/data" ]
+CMD [ "./server", "--server", "/data" ]
