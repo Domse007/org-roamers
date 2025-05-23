@@ -8,10 +8,7 @@ use orgize::{
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    file::OrgFile,
-    sqlite::{olp, rebuild},
-};
+use crate::{file::OrgFile, sqlite::rebuild};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct Timestamps {
@@ -45,12 +42,11 @@ pub struct NodeFromOrg {
 
 impl NodeFromOrg {
     #[rustfmt::skip]
-    pub fn insert_into(&self, con: &mut Connection, with_replace: bool) -> anyhow::Result<()> {
+    pub fn insert_into(&self, con: &mut Connection) -> anyhow::Result<()> {
+        // this does not insert olp, tags, etc. -- why?
         rebuild::insert_node(
-            con, with_replace, &self.uuid, self.file.as_str(), self.level, 0,
-            false, 0, "", "", self.title.as_str(), "",
-            olp::into_olp_string(self.olp.clone()).as_str(),
-            olp::into_olp_string(self.actual_olp.clone()).as_str(),
+            con, &self.uuid, self.file.as_str(), self.level,
+            false, 0, "", "", self.title.as_str(), &self.actual_olp
         )
     }
 }

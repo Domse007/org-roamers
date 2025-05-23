@@ -1,9 +1,11 @@
+mod args;
 mod cli;
 mod conf;
 
 use std::{env, fs, panic, path::PathBuf, process::ExitCode, str::FromStr};
 
 use anyhow::Result;
+use args::CliArgs;
 use cli::run_cli_server;
 use conf::Configuration;
 use org_roamers::{
@@ -25,10 +27,10 @@ fn main() -> Result<ExitCode> {
 
     let args = env::args().skip(1).collect::<Vec<String>>();
 
-    let path = match args.first() {
-        Some(path) => path,
-        None => {
-            error!("Could not get path");
+    let cli_args = match CliArgs::parse(&args) {
+        Ok(args) => args,
+        Err(err) => {
+            error!("An error occured while parsing args: {err}");
             return Ok(ExitCode::FAILURE);
         }
     };
@@ -41,7 +43,7 @@ fn main() -> Result<ExitCode> {
 
     let configuration = Configuration {
         html_export_path: html_path,
-        roam_path: path.into(),
+        roam_path: cli_args.path.into(),
         ip_addr: "0.0.0.0".to_string(),
         port: 5000,
     };
@@ -86,6 +88,20 @@ fn main() -> Result<ExitCode> {
 
     if let Err(err) = global.sqlite.insert_files(&configuration.roam_path) {
         tracing::error!("An error occured: {err}");
+    }
+
+    if cli_args.dump {
+        let mut dump_path = env::current_dir().unwrap();
+        dump_path.push("dump.db");
+        if std::fs::exists(&dump_path).unwrap() {
+            std::fs::remove_file(&dump_path).unwrap();
+        }
+        global
+            .sqlite
+            .connection()
+            .backup(rusqlite::DatabaseName::Main, &dump_path, None)?;
+        tracing::info!("Saved db dump to {}", dump_path.display());
+        return Ok(ExitCode::SUCCESS);
     }
 
     let runtime = start_server(configuration.get_url(false), calls, global).unwrap();

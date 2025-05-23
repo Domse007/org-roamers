@@ -121,7 +121,7 @@ fn get_nodes_from_event_path(db: &mut Connection, path: PathBuf) -> anyhow::Resu
         }
     };
     for node in nodes {
-        if let Err(err) = node.insert_into(db, true) {
+        if let Err(err) = node.insert_into(db) {
             tracing::error!(
                 "An error occured while updating {} ({}): {}",
                 node.uuid,

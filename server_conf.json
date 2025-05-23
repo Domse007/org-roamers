@@ -1,3 +1,4 @@
 {
-  "root": "web/dist/"
+    "root": "web/dist/",
+    "strict": false
 }

@@ -226,7 +226,6 @@ pub fn get_org_as_html(db: &mut ServerState, query: Query, scope: String) -> Org
     let links = outgoing_links
         .iter()
         .map(|bare| {
-            let bare = format!("\"{}\"", bare);
             const STMNT: &str = "SELECT id, title FROM nodes WHERE id = ?1";
             db.sqlite.query_one(STMNT, [bare], |row| {
                 Ok(OutgoingLink {
@@ -268,38 +267,28 @@ pub fn search(db: &mut ServerState, query: String) -> SearchResponse {
 }
 
 pub fn get_graph_data(db: &mut ServerState) -> GraphData {
-    let olp = |s: String, db: &mut ServerState| -> String {
-        (!s.is_empty())
-            .then(|| {
-                olp::parse_olp(s[1..s.len() - 1].to_string())
-                    .unwrap_or_default()
-                    .pop()
-                    .unwrap_or_default()
-            })
-            .map(|parent| {
-                let stmnt = "SELECT title, id FROM nodes WHERE title = ?1;";
-                // TODO: fix at some point
-                let parent = format!("\"{}\"", parent);
-                db.sqlite.query_one(stmnt, [parent], |row| {
-                    Ok(row.get::<usize, String>(1).unwrap())
-                })
-            })
-            .unwrap_or(Ok(String::new()))
-            .unwrap_or_default()
-    };
-
     let title_sanitizer = |title: &str| {
         let sanitier = TitleSanitizer::new();
         sanitier.process(title)
     };
 
-    let mut nodes = helpers::get_all_nodes(db.sqlite.connection(), ["id", "title", "actual_olp"])
+    let mut nodes = helpers::get_all_nodes(db.sqlite.connection(), ["id", "title"])
         .into_iter()
-        .map(|e| RoamNode {
-            title: title_sanitizer(&e[1]).into(),
-            id: e[0].to_string().into(),
-            parent: olp(e[2].to_string(), db).into(),
-            num_links: 0,
+        .map(|e| {
+            let parent = olp::get_olp(db.sqlite.connection(), &e[0])
+                .unwrap_or_default()
+                .pop()
+                .unwrap_or_default();
+            let stmnt = "SELECT title, id FROM nodes WHERE title = ?1;";
+            let parent = db.sqlite.query_one(stmnt, [parent], |row| {
+                    Ok(row.get::<usize, String>(1).unwrap())
+                }).unwrap_or_default();
+            RoamNode {
+                title: title_sanitizer(&e[1]).into(),
+                id: e[0].to_string().into(),
+                parent: parent.into(),
+                num_links: 0,
+            }
         })
         .collect::<Vec<RoamNode>>();
 
@@ -325,7 +314,7 @@ pub fn get_graph_data(db: &mut ServerState) -> GraphData {
     const ALL_LINKS: &str = concat!(
         "SELECT source, dest, type\n",
         "FROM links\n",
-        "WHERE type = '\"id\"';"
+        "WHERE type = 'id';"
     );
 
     let mut links: Vec<RoamLink> = db

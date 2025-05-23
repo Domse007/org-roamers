@@ -6,6 +6,7 @@ use rusqlite::{Connection, Params};
 
 use crate::error::ServerError;
 
+pub mod init;
 pub mod olp;
 pub mod rebuild;
 
@@ -16,21 +17,28 @@ pub struct SqliteConnection {
 impl SqliteConnection {
     const MIN_VERSION: usize = 20;
 
-    pub fn init() -> Result<Self> {
+    pub fn init(strict: bool) -> Result<Self> {
         let this = {
             let mut connection = Connection::open_in_memory()?;
-            rebuild::init_version(&mut connection, Self::MIN_VERSION)?;
-            rebuild::init_files_table(&mut connection)?;
-            rebuild::init_nodes_table(&mut connection)?;
-            rebuild::init_links_table(&mut connection)?;
-            rebuild::init_aliases(&mut connection)?;
-            rebuild::init_tags(&mut connection)?;
+            init::init_version(&mut connection, Self::MIN_VERSION)?;
+            init::init_files_table(&mut connection)?;
+            init::init_nodes_table(&mut connection)?;
+            init::init_links_table(&mut connection)?;
+            init::init_aliases(&mut connection)?;
+            init::init_tags(&mut connection)?;
+            init::init_olp_table(&mut connection)?;
             Self { connection }
         };
 
         let version: usize = this
             .connection
             .pragma_query_value(None, "user_version", |row| Ok(row.get_unwrap(0)))?;
+
+        if strict {
+            if let Err(err) = this.connection.execute("PRAGMA foreign_keys = ON;", []) {
+                tracing::error!("Could not enable foreign_keys: {err}");
+            }
+        }
 
         if version != Self::MIN_VERSION {
             tracing::error!(

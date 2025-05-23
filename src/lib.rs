@@ -35,6 +35,8 @@ use std::path::{Path, PathBuf};
 pub struct StaticServerConfiguration {
     /// Root path to the website files. e.g. .js / .html / .css
     pub root: String,
+    /// Use stricter policy like foreign_keys = ON.
+    pub strict: bool,
 }
 
 #[derive(Default)]
@@ -83,7 +85,7 @@ impl ServerState {
         org_roam_db_path: P,
         static_conf: StaticServerConfiguration,
     ) -> Result<ServerState, Box<dyn std::error::Error>> {
-        let sqlite_con = match SqliteConnection::init() {
+        let sqlite_con = match SqliteConnection::init(static_conf.strict) {
             Ok(con) => con,
             Err(e) => {
                 return Err(
