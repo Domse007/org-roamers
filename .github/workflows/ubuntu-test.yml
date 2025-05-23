@@ -1,10 +1,10 @@
-name: Test
+name: Test on Ubuntu
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "**" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "**" ]
 
 jobs:
   required:
@@ -17,15 +17,27 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: true
+
       - name: Install ${{ matrix.toolchain }}
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.toolchain }}
-      - name: Update system
-        run: |
-          sudo apt update
-          sudo apt upgrade
+
       - name: Install dependencies
         run: sudo apt install -y texlive-latex-extra dvisvgm
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ./web
+
+      - name: Build project
+        run: npm run build
+        working-directory: ./web
+
       - name: cargo test
         run: cargo test --all-features --all-targets
