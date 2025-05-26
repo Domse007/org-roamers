@@ -47,7 +47,9 @@ pub struct ServerRuntime {
 impl ServerRuntime {
     pub fn graceful_shutdown(self) -> Result<(), Box<dyn Any + Send>> {
         self.sender.send(()).unwrap();
-        self.handle.join()
+        self.handle.join()?;
+        tracing::info!("Server finished shutting down.");
+        Ok(())
     }
 }
 

@@ -40,4 +40,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: windows-msvc-binary
-        path: target/release/org-roamers-cli.exe
+        path: target/release/org-roamers-gui.exe

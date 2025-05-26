@@ -56,12 +56,12 @@ pub fn start_server(ctx: &OrgRoamersGUI) -> anyhow::Result<ServerRuntime> {
 
     let mut state = ServerState::new(
         html_path(),
-        ctx.roam_path.clone().into(),
+        ctx.settings.roam_path.clone().into(),
         server_configuration,
     )
     .unwrap();
 
-    if let Err(err) = state.sqlite.insert_files(&ctx.roam_path) {
+    if let Err(err) = state.sqlite.insert_files(&ctx.settings.roam_path) {
         anyhow::bail!("An error occured: {err}");
     }
 
