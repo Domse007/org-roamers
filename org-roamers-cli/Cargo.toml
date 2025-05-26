@@ -11,3 +11,7 @@ serde = "1.0.219"
 serde_json = "1.0.140"
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
+
+[features]
+default = []
+static_assets = ["org-roamers/static_assets"]

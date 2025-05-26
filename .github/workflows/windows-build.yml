@@ -34,7 +34,7 @@ jobs:
       working-directory: ./web
 
     - name: Build release binary
-      run: cargo build --release --bin org-roamers-cli
+      run: cargo build --release --bin org-roamers-gui --features static_assets
 
     - name: Upload build artifact
       uses: actions/upload-artifact@v4
