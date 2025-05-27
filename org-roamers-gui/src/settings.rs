@@ -25,11 +25,11 @@ impl Default for Settings {
 
 impl Settings {
     pub fn write<P: AsRef<Path>>(&self, path: P) -> anyhow::Result<()> {
-	if let Some(parent) = path.as_ref().parent() {
-	    if !parent.exists() {
-	        fs::create_dir(parent)?;	
-	    }
-	}
+        if let Some(parent) = path.as_ref().parent() {
+            if !parent.exists() {
+                fs::create_dir(parent)?;
+            }
+        }
         let mut file = File::create(path)?;
         let deserialized = serde_json::to_string_pretty(self)?;
         file.write(deserialized.as_bytes())?;

@@ -19,7 +19,7 @@ fn main() -> ExitCode {
             }
         }
     } else {
-	eprintln!("No command provided. Use --server or --cli");
-	ExitCode::FAILURE
+        eprintln!("No command provided. Use --server or --cli");
+        ExitCode::FAILURE
     }
 }

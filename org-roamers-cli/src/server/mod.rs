@@ -9,7 +9,9 @@ use args::CliArgs;
 use cli::run_cli_server;
 use conf::Configuration;
 use org_roamers::{
-    api::APICalls, server::{self, start_server}, ServerState, StaticServerConfiguration
+    ServerState, StaticServerConfiguration,
+    api::APICalls,
+    server::{self, start_server},
 };
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};

@@ -53,10 +53,12 @@ mod dynamic_loader {
 pub fn get_loader(_root: PathBuf) -> impl DataLoader {
     #[cfg(feature = "static_assets")]
     {
+        tracing::info!("Using static data loader");
         static_loader::StaticLoader
     }
     #[cfg(not(feature = "static_assets"))]
     {
+        tracing::info!("Using dynamic data loader");
         dynamic_loader::DynamicLoader::new(_root)
     }
 }

@@ -97,17 +97,19 @@ impl eframe::App for OrgRoamersGUI {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
-                let ip_label = ui.label("IP:");
+                let ip_label = ui.add_sized([50., ui.available_height()], egui::Label::new("IP:"));
                 ui.text_edit_singleline(&mut self.settings.ip_addr)
                     .labelled_by(ip_label.id);
             });
             ui.horizontal(|ui| {
-                let port_label = ui.label("Port:");
+                let port_label =
+                    ui.add_sized([50., ui.available_height()], egui::Label::new("Port:"));
                 ui.text_edit_singleline(&mut self.settings.port)
                     .labelled_by(port_label.id);
             });
             ui.horizontal(|ui| {
-                let path_label = ui.label("Path:");
+                let path_label =
+                    ui.add_sized([50., ui.available_height()], egui::Label::new("Path:"));
                 ui.text_edit_singleline(&mut self.settings.roam_path)
                     .labelled_by(path_label.id);
                 if ui.button("Pick").clicked() {
@@ -138,7 +140,7 @@ impl eframe::App for OrgRoamersGUI {
                     match start::start_server(&self) {
                         Ok(rt) => self.runtime = Some(rt),
                         Err(err) => {
-			    print_gui_error(format!("Error starting server: {err:?}"));
+                            print_gui_error(format!("Error starting server: {err:?}"));
                         }
                     }
                 }

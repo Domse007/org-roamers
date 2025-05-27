@@ -43,7 +43,7 @@ impl Default for StaticServerConfiguration {
     fn default() -> Self {
         Self {
             root: "./web/dist/".to_string(),
-            strict: false
+            strict: false,
         }
     }
 }
