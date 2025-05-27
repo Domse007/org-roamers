@@ -1,0 +1,100 @@
+name: Build and Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  linux-deb:
+    name: Build .deb on Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: x86_64-pc-windows-msvc
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ./web
+
+      - name: Build project
+        run: npm run build
+        working-directory: ./web
+
+      - name: Install cargo-deb
+        run: cargo install cargo-deb
+
+      - name: Build and package
+        run: |
+          cargo build --release --bin org-roamers-gui --features static_assets
+          cargo build --release --bin org-roamers-cli --features static_assets
+          cargo deb
+
+      - name: Create .tar.gz
+        run: |
+          mkdir -p dist
+          cp target/release/org-roamers-cli dist/
+          cp target/release/org-roamers-gui dist/
+          tar -czvf org-roamers-linux.tar.gz -C dist .
+          rm -rf dist
+
+      - name: Upload release files
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            target/debian/*.deb
+            org-roamers-linux.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  windows-exe:
+    name: Build .exe on Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: x86_64-pc-windows-msvc
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ./web
+
+      - name: Build project
+        run: npm run build
+        working-directory: ./web
+
+      - name: Build executable
+        run: cargo build --release
+
+      - name: Create .zip
+        run: |
+          mkdir dist
+          copy target\release\*.exe dist\
+          powershell Compress-Archive -Path dist\* -DestinationPath org-roamers-windows.zip
+
+      - name: Upload .exe to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            org-roamers-windows.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

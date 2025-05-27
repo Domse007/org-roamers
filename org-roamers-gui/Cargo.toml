@@ -1,6 +1,8 @@
 [package]
 name = "org-roamers-gui"
 version = "0.1.0"
+license = "GPLv3"
+authors = [ "Dominik Keller" ]
 edition = "2024"
 
 [dependencies]
@@ -17,3 +19,13 @@ rfd = "0.15.3"
 [features]
 default = []
 static_assets = ["org-roamers/static_assets"]
+
+[package.metadata.deb]
+maintainer = "Dominik Keller <github@dominik-keller.com>"
+depends = [ ]
+assets = [
+    [ "target/release/org-roamers-gui", "usr/local/bin/", "755" ],
+    [ "target/release/org-roamers-cli", "usr/local/bin/", "755" ]
+]
+features = [ "static_assets" ]
+section = "Web Software"
