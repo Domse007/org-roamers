@@ -64,7 +64,10 @@ enum TableRow {
 
 impl HtmlExport<'_> {
     pub fn finish(self) -> (String, Vec<String>) {
-        (self.output, self.outgoing_id_links)
+        let mut outgoing = self.outgoing_id_links;
+        outgoing.sort();
+        outgoing.dedup();
+        (self.output, outgoing)
     }
 }
 
