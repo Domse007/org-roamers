@@ -1,27 +1,42 @@
 #+html: <div align="center">
 * *org-roamers*
-*NOTE:* /This is in very early development and not ready for actual
-usage./
+*NOTE:* /This is in very early development and not ready for actual usage./
+
+#+html: <img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/domse007/org-roamers/windows-build.yml?label=windows">
+#+html: <img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/domse007/org-roamers/ubuntu-test.yml">
+#+html: <img alt="GitHub License" src="https://img.shields.io/github/license/domse007/org-roamers">
 #+html: </div>
 -----
 
-org-roamers is an addition to [[https://github.com/org-roam/org-roam][org-roam]] and a replacement for
-[[https://github.com/org-roam/org-roam-ui][org-roam-ui]].
+org-roamers is an addition to [[https://github.com/org-roam/org-roam][org-roam]] and a replacement for [[https://github.com/org-roam/org-roam-ui][org-roam-ui]]. org-roamers is a standalone server and does not need emacs to build the database or retrieve any content. But with =org-roamers.el= there is still interoperability between emacs and org-roamers. The server can either be installed locally, or containerized using docker. For local usage, the server can either be compiled to be used as a cli, or as a basic gui.
 
-The server requires one argument: the path to the org files:
+Note: org-roamers tries to be compatible with org-roam, but some hurdles must be expected. It tries to build the same graph, but internally the databases differ substantially.
+
+The cli version can be started with:
 
 #+begin_src sh
-cargo run --release --bin org-roamers-cli -- --server <Path>
+org-roamers-cli --server <Path>
 #+end_src
 
-org-roamers tries to be compatible with org-roam, but some hurdles
-must be expected. It tries to build the same graph, but internally the
-databases differ substantially.
+* Compilation
+Note: for release builds, use the =static_assets= feature, to include all web components in the binary. With that, the binaries are portable.
+
+To compile the cli, use the following command:
+
+#+begin_src sh
+make website
+cargo build --release --bin org-roamers-cli --features static_assets
+#+end_src
+
+To compile the gui, only the bin must be changed:
+
+#+begin_src sh
+make website
+cargo build --release --bin org-roamers-gui --features static_assets
+#+end_src
 
 * Docker
-The server can also be run inside a docker container. A Dockerfile is
-provided in the root of the project. With a working installation of
-docker, use the following commands to create a working image.
+The server can also be run inside a docker container. A Dockerfile is provided in the root of the project. With a working installation of docker, use the following commands to create a working image.
 
 #+begin_src sh
 # build the image
@@ -32,9 +47,7 @@ docker run -p 5000:5000 -v <ROAM_DIR>:/data -v /etc/org-roamers/:/etc/org-roamer
 
 * Configuration
 ** HTML display
-Custom environments (e.g. =#+begin_CUSTOM=) can be styled by adding an
-entry to the =html_settings.json= configuration (on unix found in
-=/etc/org-roamers=). Example:
+Custom environments (e.g. =#+begin_CUSTOM=) can be styled by adding an entry to the =html_settings.json= configuration (on unix found in =/etc/org-roamers=). Example:
 
 #+begin_src json
 {
@@ -52,8 +65,7 @@ entry to the =html_settings.json= configuration (on unix found in
 Explanation:
 - =on=: The string on which the exporter checks if the rule applies.
 - =header=: Custom header that is inserted before the text.
-- =css_style=: Additional styling that is added to the enclosing HTML
-  element.
+- =css_style=: Additional styling that is added to the enclosing HTML element.
 
 * Testing
 All rust based tests can be run with the standard rust command:
