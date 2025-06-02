@@ -11,9 +11,8 @@ use notify::{
     event::{AccessKind, CreateKind, ModifyKind, RemoveKind},
     Event, EventKind, RecommendedWatcher, RecursiveMode, Result, Watcher,
 };
-use rusqlite::Connection;
 
-use crate::{transform::org::get_nodes_from_file, ServerState};
+use crate::{diff, ServerState};
 
 pub enum OrgWatcherEvent {
     Create(PathBuf),
@@ -112,25 +111,8 @@ pub fn watcher(path: PathBuf) -> anyhow::Result<(OrgWatcher, Arc<Mutex<bool>>)> 
     ))
 }
 
-fn get_nodes_from_event_path(db: &mut Connection, path: PathBuf) -> anyhow::Result<()> {
-    let nodes = match get_nodes_from_file(path) {
-        Ok(nodes) => nodes,
-        Err(err) => {
-            tracing::error!("Some error occured: {err}");
-            return Ok(());
-        }
-    };
-    for node in nodes {
-        if let Err(err) = node.insert_into(db) {
-            tracing::error!(
-                "An error occured while updating {} ({}): {}",
-                node.uuid,
-                node.title,
-                err
-            );
-        }
-    }
-    Ok(())
+fn get_nodes_from_event_path(state: &mut ServerState, path: PathBuf) -> anyhow::Result<()> {
+    diff::diff(state, path)
 }
 
 fn handle_event(db: Arc<Mutex<ServerState>>, event: OrgWatcherEvent) -> anyhow::Result<()> {
@@ -143,7 +125,7 @@ fn handle_event(db: Arc<Mutex<ServerState>>, event: OrgWatcherEvent) -> anyhow::
         }
         OrgWatcherEvent::Modify(path) => {
             tracing::info!("Processing modified {path:?}");
-            get_nodes_from_event_path(db.lock().unwrap().sqlite.connection(), path)?
+            get_nodes_from_event_path(&mut db.lock().unwrap(), path)?
         }
         OrgWatcherEvent::Remove(_path) => {
             // TODO: broken...

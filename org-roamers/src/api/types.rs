@@ -1,7 +1,9 @@
 use rouille::Response;
 use serde::{Deserialize, Serialize};
 
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Hash, Eq)]
+use crate::transform::org::NodeFromOrg;
+
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialOrd, Ord)]
 pub struct RoamID(String);
 
 impl RoamID {
@@ -41,7 +43,7 @@ impl From<String> for RoamID {
     }
 }
 
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, Eq)]
 pub struct RoamTitle(String);
 
 impl RoamTitle {
@@ -66,18 +68,32 @@ impl From<String> for RoamTitle {
     }
 }
 
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, Eq)]
 pub struct RoamLink {
     pub from: RoamID,
     pub to: RoamID,
 }
 
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, Eq)]
 pub struct RoamNode {
     pub title: RoamTitle,
     pub id: RoamID,
     pub parent: RoamID,
     pub num_links: usize,
+}
+
+impl From<NodeFromOrg> for RoamNode {
+    fn from(value: NodeFromOrg) -> Self {
+        Self {
+            title: value.title.into(),
+            id: value.uuid.into(),
+            parent: value
+                .parent
+                .map(Into::into)
+                .unwrap_or(RoamID("".to_string())),
+            num_links: value.links.len(),
+        }
+    }
 }
 
 /// Response structure for transmitting graph information.
@@ -158,6 +174,8 @@ pub struct ServerStatus {
     /// is true, when files changed on disk.
     pub visited_node: Option<RoamID>,
     pub pending_changes: bool,
+    pub updated_nodes: Vec<RoamNode>,
+    pub updated_links: Vec<RoamLink>,
 }
 
 impl From<ServerStatus> for Response {
@@ -291,8 +309,10 @@ mod tests {
         let status = ServerStatus {
             visited_node: None,
             pending_changes: true,
+            updated_nodes: vec![],
+            updated_links: vec![],
         };
-        let expected = "{\"visited_node\":null,\"pending_changes\":true}";
+        let expected = "{\"visited_node\":null,\"pending_changes\":true,\"updated_nodes\":[],\"updated_links\":[]}";
         assert_eq!(serde_json::to_string(&status).unwrap(), expected);
     }
 

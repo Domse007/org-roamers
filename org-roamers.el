@@ -96,13 +96,31 @@
 	     (message "Successfully informed server.")))))
       (setq org-roamers--last-id id))))
 
+(defun org-roamers--buffer-modified (file-name)
+  (format "%s/emacs?task=modified&file=%s" org-roamers-url file-name))
+
+(defun org-roamers--save-buffer ()
+  (let ((file-name (buffer-file-name (buffer-base-buffer))))
+    (when (and (org-roam-buffer-p) file-name)
+      (request
+	(org-roamers--buffer-modified file-name)
+	:type "POST"
+	:success
+	(cl-function
+	 (lambda (&key data &allow-other-keys)
+	   (message "Successfully informed server.")))))))
+
 (define-minor-mode org-roamers-mode
   "Enable org-roamers enhances in current buffer."
   :group 'org-roamers
   :global t
   (if org-roamers-mode
-      (add-hook 'post-command-hook #'org-roamers-follow)
-    (remove-hook 'post-command-hook #'org-roamers-follow)))
+      (progn
+	(add-hook 'post-command-hook #'org-roamers-follow)
+	(add-hook 'after-save-hook #'org-roamers--save-buffer))
+    (progn
+      (remove-hook 'post-command-hook #'org-roamers-follow)
+      (remove-hook 'after-save-hook #'org-roamers--save-buffer))))
 
 (provide 'org-roamers)
 ;;; org-roamers.el ends here

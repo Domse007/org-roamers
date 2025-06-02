@@ -34,4 +34,4 @@ EXPOSE 5000
 # Define a runtime argument for data directory (via env var or CMD)
 ENV DATA_DIR=/data
 
-CMD [ "./server", "--server", "/data" ]
+CMD [ "./server", "--server", "/data", "--fs-watcher" ]

@@ -66,13 +66,15 @@ pub fn entry(args: Vec<String>) -> Result<ExitCode> {
     };
     info!("Using config path {server_conf_path:?}");
 
-    let server_configuration = match fs::read_to_string(server_conf_path) {
+    let mut server_configuration = match fs::read_to_string(server_conf_path) {
         Ok(content) => serde_json::from_str(content.as_str()).unwrap(),
         Err(err) => {
             tracing::error!("Failed to load config: {err}");
             StaticServerConfiguration::default()
         }
     };
+
+    server_configuration.fs_watcher = cli_args.fs_watcher;
 
     let mut global = match ServerState::new(
         configuration.html_export_path.as_path(),

@@ -120,6 +120,8 @@ impl eframe::App for OrgRoamersGUI {
                 }
             });
 
+            ui.checkbox(&mut self.settings.fs_watcher, "Enable file system watcher");
+
             ui.separator();
 
             let button_label = if self.runtime.is_some() {

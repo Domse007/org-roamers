@@ -11,6 +11,7 @@ pub struct Settings {
     pub ip_addr: String,
     pub port: String,
     pub roam_path: String,
+    pub fs_watcher: bool,
 }
 
 impl Default for Settings {
@@ -19,6 +20,7 @@ impl Default for Settings {
             ip_addr: "localhost".to_string(),
             port: "5000".to_string(),
             roam_path: "".to_string(),
+            fs_watcher: false,
         }
     }
 }

@@ -1,14 +1,18 @@
+export interface RoamNode {
+  title: string;
+  id: string;
+  parent: string;
+  num_links: number;
+}
+
+export interface RoamLink {
+  from: string;
+  to: string;
+}
+
 export default interface GraphData {
-  nodes: {
-    title: string;
-    id: string;
-    parent: string;
-    num_links: number;
-  }[];
-  links: {
-    from: string;
-    to: string;
-  }[];
+  nodes: RoamNode[];
+  links: RoamLink[];
 }
 
 export interface SearchResponse {
@@ -25,6 +29,8 @@ export interface SearchResponse {
 export interface ServerStatus {
   visited_node: string | null;
   pending_changes: boolean;
+  updated_nodes: RoamNode[];
+  updated_links: RoamLink[];
 }
 
 export interface OrgAsHTMLResponse {

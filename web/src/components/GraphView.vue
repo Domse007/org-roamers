@@ -9,6 +9,7 @@ import type GraphData from "@/types";
 import { onMounted, watch } from "vue";
 import { generalSettings } from "../settings.ts";
 import drawHover from "../sigma_helpers.ts";
+import type { RoamLink, RoamNode } from "@/types";
 
 const randomNumber = (min: number, max: number) =>
   Math.random() * (max - min) + min;
@@ -138,17 +139,23 @@ const zoomOnto = (id: string, old_id: string) => {
   const graphOffset = 0.4 * ratio;
   const position = sigma!.getNodeDisplayData(id)!;
 
-  sigma!.getCamera().animate(
-    {
-      x: position.x + graphOffset,
-      y: position.y,
-      ratio: ratio,
-    },
-    {
-      duration: 1000,
-    },
-  );
-  highlightEdgesFromNode(id, c("--highlight-2"));
+  const actualZoom = () => {
+    sigma!.getCamera().animate(
+      {
+        x: position.x + graphOffset,
+        y: position.y,
+        ratio: ratio,
+      },
+      {
+        duration: 1000,
+      },
+    );
+    highlightEdgesFromNode(id, c("--highlight-2"));
+  };
+
+  try {
+    actualZoom();
+  } catch (_) {}
 };
 
 function highlightEdgesFromNode(sourceNode: unknown, color: string) {
@@ -157,10 +164,46 @@ function highlightEdgesFromNode(sourceNode: unknown, color: string) {
   });
 }
 
+const incrementalGraphUpdate = (updates: {
+  nodes: RoamNode[];
+  links: RoamLink[];
+}) => {
+  const style = window.getComputedStyle(document.body);
+  const nodeColor = style.getPropertyValue("--node");
+  const nodeBorderColor = style.getPropertyValue("--node-border");
+  for (const node of updates.nodes) {
+    try {
+      graph.addNode(node.id, {
+        label: node.title,
+        x: randomNumber(1, 100),
+        y: randomNumber(1, 100),
+        size: node.num_links / 2 <= 5 ? 5 : node.num_links / 2,
+        color: nodeColor,
+        borderColor: nodeBorderColor,
+      });
+    } catch (err) {
+      console.log(`${node.id} (${node.title}): ${err}`);
+    }
+  }
+  const edgeColor = style.getPropertyValue("--overlay");
+  for (const link of updates.links) {
+    try {
+      graph.addEdge(link.from, link.to, { color: edgeColor });
+    } catch (error) {
+      console.log(`${link.from}->${link.to}: ${error}`);
+    }
+  }
+  document.getElementById("graph")!.innerHTML = "";
+  setupGraph();
+  // bit sketchy...
+  zoomOnto(old_node, old_node);
+};
+
 const prop = defineProps<{
   count: number;
   toggleLayouter: boolean;
   zoomNode: string;
+  updates: { nodes: RoamNode[]; links: RoamLink[] } | null;
 }>();
 
 let old_count = 0;
@@ -184,6 +227,10 @@ watch(prop, () => {
   if (old_node != prop.zoomNode) {
     zoomOnto(prop.zoomNode, old_node);
     old_node = prop.zoomNode;
+  }
+  if (prop.updates != null) {
+    console.log("STARTING TO UPDATE GRAPH");
+    incrementalGraphUpdate(prop.updates);
   }
 });
 

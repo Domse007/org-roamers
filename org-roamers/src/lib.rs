@@ -12,6 +12,7 @@
 //! See: the provided server implementation `org_roamers::bin::server::main.rs`.
 
 pub mod api;
+mod diff;
 pub mod error;
 pub mod file;
 mod latex;
@@ -24,6 +25,8 @@ pub mod transform;
 pub mod watcher;
 
 use api::types::RoamID;
+use api::types::RoamLink;
+use api::types::RoamNode;
 use serde::Deserialize;
 use serde::Serialize;
 use sqlite::SqliteConnection;
@@ -37,6 +40,8 @@ pub struct StaticServerConfiguration {
     pub root: String,
     /// Use stricter policy like foreign_keys = ON.
     pub strict: bool,
+    /// Use the filesystem watcher
+    pub fs_watcher: bool,
 }
 
 impl Default for StaticServerConfiguration {
@@ -44,14 +49,17 @@ impl Default for StaticServerConfiguration {
         Self {
             root: "./web/dist/".to_string(),
             strict: false,
+            fs_watcher: false,
         }
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub(crate) struct DynamicServerState {
     pub working_id: Option<(RoamID, Option<RoamID>)>,
     pub pending_reload: bool,
+    pub updated_links: Vec<RoamLink>,
+    pub updated_nodes: Vec<RoamNode>,
 }
 
 impl DynamicServerState {

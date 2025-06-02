@@ -25,6 +25,7 @@ use crate::api::types::SearchResponseProvider;
 use crate::api::types::ServerStatus;
 use crate::api::APICalls;
 use crate::api::APICallsInternal;
+use crate::diff;
 use crate::latex;
 use crate::search::Search;
 use crate::server::emacs::EmacsRequest;
@@ -68,11 +69,17 @@ pub fn start_server(
     let calls: Arc<Mutex<APICallsInternal>> = Arc::new(Mutex::new(calls.into()));
 
     let org_roam_db_path = state.org_roam_db_path.clone();
+    let use_fs_watcher = state.static_conf.fs_watcher;
 
     let lock = Arc::new(Mutex::new(state));
 
-    let (watcher, changes_flag) = watcher::watcher(org_roam_db_path.clone())?;
-    watcher::default_watcher_runtime(lock.clone(), watcher, org_roam_db_path);
+    let mut changes_flag = Arc::new(Mutex::new(false));
+    if use_fs_watcher {
+        tracing::info!("Starting fs wather.");
+        let (watcher, _changes_flag) = watcher::watcher(org_roam_db_path.clone())?;
+        changes_flag = _changes_flag;
+        watcher::default_watcher_runtime(lock.clone(), watcher, org_roam_db_path);
+    }
 
     let server = Server::new(url, move |request| {
         let mut state = lock.lock().unwrap();
@@ -127,8 +134,10 @@ pub fn start_server(
                             EmacsRequest::BufferOpened(id) => {
                                 state.dynamic_state.update_working_id(id.into());
                             }
-                            EmacsRequest::BufferModified(_file) => {
-                                todo!()
+                            EmacsRequest::BufferModified(file) => {
+                                if let Err(err) = diff::diff(&mut state, file) {
+                                    tracing::error!("An error occured while updating db: {err}");
+                                }
                             }
                         }
                         Response::empty_204()
@@ -380,9 +389,28 @@ pub fn get_latex_svg(db: &mut ServerState, tex: String, color: String, id: Strin
 
 pub fn get_status_data(state: &mut ServerState, changes_flag: Arc<Mutex<bool>>) -> ServerStatus {
     let mut changes = changes_flag.lock().unwrap();
+
+    let mut updated_nodes = state
+        .dynamic_state
+        .updated_nodes
+        .drain(..)
+        .collect::<Vec<_>>();
+    updated_nodes.sort();
+    updated_nodes.dedup();
+
+    let mut updated_links = state
+        .dynamic_state
+        .updated_links
+        .drain(..)
+        .collect::<Vec<_>>();
+    updated_links.sort();
+    updated_links.dedup();
+
     let status = ServerStatus {
         visited_node: state.dynamic_state.get_working_id().cloned(),
         pending_changes: *changes || state.dynamic_state.pending_reload,
+        updated_nodes,
+        updated_links,
     };
     *changes = false;
     status

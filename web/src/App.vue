@@ -5,7 +5,7 @@ import SearchBar from "./components/SearchBar.vue";
 import SettingsPane from "./components/Settings/SettingsPane.vue";
 import ErrorDialog from "./components/ErrorDialog.vue";
 import { onMounted, type Ref, ref } from "vue";
-import { type ServerStatus } from "./types.ts";
+import { type RoamLink, type RoamNode, type ServerStatus } from "./types.ts";
 import { STATUS_INTERVAL } from "./settings.ts";
 
 const toggleLayouterRef: Ref<boolean> = ref(false);
@@ -24,6 +24,9 @@ const redrawGraph = () => {
   graphUpdateCount.value++;
 };
 
+const graphUpdatesRef: Ref<{ nodes: RoamNode[]; links: RoamLink[] } | null> =
+  ref(null);
+
 onMounted(() => {
   setInterval(() => {
     console.log("Running status check");
@@ -31,8 +34,13 @@ onMounted(() => {
       .then((resp) => resp.json())
       .then((text) => JSON.parse(text))
       .then((json: ServerStatus) => {
-        if (json.pending_changes) {
-          redrawGraph();
+        if (json.updated_links.length > 0 || json.updated_nodes.length > 0) {
+          graphUpdatesRef.value = {
+            nodes: json.updated_nodes,
+            links: json.updated_links,
+          };
+        } else {
+          graphUpdatesRef.value = null;
         }
         if (json.visited_node != null) {
           updatePreviewID(json.visited_node);
@@ -61,6 +69,7 @@ const closeError = () => (errorMessage.value = null);
       :count="graphUpdateCount"
       :toggle-layouter="toggleLayouterRef"
       :zoom-node="previewID"
+      :updates="graphUpdatesRef"
     ></GraphView>
     <PreviewFrame
       :id="previewID"

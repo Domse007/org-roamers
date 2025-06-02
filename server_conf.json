@@ -1,4 +1,5 @@
 {
     "root": "web/dist/",
-    "strict": false
+    "strict": false,
+    "fs_watcher": false
 }

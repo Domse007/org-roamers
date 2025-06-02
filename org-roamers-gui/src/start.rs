@@ -46,13 +46,15 @@ pub fn start_server(ctx: &OrgRoamersGUI) -> anyhow::Result<ServerRuntime> {
         get_status_data: server::get_status_data,
     };
 
-    let server_configuration = match fs::read_to_string(server_conf_path()) {
+    let mut server_configuration = match fs::read_to_string(server_conf_path()) {
         Ok(content) => serde_json::from_str(content.as_str()).unwrap(),
         Err(err) => {
             tracing::error!("Failed to load config: {err}");
             StaticServerConfiguration::default()
         }
     };
+
+    server_configuration.fs_watcher = ctx.settings.fs_watcher;
 
     let mut state = ServerState::new(
         html_path(),

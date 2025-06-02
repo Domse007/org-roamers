@@ -18,6 +18,10 @@ The cli version can be started with:
 org-roamers-cli --server <Path>
 #+end_src
 
+The cli can be invoked with the =--fs-watcher= argument to enable the fs
+watcher. This is mostly useful for deployments, where emacs is not
+actively talking to org-roamers about changes.
+
 * Compilation
 Note: for release builds, use the =static_assets= feature, to include all web components in the binary. With that, the binaries are portable.
 
