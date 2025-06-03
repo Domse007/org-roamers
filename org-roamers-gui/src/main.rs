@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 use std::{env, path::PathBuf, process::Command};
 
 use eframe;
