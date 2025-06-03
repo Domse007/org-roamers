@@ -1,7 +1,7 @@
 use std::{env, path::PathBuf, process::Command};
 
 use eframe;
-use egui::Button;
+use egui::{Button, IconData};
 use logger::LogBuffer;
 use org_roamers::server::ServerRuntime;
 use rfd::FileDialog;
@@ -28,9 +28,19 @@ fn main() {
     tracing::info!("Starting GUI...");
 
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([600., 800.]),
+        viewport: egui::ViewportBuilder::default()
+            .with_title(NAME)
+            .with_drag_and_drop(true)
+            .with_inner_size([600., 800.])
+            .with_icon(OrgRoamersGUI::icon()),
+        #[cfg(target_os = "linux")]
+        // Set WM_CLASS to match the .desktop file
+        window_builder: Some(Box::new(|builder| {
+            builder.with_title(NAME).with_app_id(NAME)
+        })),
         ..Default::default()
     };
+
     eframe::run_native(
         NAME,
         options,
@@ -79,9 +89,18 @@ impl OrgRoamersGUI {
             logs,
         }
     }
-}
 
-impl OrgRoamersGUI {
+    fn icon() -> IconData {
+        const DATA: &[u8] = include_bytes!("../../web/public/org-roamers-gui.png");
+        let image = image::load_from_memory(DATA).unwrap().into_rgba8();
+        let (width, height) = image.dimensions();
+        IconData {
+            rgba: image.into_raw(),
+            width,
+            height,
+        }
+    }
+
     pub fn url(&self) -> anyhow::Result<String> {
         let port: usize = self.settings.port.parse()?;
         Ok(format!("{}:{}", self.settings.ip_addr, port))

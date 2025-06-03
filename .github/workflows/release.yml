@@ -46,6 +46,8 @@ jobs:
           mkdir -p dist
           cp target/release/org-roamers-cli dist/
           cp target/release/org-roamers-gui dist/
+	  cp target/org-roamers-gui.desktop dist/
+	  cp web/public/favicon.ico dist/
           tar -czvf org-roamers-linux.tar.gz -C dist .
           rm -rf dist
 
