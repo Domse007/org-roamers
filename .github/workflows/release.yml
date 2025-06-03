@@ -57,6 +57,7 @@ jobs:
           files: |
             target/debian/*.deb
             org-roamers-linux.tar.gz
+            org-roamers.el
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -84,19 +85,21 @@ jobs:
         run: npm run build
         working-directory: ./web
 
-      - name: Build executable
-        run: cargo build --release
+      - name: Build Rust binary
+        run: cargo build --release --bin org-roamers-gui --features static_assets
 
-      - name: Create .zip
+      - name: Install NSIS
         run: |
-          mkdir dist
-          copy target\release\*.exe dist\
-          powershell Compress-Archive -Path dist\* -DestinationPath org-roamers-windows.zip
+          choco install nsis -y
+        shell: powershell
 
-      - name: Upload .exe to Release
+      - name: Create installer
+        run: makensis ${{ github.workspace }}\installer.nsi
+
+      - name: Upload installer
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            org-roamers-windows.zip
+            org-roamers-gui-setup.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
