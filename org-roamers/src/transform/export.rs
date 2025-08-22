@@ -1,7 +1,7 @@
 use std::cmp::min;
 use std::fmt::Write;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use orgize::rowan::ast::AstNode;
@@ -38,10 +38,11 @@ pub struct HtmlExport<'a> {
     in_descriptive_list: Vec<bool>,
     in_special_block: bool,
     outgoing_id_links: Vec<String>,
+    file: String,
 }
 
 impl<'a> HtmlExport<'a> {
-    pub fn new(settings: &'a HtmlExportSettings) -> Self {
+    pub fn new(settings: &'a HtmlExportSettings, file: String) -> Self {
         Self {
             settings,
             output: String::with_capacity(1000),
@@ -49,6 +50,7 @@ impl<'a> HtmlExport<'a> {
             in_descriptive_list: vec![],
             in_special_block: false,
             outgoing_id_links: vec![],
+            file,
         }
     }
 }
@@ -333,12 +335,19 @@ impl Traverser for HtmlExport<'_> {
                 }
 
                 if link.is_image() {
-                    let _ = write!(&mut self.output, r#"<img src="{}">"#, HtmlEscape(&path));
-                    return ctx.skip();
+                    let mut path = PathBuf::from(self.file.clone());
+                    path.pop();
+                    path.push(link.path().as_ref());
+                    let _ = write!(
+                        &mut self.output,
+                        r#"<img style="width: 80%; margin: auto; display: block;" src="assets?file={}">"#,
+                        HtmlEscape(&path.to_str().unwrap())
+                    );
+                    // return ctx.skip();
                 }
 
                 if !link.has_description() {
-                    let _ = write!(&mut self.output, "{}</a>", HtmlEscape(&path));
+                    let _ = write!(&mut self.output, "</a>");
                     ctx.skip();
                 }
             }
@@ -422,7 +431,7 @@ mod tests {
             "</table></section></div>"
         );
         let settings = HtmlExportSettings::default();
-        let mut handler = HtmlExport::new(&settings);
+        let mut handler = HtmlExport::new(&settings, "".into());
         Org::parse(org).traverse(&mut handler);
         assert_eq!(handler.finish().0, exp);
     }

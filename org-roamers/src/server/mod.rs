@@ -1,5 +1,7 @@
 use std::any::Any;
 use std::error::Error;
+use std::fs::File;
+use std::io::Read;
 use std::path::PathBuf;
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
@@ -145,6 +147,12 @@ pub fn start_server(
                     Err(err) => err.handle(),
                 }
             },
+            (GET) (/assets) => {
+                match request.get_param("file") {
+                    Some(path) => serve_assets(path),
+                    None => Response::empty_404(),
+                }
+            },
             _ => {
                 let conf = state.static_conf.root.to_string();
                 calls.default_route(&mut state, conf, Some(request.url()))
@@ -225,7 +233,9 @@ pub fn get_org_as_html(db: &mut ServerState, query: Query, scope: String) -> Org
             None => return OrgAsHTMLResponse::simple("Did not get node."),
         };
 
-    let contents = match std::fs::read_to_string(file.replace('"', "")) {
+    let file = file.replace('"', "");
+
+    let contents = match std::fs::read_to_string(&file) {
         Ok(f) => f,
         Err(err) => {
             return OrgAsHTMLResponse::simple(format!("Could not get file contents: {err}"))
@@ -238,7 +248,9 @@ pub fn get_org_as_html(db: &mut ServerState, query: Query, scope: String) -> Org
         Subtree::get(id.into(), contents.as_str()).unwrap_or(contents)
     };
 
-    let mut handler = HtmlExport::new(&db.html_export_settings);
+    // FIXME: This is VERY BAD!! file is an absolute path, but it should be
+    //        relative to the root of the org-roam dir.
+    let mut handler = HtmlExport::new(&db.html_export_settings, file);
     Org::parse(contents).traverse(&mut handler);
 
     let (org, outgoing_links) = handler.finish();
@@ -414,4 +426,37 @@ pub fn get_status_data(state: &mut ServerState, changes_flag: Arc<Mutex<bool>>) 
     };
     *changes = false;
     status
+}
+
+pub fn serve_assets(file: String) -> Response {
+    let file = PathBuf::from(file);
+
+    let mime = match file.extension() {
+        Some(extension) => match extension.to_str().unwrap() {
+            "jpeg" | "jpg" => "image/jpeg",
+            "png" => "image/png",
+            _ => return Response::empty_404(),
+        },
+        _ => {
+            tracing::error!("No file extension provided.");
+            return Response::empty_404();
+        }
+    };
+
+    let mut buffer = vec![];
+    let mut source_file = match File::open(file) {
+        Ok(file) => file,
+        Err(_) => return Response::empty_404(),
+    };
+
+    if let Err(_) = source_file.read_to_end(&mut buffer) {
+        return Response::empty_404();
+    }
+
+    Response {
+        status_code: 200,
+        headers: vec![("Content-Type".into(), mime.into())],
+        data: ResponseBody::from_data(buffer),
+        upgrade: None,
+    }
 }
