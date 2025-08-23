@@ -24,7 +24,6 @@ const updateGraph = () => {
 
   fetch(`/graph`)
     .then((resp) => resp.json())
-    .then((text) => JSON.parse(text))
     .then((json: GraphData) => {
       json.nodes.forEach(
         (node: {

@@ -12,8 +12,7 @@ const showSuggestions: Ref<boolean> = ref(false);
 const search = async (query: string) => {
   const encoded = encodeURIComponent(query);
   const resp = await fetch(`/search?q=${encoded}`);
-  const text = await resp.json();
-  const res = await JSON.parse(text);
+  const res = await resp.json();
   return res;
 };
 

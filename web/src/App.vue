@@ -32,7 +32,6 @@ onMounted(() => {
     console.log("Running status check");
     fetch("/status")
       .then((resp) => resp.json())
-      .then((text) => JSON.parse(text))
       .then((json: ServerStatus) => {
         if (json.updated_links.length > 0 || json.updated_nodes.length > 0) {
           graphUpdatesRef.value = {

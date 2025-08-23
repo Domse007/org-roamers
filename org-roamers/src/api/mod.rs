@@ -2,7 +2,7 @@ pub mod types;
 
 use std::sync::{Arc, Mutex};
 
-use rouille::Response;
+use axum::response::Response;
 use types::{GraphData, OrgAsHTMLResponse, SearchResponse, ServerStatus};
 
 use crate::{
