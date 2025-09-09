@@ -25,7 +25,6 @@ const preview = (id: string) => {
   const scope: "file" | "node" = getScope();
   fetch(`/org?id=${id}&scope=${scope}`)
     .then((response) => response.json())
-    .then((text) => JSON.parse(text))
     .then((resp: OrgAsHTMLResponse) => {
       history.push(id);
       rendered.value = resp.org;

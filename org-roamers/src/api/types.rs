@@ -1,4 +1,4 @@
-use rouille::Response;
+use axum::response::{IntoResponse, Json, Response};
 use serde::{Deserialize, Serialize};
 
 use crate::transform::org::NodeFromOrg;
@@ -127,9 +127,9 @@ pub struct GraphData {
     pub links: Vec<RoamLink>,
 }
 
-impl From<GraphData> for Response {
-    fn from(val: GraphData) -> Self {
-        Response::json(&serde_json::to_string(&val).unwrap())
+impl IntoResponse for GraphData {
+    fn into_response(self) -> Response {
+        Json(self).into_response()
     }
 }
 
@@ -163,9 +163,9 @@ pub struct SearchResponse {
     pub providers: Vec<SearchResponseProvider>,
 }
 
-impl From<SearchResponse> for Response {
-    fn from(val: SearchResponse) -> Self {
-        Response::json(&serde_json::to_string(&val).unwrap())
+impl IntoResponse for SearchResponse {
+    fn into_response(self) -> Response {
+        Json(self).into_response()
     }
 }
 
@@ -178,9 +178,9 @@ pub struct ServerStatus {
     pub updated_links: Vec<RoamLink>,
 }
 
-impl From<ServerStatus> for Response {
-    fn from(val: ServerStatus) -> Self {
-        Response::json(&serde_json::to_string(&val).unwrap())
+impl IntoResponse for ServerStatus {
+    fn into_response(self) -> Response {
+        Json(self).into_response()
     }
 }
 
@@ -215,9 +215,9 @@ impl OrgAsHTMLResponse {
     }
 }
 
-impl From<OrgAsHTMLResponse> for Response {
-    fn from(val: OrgAsHTMLResponse) -> Self {
-        Response::json(&serde_json::to_string(&val).unwrap())
+impl IntoResponse for OrgAsHTMLResponse {
+    fn into_response(self) -> Response {
+        Json(self).into_response()
     }
 }
 
