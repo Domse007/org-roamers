@@ -11,28 +11,30 @@
 //!
 //! See: the provided server implementation `org_roamers::bin::server::main.rs`.
 
-pub mod api;
 mod diff;
 pub mod error;
 pub mod file;
 mod latex;
 pub mod parser;
-mod perf;
+
 pub mod search;
 pub mod server;
 pub mod sqlite;
 pub mod transform;
 pub mod watcher;
+pub mod websocket;
 
-use api::types::RoamID;
-use api::types::RoamLink;
-use api::types::RoamNode;
 use serde::Deserialize;
 use serde::Serialize;
+use server::types::RoamID;
+use server::types::RoamLink;
+use server::types::RoamNode;
 use sqlite::SqliteConnection;
 use transform::export::HtmlExportSettings;
+use websocket::WebSocketBroadcaster;
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StaticServerConfiguration {
@@ -55,7 +57,7 @@ impl Default for StaticServerConfiguration {
 }
 
 #[derive(Default, Debug)]
-pub(crate) struct DynamicServerState {
+pub struct DynamicServerState {
     pub working_id: Option<(RoamID, Option<RoamID>)>,
     pub pending_reload: bool,
     pub updated_links: Vec<RoamLink>,
@@ -81,7 +83,10 @@ impl DynamicServerState {
                     *last = current.clone();
                     Some(current)
                 }
-                None => Some(current),
+                None => {
+                    *last = Some(current.clone());
+                    Some(current)
+                }
             },
             None => None,
         }
@@ -93,7 +98,8 @@ pub struct ServerState {
     pub html_export_settings: HtmlExportSettings,
     pub org_roam_db_path: PathBuf,
     pub static_conf: StaticServerConfiguration,
-    dynamic_state: DynamicServerState,
+    pub dynamic_state: DynamicServerState,
+    pub websocket_broadcaster: Arc<WebSocketBroadcaster>,
 }
 
 impl ServerState {
@@ -118,6 +124,7 @@ impl ServerState {
             org_roam_db_path: org_roam_db_path.as_ref().to_path_buf(),
             static_conf,
             dynamic_state: DynamicServerState::default(),
+            websocket_broadcaster: Arc::new(WebSocketBroadcaster::new()),
         })
     }
 }

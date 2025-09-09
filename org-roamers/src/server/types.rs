@@ -68,7 +68,7 @@ impl From<String> for RoamTitle {
     }
 }
 
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, Eq)]
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, Eq, Hash)]
 pub struct RoamLink {
     pub from: RoamID,
     pub to: RoamID,
@@ -164,21 +164,6 @@ pub struct SearchResponse {
 }
 
 impl IntoResponse for SearchResponse {
-    fn into_response(self) -> Response {
-        Json(self).into_response()
-    }
-}
-
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub struct ServerStatus {
-    /// is true, when files changed on disk.
-    pub visited_node: Option<RoamID>,
-    pub pending_changes: bool,
-    pub updated_nodes: Vec<RoamNode>,
-    pub updated_links: Vec<RoamLink>,
-}
-
-impl IntoResponse for ServerStatus {
     fn into_response(self) -> Response {
         Json(self).into_response()
     }
@@ -302,18 +287,6 @@ mod tests {
         );
 
         assert_eq!(serde_json::to_string(&data).unwrap(), expected);
-    }
-
-    #[test]
-    fn test_server_status_serialization() {
-        let status = ServerStatus {
-            visited_node: None,
-            pending_changes: true,
-            updated_nodes: vec![],
-            updated_links: vec![],
-        };
-        let expected = "{\"visited_node\":null,\"pending_changes\":true,\"updated_nodes\":[],\"updated_links\":[]}";
-        assert_eq!(serde_json::to_string(&status).unwrap(), expected);
     }
 
     #[test]

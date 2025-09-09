@@ -26,17 +26,44 @@ export interface SearchResponse {
   }[];
 }
 
-export interface ServerStatus {
-  visited_node: string | null;
-  pending_changes: boolean;
-  updated_nodes: RoamNode[];
-  updated_links: RoamLink[];
-}
-
 export interface OrgAsHTMLResponse {
   org: string;
   links: {
     display: string;
     id: string;
   }[];
+}
+
+export interface WebSocketMessage {
+  type: string;
+}
+
+export interface StatusUpdateMessage extends WebSocketMessage {
+  type: "status_update";
+  visited_node: string | null;
+  pending_changes: boolean;
+  updated_nodes: RoamNode[];
+  updated_links: RoamLink[];
+}
+
+export interface NodeVisitedMessage extends WebSocketMessage {
+  type: "node_visited";
+  node_id: string;
+}
+
+export interface GraphUpdateMessage extends WebSocketMessage {
+  type: "graph_update";
+  new_nodes: RoamNode[];
+  updated_nodes: RoamNode[];
+  new_links: RoamLink[];
+  removed_nodes: string[];
+  removed_links: RoamLink[];
+}
+
+export interface PingMessage extends WebSocketMessage {
+  type: "ping";
+}
+
+export interface PongMessage extends WebSocketMessage {
+  type: "pong";
 }

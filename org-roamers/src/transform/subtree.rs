@@ -6,7 +6,7 @@ use orgize::{
     Org,
 };
 
-use crate::api::types::RoamID;
+use crate::server::types::RoamID;
 
 /// Get the subtree of a given node.
 /// ```rust

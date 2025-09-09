@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use crate::{
-    api::types::RoamLink, sqlite::rebuild, transform::org::get_nodes_from_file, ServerState,
+    server::types::RoamLink, sqlite::rebuild, transform::org::get_nodes_from_file, ServerState,
 };
 
 pub fn diff<P: AsRef<Path>>(state: &mut ServerState, file: P) -> anyhow::Result<()> {

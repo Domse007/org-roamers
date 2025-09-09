@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use anyhow::Result;
 use rusqlite::Connection;
 
-use crate::{api::types::SearchResponseElement, transform::title::TitleSanitizer};
+use crate::{server::types::SearchResponseElement, transform::title::TitleSanitizer};
 
 #[derive(PartialEq, Debug)]
 pub struct ForNode<'a> {

@@ -166,43 +166,116 @@ function highlightEdgesFromNode(sourceNode: unknown, color: string) {
 const incrementalGraphUpdate = (updates: {
   nodes: RoamNode[];
   links: RoamLink[];
+  removedNodes?: string[];
+  removedLinks?: RoamLink[];
 }) => {
   const style = window.getComputedStyle(document.body);
   const nodeColor = style.getPropertyValue("--node");
   const nodeBorderColor = style.getPropertyValue("--node-border");
+
+  // Handle node removals first
+  if (updates.removedNodes) {
+    for (const nodeId of updates.removedNodes) {
+      try {
+        if (graph.hasNode(nodeId)) {
+          graph.dropNode(nodeId);
+          console.log(`Removed node: ${nodeId}`);
+        }
+      } catch (err) {
+        console.log(`Error removing node ${nodeId}: ${err}`);
+      }
+    }
+  }
+
+  // Handle link removals
+  if (updates.removedLinks) {
+    for (const link of updates.removedLinks) {
+      try {
+        if (graph.hasEdge(link.from, link.to)) {
+          graph.dropEdge(link.from, link.to);
+          console.log(`Removed link: ${link.from} -> ${link.to}`);
+        }
+      } catch (err) {
+        console.log(`Error removing link ${link.from} -> ${link.to}: ${err}`);
+      }
+    }
+  }
+
+  // Handle node additions and updates
   for (const node of updates.nodes) {
     try {
-      graph.addNode(node.id, {
-        label: node.title,
-        x: randomNumber(1, 100),
-        y: randomNumber(1, 100),
-        size: node.num_links / 2 <= 5 ? 5 : node.num_links / 2,
-        color: nodeColor,
-        borderColor: nodeBorderColor,
-      });
+      if (graph.hasNode(node.id)) {
+        // Update existing node
+        graph.mergeNodeAttributes(node.id, {
+          label: node.title,
+          size: node.num_links / 2 <= 5 ? 5 : node.num_links / 2,
+          color: nodeColor,
+          borderColor: nodeBorderColor,
+        });
+        console.log(`Updated node: ${node.id} (${node.title})`);
+      } else {
+        // Add new node
+        graph.addNode(node.id, {
+          label: node.title,
+          x: randomNumber(1, 100),
+          y: randomNumber(1, 100),
+          size: node.num_links / 2 <= 5 ? 5 : node.num_links / 2,
+          color: nodeColor,
+          borderColor: nodeBorderColor,
+        });
+        console.log(`Added new node: ${node.id} (${node.title})`);
+      }
     } catch (err) {
       console.log(`${node.id} (${node.title}): ${err}`);
     }
   }
+
+  // Handle link additions
   const edgeColor = style.getPropertyValue("--overlay");
   for (const link of updates.links) {
     try {
-      graph.addEdge(link.from, link.to, { color: edgeColor });
+      if (!graph.hasEdge(link.from, link.to)) {
+        graph.addEdge(link.from, link.to, { color: edgeColor });
+        console.log(`Added new link: ${link.from} -> ${link.to}`);
+      }
     } catch (error) {
       console.log(`${link.from}->${link.to}: ${error}`);
     }
   }
-  document.getElementById("graph")!.innerHTML = "";
-  setupGraph();
-  // bit sketchy...
-  zoomOnto(old_node, old_node);
+
+  // Only rebuild the graph if we have significant changes
+  const hasSignificantChanges =
+    (updates.removedNodes && updates.removedNodes.length > 0) ||
+    (updates.removedLinks && updates.removedLinks.length > 0) ||
+    updates.nodes.length > 10 || // Threshold for rebuilding
+    updates.links.length > 10;
+
+  if (hasSignificantChanges) {
+    document.getElementById("graph")!.innerHTML = "";
+    setupGraph();
+  } else {
+    // Just refresh the sigma instance for smaller changes
+    if (sigma) {
+      sigma.refresh();
+    }
+  }
+
+  // Maintain zoom on current node if it still exists
+  if (old_node && graph.hasNode(old_node)) {
+    zoomOnto(old_node, old_node);
+  }
 };
 
 const prop = defineProps<{
   count: number;
   toggleLayouter: boolean;
   zoomNode: string;
-  updates: { nodes: RoamNode[]; links: RoamLink[] } | null;
+  updates: {
+    nodes: RoamNode[];
+    links: RoamLink[];
+    removedNodes?: string[];
+    removedLinks?: RoamLink[];
+  } | null;
 }>();
 
 let old_count = 0;
@@ -228,7 +301,12 @@ watch(prop, () => {
     old_node = prop.zoomNode;
   }
   if (prop.updates != null) {
-    console.log("STARTING TO UPDATE GRAPH");
+    console.log("STARTING TO UPDATE GRAPH", {
+      nodes: prop.updates.nodes.length,
+      links: prop.updates.links.length,
+      removedNodes: prop.updates.removedNodes?.length || 0,
+      removedLinks: prop.updates.removedLinks?.length || 0,
+    });
     incrementalGraphUpdate(prop.updates);
   }
 });

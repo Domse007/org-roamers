@@ -86,6 +86,13 @@ impl SqliteConnection {
             .map_err(Into::into)
     }
 
+    pub fn execute<P>(&self, sql: &str, params: P) -> Result<usize, ServerError>
+    where
+        P: Params,
+    {
+        self.connection.execute(sql, params).map_err(Into::into)
+    }
+
     pub fn connection(&mut self) -> &mut Connection {
         &mut self.connection
     }

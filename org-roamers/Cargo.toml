@@ -13,7 +13,7 @@ chardetng = "0.1.17"
 encoding_rs = "0.8.35"
 notify = "8.0.0"
 orgize = "0.10.0-alpha.10"
-axum = "0.7"
+axum = { version = "0.7", features = ["ws"] }
 tokio = { version = "1.0", features = ["full"] }
 tower = "0.4"
 tower-http = { version = "0.5", features = ["fs", "cors"] }
@@ -24,6 +24,8 @@ tempfile = "3.14.0"
 thiserror = "2.0.12"
 tracing = { version = "0.1.41", features = ["log"] }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+tokio-tungstenite = "0.21"
+futures-util = "0.3"
 
 [dependencies.include_dir]
 version = "0.7.4"
