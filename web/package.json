@@ -19,6 +19,7 @@
     "graphology-layout-forceatlas2": "^0.10.1",
     "highlight.js": "^11.11.1",
     "highlightjs": "^9.16.2",
+    "highlightjs-cobol": "^0.3.3",
     "katex": "^0.16.22",
     "run-p": "^0.0.0",
     "sigma": "^3.0.1",

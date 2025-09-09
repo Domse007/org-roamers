@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import hljs from "highlight.js";
+import hljsCOBOL from "highlightjs-cobol";
 import { nextTick, ref, useTemplateRef, watch, type Ref } from "vue";
 import renderMathInElement from "katex/contrib/auto-render";
 import { getScope } from "../settings.ts";
@@ -95,6 +96,8 @@ const katexOptions = {
       });
   },
 };
+
+hljs.registerLanguage("cobol", hljsCOBOL);
 
 // Updpate the selector from 'pre code' to 'code' to autodetect inline src
 // like src_java[:exports code]{ void main() } which has no <pre></pre>.
