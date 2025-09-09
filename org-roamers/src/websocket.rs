@@ -38,8 +38,8 @@ use axum::extract::ws::{Message, WebSocket};
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use tokio::sync::{broadcast, RwLock};
+use std::sync::Arc;
+use tokio::sync::{broadcast, Mutex, RwLock};
 use tokio::time::Duration;
 use tracing::{error, info, warn};
 
@@ -334,7 +334,11 @@ pub async fn handle_websocket(socket: WebSocket, broadcaster: Arc<WebSocketBroad
                 }
                 Ok(Message::Ping(data)) => {
                     info!("Received ping from client {}, sending pong", client_id);
-                    if let Err(e) = sender.send(Message::Pong(data)).await {
+                    let result = {
+                        let mut guard = sender.lock().await;
+                        guard.send(Message::Pong(data)).await
+                    };
+                    if let Err(e) = result {
                         error!("Failed to send pong to client {}: {}", client_id, e);
                         break;
                     }
@@ -368,12 +372,11 @@ pub async fn handle_websocket(socket: WebSocket, broadcaster: Arc<WebSocketBroad
 
         // Send initial ping to test connection
         let initial_ping = serde_json::to_string(&WebSocketMessage::Ping).unwrap();
-        if let Err(e) = sender
-            .lock()
-            .unwrap()
-            .send(Message::Text(initial_ping))
-            .await
-        {
+        let result = {
+            let mut guard = sender.lock().await;
+            guard.send(Message::Text(initial_ping)).await
+        };
+        if let Err(e) = result {
             error!("Failed to send initial ping to client {}: {}", client_id, e);
             return;
         }
@@ -402,7 +405,11 @@ pub async fn handle_websocket(socket: WebSocket, broadcaster: Arc<WebSocketBroad
                                 }
                             };
 
-                            if let Err(e) = sender.lock().unwrap().send(Message::Text(json)).await {
+                            let result = {
+                                let mut guard = sender.lock().await;
+                                guard.send(Message::Text(json)).await
+                            };
+                            if let Err(e) = result {
                                 error!("Failed to send {} message to client {}: {}", message_type, client_id, e);
                                 break;
                             }
@@ -423,7 +430,11 @@ pub async fn handle_websocket(socket: WebSocket, broadcaster: Arc<WebSocketBroad
                 _ = ping_interval.tick() => {
                     info!("Sending periodic ping to client {}", client_id);
                     let ping_msg = serde_json::to_string(&WebSocketMessage::Ping).unwrap();
-                    if let Err(e) = sender.lock().unwrap().send(Message::Text(ping_msg)).await {
+                    let result = {
+                        let mut guard = sender.lock().await;
+                        guard.send(Message::Text(ping_msg)).await
+                    };
+                    if let Err(e) = result {
                         error!("Failed to send periodic ping to client {}: {}", client_id, e);
                         break;
                     }
