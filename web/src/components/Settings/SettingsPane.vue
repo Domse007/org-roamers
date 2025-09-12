@@ -31,6 +31,14 @@ const switchSettingsPage = (page: MouseEvent) => {
     activePage.value = target.innerHTML;
   }
 };
+
+// Props for connection status
+const props = defineProps<{
+  connectionStatus?: "connecting" | "connected" | "disconnected";
+  pendingChanges?: boolean;
+  websocketState?: number | null;
+  websocketUrl?: string;
+}>();
 </script>
 
 <template>
@@ -75,6 +83,10 @@ const switchSettingsPage = (page: MouseEvent) => {
         <SettingsGeneral
           v-if="activePage == 'General'"
           @toggle-layouter="$emit('toggleLayouter')"
+          :connectionStatus="props.connectionStatus"
+          :pendingChanges="props.pendingChanges"
+          :websocketState="props.websocketState"
+          :websocketUrl="props.websocketUrl"
         ></SettingsGeneral>
         <SettingsFilter v-if="activePage == 'Filter'"></SettingsFilter>
       </div>

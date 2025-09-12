@@ -8,11 +8,7 @@ use anyhow::Result;
 use args::CliArgs;
 use cli::run_cli_server;
 use conf::Configuration;
-use org_roamers::{
-    ServerState, StaticServerConfiguration,
-    api::APICalls,
-    server::{self, start_server},
-};
+use org_roamers::{ServerState, StaticServerConfiguration, server::start_server};
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -44,15 +40,6 @@ pub fn entry(args: Vec<String>) -> Result<ExitCode> {
         roam_path: cli_args.path.into(),
         ip_addr: "0.0.0.0".to_string(),
         port: 5000,
-    };
-
-    let calls = APICalls {
-        default_route: server::default_route_content,
-        get_graph_data: server::get_graph_data,
-        get_org_as_html: server::get_org_as_html,
-        serve_search_results: server::search,
-        serve_latex_svg: server::get_latex_svg,
-        get_status_data: server::get_status_data,
     };
 
     let server_conf_path = {
@@ -106,7 +93,7 @@ pub fn entry(args: Vec<String>) -> Result<ExitCode> {
         return Ok(ExitCode::SUCCESS);
     }
 
-    let runtime = start_server(configuration.get_url(false), calls, global).unwrap();
+    let runtime = start_server(configuration.get_url(false), global).unwrap();
 
     info!("Starting CLI...");
 

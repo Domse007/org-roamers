@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::Read;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -24,34 +24,35 @@ use emacs::route_emacs_traffic;
 use orgize::Org;
 use rusqlite::fallible_streaming_iterator::FallibleStreamingIterator;
 
-use crate::api::types::GraphData;
-use crate::api::types::OrgAsHTMLResponse;
-use crate::api::types::OutgoingLink;
-use crate::api::types::RoamID;
-use crate::api::types::RoamLink;
-use crate::api::types::RoamNode;
-use crate::api::types::RoamTitle;
-use crate::api::types::SearchResponse;
-use crate::api::types::SearchResponseProvider;
-use crate::api::types::ServerStatus;
-use crate::api::APICalls;
-use crate::api::APICallsInternal;
 use crate::diff;
 use crate::latex;
 use crate::search::Search;
 use crate::server::emacs::EmacsRequest;
+use crate::server::types::GraphData;
+use crate::server::types::OrgAsHTMLResponse;
+use crate::server::types::OutgoingLink;
+use crate::server::types::RoamID;
+use crate::server::types::RoamLink;
+use crate::server::types::RoamNode;
+use crate::server::types::RoamTitle;
+use crate::server::types::SearchResponse;
+use crate::server::types::SearchResponseProvider;
 use crate::sqlite::helpers;
 use crate::sqlite::olp;
 use crate::transform::export::HtmlExport;
 use crate::transform::subtree::Subtree;
 use crate::transform::title::TitleSanitizer;
 use crate::watcher;
+use crate::websocket::handle_websocket;
 use crate::ServerState;
 
 pub mod data;
 pub mod emacs;
+pub mod types;
 
-type AppState = Arc<Mutex<(ServerState, APICallsInternal, Arc<Mutex<bool>>)>>;
+use axum::extract::ws::WebSocketUpgrade;
+
+type AppState = Arc<Mutex<(ServerState, Arc<Mutex<bool>>)>>;
 
 pub struct ServerRuntime {
     handle: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>>,
@@ -69,11 +70,7 @@ impl ServerRuntime {
     }
 }
 
-pub fn start_server(
-    url: String,
-    calls: APICalls,
-    state: ServerState,
-) -> Result<ServerRuntime, Box<dyn Error>> {
+pub fn start_server(url: String, state: ServerState) -> Result<ServerRuntime, Box<dyn Error>> {
     tracing::info!("Using server configuration: {:?}", state.static_conf);
 
     tracing::info!(
@@ -81,22 +78,10 @@ pub fn start_server(
         serde_json::to_string(&state.html_export_settings).unwrap()
     );
 
-    let calls: APICallsInternal = calls.into();
-
     let org_roam_db_path = state.org_roam_db_path.clone();
     let use_fs_watcher = state.static_conf.fs_watcher;
 
-    let mut changes_flag = Arc::new(Mutex::new(false));
-    if use_fs_watcher {
-        tracing::info!("Starting fs watcher.");
-        let (_watcher, _changes_flag) = watcher::watcher(org_roam_db_path.clone())?;
-        changes_flag = _changes_flag;
-        // For now, disable file watcher integration to avoid state cloning issues
-        // This will be properly implemented in a future update
-        tracing::warn!("File watcher integration temporarily disabled in Axum version");
-    }
-
-    let app_state = Arc::new(Mutex::new((state, calls, changes_flag.clone())));
+    let app_state = Arc::new(Mutex::new((state, Arc::new(Mutex::new(false)))));
 
     let app = Router::new()
         .route("/", get(default_route))
@@ -104,22 +89,37 @@ pub fn start_server(
         .route("/search", get(search_handler))
         .route("/graph", get(get_graph_data_handler))
         .route("/latex", get(get_latex_svg_handler))
-        .route("/status", get(get_status_handler))
+        .route("/ws", get(websocket_handler))
         .route("/emacs", post(emacs_handler))
         .route("/assets", get(serve_assets_handler))
         .fallback(fallback_handler)
         .layer(CorsLayer::permissive())
-        .with_state(app_state);
+        .with_state(app_state.clone());
 
     let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
 
     let handle = std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new()?;
         rt.block_on(async {
+            // Start file watcher with WebSocket integration if enabled
+            if use_fs_watcher {
+                tracing::info!("Starting WebSocket-integrated file watcher.");
+                let app_state_clone = app_state.clone();
+                let watch_path = org_roam_db_path.clone();
+                let runtime_handle = tokio::runtime::Handle::current();
+
+                let _watcher_handle = watcher::start_watcher_runtime(
+                    app_state_clone,
+                    watch_path,
+                    Some(runtime_handle),
+                )?;
+            }
+
             let listener = tokio::net::TcpListener::bind(&url).await?;
             tracing::info!("Server listening on {}", url);
 
-            let server = axum::serve(listener, app);
+            // Configure server with proper keepalive and timeout settings
+            let server = axum::serve(listener, app).tcp_nodelay(true);
 
             // Set up graceful shutdown
             tokio::select! {
@@ -149,9 +149,9 @@ pub fn start_server(
 
 async fn default_route(State(app_state): State<AppState>) -> Response {
     let mut state = app_state.lock().unwrap();
-    let (ref mut server_state, ref mut calls, _) = *state;
+    let (ref mut server_state, _) = *state;
     let conf = server_state.static_conf.root.to_string();
-    calls.default_route(server_state, conf, None)
+    default_route_content(server_state, conf, None)
 }
 
 async fn get_org_as_html_handler(
@@ -159,7 +159,7 @@ async fn get_org_as_html_handler(
     State(app_state): State<AppState>,
 ) -> Response {
     let mut state = app_state.lock().unwrap();
-    let (ref mut server_state, ref mut calls, _) = *state;
+    let (ref mut server_state, _) = *state;
 
     let scope = params
         .get("scope")
@@ -174,9 +174,7 @@ async fn get_org_as_html_handler(
         },
     };
 
-    calls
-        .get_org_as_html(server_state, query, scope)
-        .into_response()
+    get_org_as_html(server_state, query, scope).into_response()
 }
 
 async fn search_handler(
@@ -184,20 +182,18 @@ async fn search_handler(
     State(app_state): State<AppState>,
 ) -> Response {
     let mut state = app_state.lock().unwrap();
-    let (ref mut server_state, ref mut calls, _) = *state;
+    let (ref mut server_state, _) = *state;
 
     match params.get("q") {
-        Some(query) => calls
-            .serve_search_results(server_state, query.clone())
-            .into_response(),
+        Some(query) => search(server_state, query.clone()).into_response(),
         None => StatusCode::NOT_FOUND.into_response(),
     }
 }
 
 async fn get_graph_data_handler(State(app_state): State<AppState>) -> impl IntoResponse {
     let mut state = app_state.lock().unwrap();
-    let (ref mut server_state, ref mut calls, _) = *state;
-    calls.get_graph_data(server_state)
+    let (ref mut server_state, _) = *state;
+    get_graph_data(server_state)
 }
 
 async fn get_latex_svg_handler(
@@ -205,20 +201,24 @@ async fn get_latex_svg_handler(
     State(app_state): State<AppState>,
 ) -> Response {
     let mut state = app_state.lock().unwrap();
-    let (ref mut server_state, ref mut calls, _) = *state;
+    let (ref mut server_state, _) = *state;
 
     match (params.get("tex"), params.get("color"), params.get("id")) {
         (Some(tex), Some(color), Some(id)) => {
-            calls.serve_latex_svg(server_state, tex.clone(), color.clone(), id.clone())
+            get_latex_svg(server_state, tex.clone(), color.clone(), id.clone())
         }
         _ => StatusCode::NOT_FOUND.into_response(),
     }
 }
 
-async fn get_status_handler(State(app_state): State<AppState>) -> impl IntoResponse {
-    let mut state = app_state.lock().unwrap();
-    let (ref mut server_state, ref mut calls, ref changes_flag) = *state;
-    calls.get_status_data(server_state, changes_flag.clone())
+async fn websocket_handler(ws: WebSocketUpgrade, State(app_state): State<AppState>) -> Response {
+    let broadcaster = {
+        let state = app_state.lock().unwrap();
+        let (ref server_state, _) = *state;
+        server_state.websocket_broadcaster.clone()
+    };
+
+    ws.on_upgrade(move |socket| handle_websocket(socket, broadcaster))
 }
 
 async fn emacs_handler(
@@ -230,13 +230,41 @@ async fn emacs_handler(
     match route_emacs_traffic(params) {
         Ok(req) => {
             let mut state = app_state.lock().unwrap();
-            let (ref mut server_state, _, _) = *state;
+            let (ref mut server_state, _) = *state;
 
             match req {
                 EmacsRequest::BufferOpened(id) => {
-                    server_state.dynamic_state.update_working_id(id.into());
+                    let roam_id: RoamID = id.clone().into();
+                    server_state
+                        .dynamic_state
+                        .update_working_id(roam_id.clone());
+
+                    // Broadcast node visit via WebSocket
+                    let broadcaster = server_state.websocket_broadcaster.clone();
+                    tokio::spawn(async move {
+                        broadcaster.broadcast_node_visited(roam_id).await;
+                    });
                 }
                 EmacsRequest::BufferModified(file) => {
+                    // Broadcast pending changes status
+                    let broadcaster = server_state.websocket_broadcaster.clone();
+                    let visited_node = server_state
+                        .dynamic_state
+                        .working_id
+                        .as_ref()
+                        .map(|(id, _)| id.clone());
+
+                    tokio::spawn(async move {
+                        broadcaster
+                            .broadcast_status_update(
+                                visited_node,
+                                true,   // pending_changes = true
+                                vec![], // updated_nodes will be populated by watcher
+                                vec![], // updated_links will be populated by watcher
+                            )
+                            .await;
+                    });
+
                     if let Err(err) = diff::diff(server_state, file) {
                         tracing::error!("An error occurred while updating db: {err}");
                     }
@@ -248,18 +276,26 @@ async fn emacs_handler(
     }
 }
 
-async fn serve_assets_handler(AxumQuery(params): AxumQuery<HashMap<String, String>>) -> Response {
+async fn serve_assets_handler(
+    AxumQuery(params): AxumQuery<HashMap<String, String>>,
+    State(app_state): State<AppState>,
+) -> Response {
     match params.get("file") {
-        Some(path) => serve_assets(path.clone()),
+        Some(path) => {
+            let state = app_state.lock().unwrap();
+            let (ref server_state, _) = *state;
+            let org_roam_path = &server_state.org_roam_db_path;
+            serve_assets(org_roam_path, path.clone())
+        }
         None => StatusCode::NOT_FOUND.into_response(),
     }
 }
 
 async fn fallback_handler(uri: axum::http::Uri, State(app_state): State<AppState>) -> Response {
     let mut state = app_state.lock().unwrap();
-    let (ref mut server_state, ref mut calls, _) = *state;
+    let (ref mut server_state, _) = *state;
     let conf = server_state.static_conf.root.to_string();
-    calls.default_route(server_state, conf, Some(uri.path().to_string()))
+    default_route_content(server_state, conf, Some(uri.path().to_string()))
 }
 
 pub fn default_route_content(_db: &mut ServerState, root: String, url: Option<String>) -> Response {
@@ -342,9 +378,14 @@ pub fn get_org_as_html(db: &mut ServerState, query: Query, scope: String) -> Org
         Subtree::get(id.into(), contents.as_str()).unwrap_or(contents)
     };
 
-    // FIXME: This is VERY BAD!! file is an absolute path, but it should be
-    //        relative to the root of the org-roam dir.
-    let mut handler = HtmlExport::new(&db.html_export_settings, file);
+    // Convert absolute path to relative path from org-roam directory
+    let relative_file = PathBuf::from(&file)
+        .strip_prefix(&db.org_roam_db_path)
+        .unwrap_or(Path::new(&file))
+        .to_string_lossy()
+        .to_string();
+
+    let mut handler = HtmlExport::new(&db.html_export_settings, relative_file);
     Org::parse(contents).traverse(&mut handler);
 
     let (org, outgoing_links) = handler.finish();
@@ -496,39 +537,10 @@ pub fn get_latex_svg(db: &mut ServerState, tex: String, color: String, id: Strin
     }
 }
 
-pub fn get_status_data(state: &mut ServerState, changes_flag: Arc<Mutex<bool>>) -> ServerStatus {
-    let mut changes = changes_flag.lock().unwrap();
+pub fn serve_assets<P: AsRef<Path>>(root: P, file: String) -> Response {
+    let file_path = root.as_ref().join(&file);
 
-    let mut updated_nodes = state
-        .dynamic_state
-        .updated_nodes
-        .drain(..)
-        .collect::<Vec<_>>();
-    updated_nodes.sort();
-    updated_nodes.dedup();
-
-    let mut updated_links = state
-        .dynamic_state
-        .updated_links
-        .drain(..)
-        .collect::<Vec<_>>();
-    updated_links.sort();
-    updated_links.dedup();
-
-    let status = ServerStatus {
-        visited_node: state.dynamic_state.get_working_id().cloned(),
-        pending_changes: *changes || state.dynamic_state.pending_reload,
-        updated_nodes,
-        updated_links,
-    };
-    *changes = false;
-    status
-}
-
-pub fn serve_assets(file: String) -> Response {
-    let file = PathBuf::from(file);
-
-    let mime = match file.extension() {
+    let mime = match PathBuf::from(&file).extension() {
         Some(extension) => match extension.to_str().unwrap() {
             "jpeg" | "jpg" => "image/jpeg",
             "png" => "image/png",
@@ -541,7 +553,7 @@ pub fn serve_assets(file: String) -> Response {
     };
 
     let mut buffer = vec![];
-    let mut source_file = match File::open(file) {
+    let mut source_file = match File::open(&file_path) {
         Ok(file) => file,
         Err(_) => return StatusCode::NOT_FOUND.into_response(),
     };

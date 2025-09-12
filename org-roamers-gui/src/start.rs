@@ -1,10 +1,6 @@
 use std::{fs, path::PathBuf};
 
-use org_roamers::{
-    ServerState, StaticServerConfiguration,
-    api::APICalls,
-    server::{self, ServerRuntime},
-};
+use org_roamers::{ServerState, StaticServerConfiguration, server::ServerRuntime};
 
 use crate::OrgRoamersGUI;
 
@@ -37,15 +33,6 @@ fn server_conf_path() -> PathBuf {
 pub fn start_server(ctx: &OrgRoamersGUI) -> anyhow::Result<ServerRuntime> {
     let url = ctx.url()?;
 
-    let calls = APICalls {
-        default_route: server::default_route_content,
-        get_graph_data: server::get_graph_data,
-        get_org_as_html: server::get_org_as_html,
-        serve_search_results: server::search,
-        serve_latex_svg: server::get_latex_svg,
-        get_status_data: server::get_status_data,
-    };
-
     let mut server_configuration = match fs::read_to_string(server_conf_path()) {
         Ok(content) => serde_json::from_str(content.as_str()).unwrap(),
         Err(err) => {
@@ -67,5 +54,5 @@ pub fn start_server(ctx: &OrgRoamersGUI) -> anyhow::Result<ServerRuntime> {
         anyhow::bail!("An error occured: {err}");
     }
 
-    Ok(server::start_server(url, calls, state).unwrap())
+    Ok(org_roamers::server::start_server(url, state).unwrap())
 }
