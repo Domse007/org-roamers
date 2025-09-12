@@ -12,7 +12,7 @@ impl RoamID {
     }
 
     /// ```rust
-    /// use org_roamers::api::types::RoamID;
+    /// use org_roamers::server::types::RoamID;
     ///
     /// let id: RoamID = "t t".into();
     /// assert_eq!(id.with_quotes(3), "\"\"\"t t\"\"\"");

@@ -67,3 +67,19 @@ export interface PingMessage extends WebSocketMessage {
 export interface PongMessage extends WebSocketMessage {
   type: "pong";
 }
+
+export interface SearchRequestMessage extends WebSocketMessage {
+  type: "search_request";
+  query: string;
+  request_id: string;
+}
+
+export interface SearchResponseMessage extends WebSocketMessage {
+  type: "search_response";
+  request_id: string;
+  results: {
+    display: string;
+    id: string;
+    tags: string[];
+  }[];
+}

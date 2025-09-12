@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import PreviewFrame from "./components/PreviewFrame.vue";
 import GraphView from "./components/GraphView.vue";
-import SearchBar from "./components/SearchBar.vue";
+import SearchBar, { type SearchBarMethods } from "./components/SearchBar.vue";
 import SettingsPane from "./components/Settings/SettingsPane.vue";
 import ErrorDialog from "./components/ErrorDialog.vue";
-import { onMounted, onUnmounted, type Ref, ref } from "vue";
+import { onMounted, onUnmounted, type Ref, ref, provide } from "vue";
 import { type RoamLink, type RoamNode } from "./types.ts";
 
 const connectionStatus: Ref<"connecting" | "connected" | "disconnected"> =
@@ -39,23 +39,29 @@ const graphUpdatesRef: Ref<{
   removedLinks?: RoamLink[];
 } | null> = ref(null);
 
-let websocket: WebSocket | null = null;
+// Reference to SearchBar component to handle search responses
+const searchBarRef = ref<SearchBarMethods | null>(null);
+
+const websocket: Ref<WebSocket | null> = ref(null);
+
+// Provide WebSocket to child components
+provide('websocket', websocket);
 
 const connectWebSocket = () => {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   const wsUrl = `${protocol}//${window.location.host}/ws`;
 
   console.log(`Attempting to connect to WebSocket: ${wsUrl}`);
-  websocket = new WebSocket(wsUrl);
+  websocket.value = new WebSocket(wsUrl);
 
-  websocket.onopen = () => {
+  websocket.value.onopen = () => {
     console.log("WebSocket connected successfully");
-    console.log("WebSocket readyState:", websocket?.readyState);
+    console.log("WebSocket readyState:", websocket.value?.readyState);
     connectionStatus.value = "connected";
     errorMessage.value = null;
   };
 
-  websocket.onmessage = (event) => {
+  websocket.value.onmessage = (event) => {
     try {
       const message = JSON.parse(event.data);
       console.log("WebSocket message received:", message.type, message);
@@ -121,9 +127,9 @@ const connectWebSocket = () => {
         case "ping":
           // Respond to ping with pong
           console.log("Received ping, sending pong");
-          if (websocket && websocket.readyState === WebSocket.OPEN) {
+          if (websocket.value && websocket.value.readyState === WebSocket.OPEN) {
             try {
-              websocket.send(JSON.stringify({ type: "pong" }));
+              websocket.value.send(JSON.stringify({ type: "pong" }));
               console.log("Pong sent successfully");
             } catch (error) {
               console.error("Failed to send pong:", error);
@@ -131,8 +137,18 @@ const connectWebSocket = () => {
           } else {
             console.warn(
               "Cannot send pong - WebSocket not open. ReadyState:",
-              websocket?.readyState,
+              websocket.value?.readyState,
             );
+          }
+          break;
+
+        case "search_response":
+          // Forward search responses to SearchBar component
+          console.log("Search response received:", message.request_id, message.results.length, "results");
+          if (searchBarRef.value) {
+            searchBarRef.value.handleSearchResponse(message);
+          } else {
+            console.warn("SearchBar component not available");
           }
           break;
 
@@ -144,14 +160,14 @@ const connectWebSocket = () => {
     }
   };
 
-  websocket.onerror = (error) => {
+  websocket.value.onerror = (error) => {
     console.error("WebSocket error occurred:", error);
-    console.log("WebSocket readyState during error:", websocket?.readyState);
+    console.log("WebSocket readyState during error:", websocket.value?.readyState);
     connectionStatus.value = "disconnected";
     errorMessage.value = "WebSocket connection error.";
   };
 
-  websocket.onclose = (event) => {
+  websocket.value.onclose = (event) => {
     console.log(
       "WebSocket closed - Code:",
       event.code,
@@ -194,15 +210,15 @@ onMounted(() => {
 
   // Add periodic connection health check
   setInterval(() => {
-    if (websocket) {
+    if (websocket.value) {
       console.log(
         "WebSocket health check - ReadyState:",
-        websocket.readyState,
+        websocket.value.readyState,
         "Status:",
         connectionStatus.value,
       );
       if (
-        websocket.readyState === WebSocket.CLOSED &&
+        websocket.value.readyState === WebSocket.CLOSED &&
         connectionStatus.value !== "connecting"
       ) {
         console.warn(
@@ -217,8 +233,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   console.log("Component unmounting, closing WebSocket");
-  if (websocket) {
-    websocket.close(1000, "Component unmounting");
+  if (websocket.value) {
+    websocket.value.close(1000, "Component unmounting");
   }
 });
 
@@ -231,7 +247,7 @@ const closeError = () => (errorMessage.value = null);
     <ErrorDialog v-if="errorMessage != null" @dialog-close="closeError">{{
       errorMessage
     }}</ErrorDialog>
-    <SearchBar @open-node="updatePreviewID"></SearchBar>
+    <SearchBar ref="searchBarRef" @open-node="updatePreviewID"></SearchBar>
     <GraphView
       @open-node="updatePreviewID"
       @updates-processed="clearGraphUpdates"

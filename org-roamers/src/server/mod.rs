@@ -44,6 +44,7 @@ use crate::transform::subtree::Subtree;
 use crate::transform::title::TitleSanitizer;
 use crate::watcher;
 use crate::websocket::handle_websocket;
+
 use crate::ServerState;
 
 pub mod data;
@@ -218,8 +219,11 @@ async fn websocket_handler(ws: WebSocketUpgrade, State(app_state): State<AppStat
         server_state.websocket_broadcaster.clone()
     };
 
-    ws.on_upgrade(move |socket| handle_websocket(socket, broadcaster))
+    let app_state_clone = app_state.clone();
+    ws.on_upgrade(move |socket| handle_websocket(socket, broadcaster, app_state_clone))
 }
+
+
 
 async fn emacs_handler(
     AxumQuery(params): AxumQuery<HashMap<String, String>>,

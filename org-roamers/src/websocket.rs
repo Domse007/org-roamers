@@ -55,6 +55,18 @@ pub type ClientId = u64;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum WebSocketMessage {
+    /// Search request from client
+    #[serde(rename = "search_request")]
+    SearchRequest {
+        query: String,
+        request_id: String,
+    },
+    /// Search results response
+    #[serde(rename = "search_response")]
+    SearchResponse {
+        request_id: String,
+        results: Vec<crate::server::types::SearchResponseElement>,
+    },
     /// Status update about the current state of the application
     ///
     /// Sent when:
@@ -158,6 +170,8 @@ impl WebSocketBroadcaster {
 
     pub async fn broadcast(&self, message: WebSocketMessage) {
         let message_type = match &message {
+            WebSocketMessage::SearchRequest { .. } => "search_request",
+            WebSocketMessage::SearchResponse { .. } => "search_response",
             WebSocketMessage::StatusUpdate { .. } => "status_update",
             WebSocketMessage::GraphUpdate { .. } => "graph_update",
             WebSocketMessage::NodeVisited { .. } => "node_visited",
@@ -264,12 +278,17 @@ impl WebSocketBroadcaster {
 /// - Proper cleanup when the connection closes
 /// - Message broadcasting from the server to client
 /// - Basic message handling from client to server
+/// - Search request processing
 ///
 /// # Arguments
 ///
 /// * `socket` - The WebSocket connection
 /// * `broadcaster` - Shared broadcaster instance for message distribution
-pub async fn handle_websocket(socket: WebSocket, broadcaster: Arc<WebSocketBroadcaster>) {
+pub async fn handle_websocket(
+    socket: WebSocket, 
+    broadcaster: Arc<WebSocketBroadcaster>,
+    app_state: Arc<std::sync::Mutex<(crate::ServerState, Arc<std::sync::Mutex<bool>>)>>,
+) {
     let (client_id, mut receiver) = broadcaster.add_client().await;
     let (sender, mut ws_receiver) = socket.split();
     let sender = Arc::new(Mutex::new(sender));
@@ -300,6 +319,33 @@ pub async fn handle_websocket(socket: WebSocket, broadcaster: Arc<WebSocketBroad
                         }
                         Ok(WebSocketMessage::Pong) => {
                             info!("Received pong from client {}", client_id);
+                        }
+                        Ok(WebSocketMessage::SearchRequest { query, request_id }) => {
+                            info!("Received search request from client {}: {}", client_id, query);
+                            
+                            // Process search in a separate task to avoid blocking
+                            let app_state_clone = app_state.clone();
+                            let broadcaster_clone = broadcaster_clone.clone();
+                            tokio::spawn(async move {
+                                let results = {
+                                    let mut state_guard = app_state_clone.lock().unwrap();
+                                    let (ref mut server_state, _) = *state_guard;
+                                    crate::server::search(server_state, query)
+                                };
+                                
+                                // Extract results from the first provider (usually sqlite)
+                                let search_results = results.providers
+                                    .first()
+                                    .map(|provider| provider.results.clone())
+                                    .unwrap_or_default();
+                                
+                                let response = WebSocketMessage::SearchResponse {
+                                    request_id,
+                                    results: search_results,
+                                };
+                                
+                                broadcaster_clone.broadcast(response).await;
+                            });
                         }
                         Ok(other) => {
                             info!(
@@ -389,6 +435,8 @@ pub async fn handle_websocket(socket: WebSocket, broadcaster: Arc<WebSocketBroad
                     match msg {
                         Ok(message) => {
                             let message_type = match &message {
+                                WebSocketMessage::SearchRequest { .. } => "search_request",
+                                WebSocketMessage::SearchResponse { .. } => "search_response",
                                 WebSocketMessage::StatusUpdate { .. } => "status_update",
                                 WebSocketMessage::GraphUpdate { .. } => "graph_update",
                                 WebSocketMessage::NodeVisited { .. } => "node_visited",

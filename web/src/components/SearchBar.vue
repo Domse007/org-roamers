@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, type Ref } from "vue";
-import { type SearchResponse } from "../types.ts";
+import { ref, type Ref, inject, onMounted } from "vue";
+import { type SearchRequestMessage, type SearchResponseMessage } from "../types.ts";
 import SearchSuggestion from "./SearchSuggestion.vue";
 
 const searchSuggestions: Ref<
@@ -9,24 +9,87 @@ const searchSuggestions: Ref<
 const searchterm: Ref<string> = ref("");
 const showSuggestions: Ref<boolean> = ref(false);
 
-const search = async (query: string) => {
-  const encoded = encodeURIComponent(query);
-  const resp = await fetch(`/search?q=${encoded}`);
-  const res = await resp.json();
-  return res;
+// Get WebSocket from parent component
+const websocket = inject<Ref<WebSocket | null>>('websocket', ref(null));
+const pendingSearchRequests = new Map<string, (results: { display: string; id: string; tags: string[] }[]) => void>();
+
+// Generate unique request IDs
+const generateRequestId = () => `search_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+const search = async (query: string): Promise<{ display: string; id: string; tags: string[] }[]> => {
+  return new Promise((resolve, reject) => {
+    if (!websocket.value || websocket.value.readyState !== WebSocket.OPEN) {
+      console.error('WebSocket is not connected');
+      resolve([]); // Return empty results if WebSocket is not available
+      return;
+    }
+
+    if (!query.trim()) {
+      resolve([]);
+      return;
+    }
+
+    const requestId = generateRequestId();
+    const searchMessage: SearchRequestMessage = {
+      type: 'search_request',
+      query: query.trim(),
+      request_id: requestId
+    };
+
+    // Store the promise resolver
+    pendingSearchRequests.set(requestId, resolve);
+
+    // Set a timeout to clean up if no response is received
+    setTimeout(() => {
+      if (pendingSearchRequests.has(requestId)) {
+        pendingSearchRequests.delete(requestId);
+        console.warn(`Search request ${requestId} timed out`);
+        resolve([]); // Return empty results on timeout
+      }
+    }, 5000); // 5 second timeout
+
+    try {
+      websocket.value.send(JSON.stringify(searchMessage));
+    } catch (error) {
+      console.error('Failed to send search request:', error);
+      pendingSearchRequests.delete(requestId);
+      resolve([]);
+    }
+  });
+};
+
+// Handle search responses from WebSocket
+const handleSearchResponse = (message: SearchResponseMessage) => {
+  const resolver = pendingSearchRequests.get(message.request_id);
+  if (resolver) {
+    resolver(message.results);
+    pendingSearchRequests.delete(message.request_id);
+  } else {
+    console.warn(`Received search response for unknown request: ${message.request_id}`);
+  }
 };
 
 const InputHandler = () => {
   showSuggestions.value = true;
-  search(searchterm.value).then((res: SearchResponse) => {
-    searchSuggestions.value = res.providers[0].results;
-    console.log(searchSuggestions.value);
+  search(searchterm.value).then((results: { display: string; id: string; tags: string[] }[]) => {
+    searchSuggestions.value = results;
+    console.log('Search results:', searchSuggestions.value);
   });
 };
 
 const searchOnLeave = () => {
   setTimeout(() => (showSuggestions.value = false), 100);
 };
+
+// Export types for parent components
+export interface SearchBarMethods {
+  handleSearchResponse: (message: SearchResponseMessage) => void;
+}
+
+// Expose the search response handler to the parent component
+defineExpose<SearchBarMethods>({
+  handleSearchResponse
+});
 </script>
 
 <template>
