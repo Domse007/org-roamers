@@ -15,7 +15,6 @@ mod diff;
 pub mod error;
 pub mod file;
 mod latex;
-pub mod parser;
 
 pub mod search;
 pub mod server;
