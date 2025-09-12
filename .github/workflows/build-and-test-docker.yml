@@ -13,6 +13,9 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
 
+      - name: Install dependencies
+        run: sudo apt install -y libc6
+
       - name: Build Docker image
         run: |
           docker build -t org-roamers-image .
