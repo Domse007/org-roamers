@@ -103,9 +103,24 @@ impl OrgWatcher {
         // Wait for debounce period
         thread::sleep(self.debounce_duration);
 
-        // Check if more events came in during debounce
-        if self.receiver.try_recv().is_ok() {
-            return Ok(None); // More events coming, wait longer
+        // Collect any additional events that came in during debounce
+        while let Ok(event_result) = self.receiver.try_recv() {
+            match event_result {
+                Ok(event) => {
+                    if let Some(org_events) = self.extract_org_events(event)? {
+                        for event in org_events {
+                            match &event {
+                                OrgWatcherEvent::Create(path)
+                                | OrgWatcherEvent::Modify(path)
+                                | OrgWatcherEvent::Remove(path) => {
+                                    self.pending_events.insert(path.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => tracing::warn!("Watcher event error during debounce: {}", e),
+            }
         }
 
         // Process all pending events
@@ -178,9 +193,9 @@ impl OrgWatcher {
             // File was created or modified
             tracing::info!("Processing file change: {:?}", path);
 
-            // Store nodes/links before update
-            let nodes_before = self.get_nodes_for_file(state, path);
-            let links_before = self.get_links_for_file(state, path);
+            // Clear dynamic state before processing
+            state.dynamic_state.updated_nodes.clear();
+            state.dynamic_state.updated_links.clear();
 
             // Update the database
             if let Err(err) = diff::diff(state, path) {
@@ -188,13 +203,19 @@ impl OrgWatcher {
                 return Ok(None);
             }
 
-            // Get nodes/links after update
-            let nodes_after = self.get_nodes_for_file(state, path);
-            let links_after = self.get_links_for_file(state, path);
+            // Use the changes detected by diff::diff
+            update
+                .new_nodes
+                .extend(state.dynamic_state.updated_nodes.clone());
+            update
+                .new_links
+                .extend(state.dynamic_state.updated_links.clone());
 
-            // Determine what changed
-            self.calculate_node_changes(&nodes_before, &nodes_after, &mut update);
-            self.calculate_link_changes(&links_before, &links_after, &mut update);
+            tracing::info!(
+                "File change processed: {} new nodes, {} new links",
+                update.new_nodes.len(),
+                update.new_links.len()
+            );
         } else {
             // File was removed
             tracing::info!("Processing file removal: {:?}", path);
@@ -260,63 +281,6 @@ impl OrgWatcher {
             .unwrap_or_default()
     }
 
-    fn calculate_node_changes(
-        &self,
-        before: &[RoamNode],
-        after: &[RoamNode],
-        update: &mut GraphUpdate,
-    ) {
-        let before_ids: HashSet<_> = before.iter().map(|n| &n.id).collect();
-        let after_ids: HashSet<_> = after.iter().map(|n| &n.id).collect();
-
-        // New nodes
-        for node in after {
-            if !before_ids.contains(&node.id) {
-                update.new_nodes.push(node.clone());
-            }
-        }
-
-        // Updated nodes (existing nodes with potentially changed titles)
-        for node in after {
-            if let Some(old_node) = before.iter().find(|n| n.id == node.id) {
-                if old_node.title != node.title {
-                    update.updated_nodes.push(node.clone());
-                }
-            }
-        }
-
-        // Removed nodes
-        for node in before {
-            if !after_ids.contains(&node.id) {
-                update.removed_nodes.push(node.id.clone());
-            }
-        }
-    }
-
-    fn calculate_link_changes(
-        &self,
-        before: &[RoamLink],
-        after: &[RoamLink],
-        update: &mut GraphUpdate,
-    ) {
-        let before_set: HashSet<_> = before.iter().collect();
-        let after_set: HashSet<_> = after.iter().collect();
-
-        // New links
-        for link in after {
-            if !before_set.contains(link) {
-                update.new_links.push(link.clone());
-            }
-        }
-
-        // Removed links
-        for link in before {
-            if !after_set.contains(link) {
-                update.removed_links.push(link.clone());
-            }
-        }
-    }
-
     fn remove_file_from_db(
         &self,
         state: &mut ServerState,
@@ -376,6 +340,7 @@ pub fn watcher(path: PathBuf) -> anyhow::Result<OrgWatcher> {
 pub fn start_watcher_runtime(
     app_state: Arc<Mutex<(crate::ServerState, Arc<Mutex<bool>>)>>,
     watch_path: PathBuf,
+    runtime_handle: Option<tokio::runtime::Handle>,
 ) -> anyhow::Result<JoinHandle<()>> {
     let mut watcher = watcher(watch_path.clone())?;
 
@@ -417,18 +382,24 @@ pub fn start_watcher_runtime(
                     update.removed_links.len()
                 );
 
-                // Broadcast detailed changes
-                tokio::spawn(async move {
-                    broadcaster
-                        .broadcast_graph_update(
-                            update.new_nodes,
-                            update.updated_nodes,
-                            update.new_links,
-                            update.removed_nodes,
-                            update.removed_links,
-                        )
-                        .await;
-                });
+                // Broadcast detailed changes using runtime handle
+                if let Some(ref handle) = runtime_handle {
+                    handle.spawn(async move {
+                        broadcaster
+                            .broadcast_graph_update(
+                                update.new_nodes,
+                                update.updated_nodes,
+                                update.new_links,
+                                update.removed_nodes,
+                                update.removed_links,
+                            )
+                            .await;
+                    });
+                } else {
+                    tracing::warn!(
+                        "No Tokio runtime handle available, WebSocket broadcast skipped"
+                    );
+                }
             }
         }
     });
@@ -443,7 +414,7 @@ pub fn default_watcher_runtime(
     path: PathBuf,
 ) -> JoinHandle<()> {
     tracing::warn!("default_watcher_runtime is deprecated, use start_watcher_runtime instead");
-    start_watcher_runtime(app_state, path).unwrap_or_else(|e| {
+    start_watcher_runtime(app_state, path, None).unwrap_or_else(|e| {
         tracing::error!("Failed to start watcher runtime: {}", e);
         thread::spawn(|| {}) // Return dummy handle
     })

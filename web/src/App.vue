@@ -7,7 +7,8 @@ import ErrorDialog from "./components/ErrorDialog.vue";
 import { onMounted, onUnmounted, type Ref, ref } from "vue";
 import { type RoamLink, type RoamNode } from "./types.ts";
 
-const connectionStatus: Ref<"connecting" | "connected" | "disconnected"> = ref("connecting");
+const connectionStatus: Ref<"connecting" | "connected" | "disconnected"> =
+  ref("connecting");
 const pendingChanges: Ref<boolean> = ref(false);
 
 const toggleLayouterRef: Ref<boolean> = ref(false);
@@ -26,6 +27,11 @@ const redrawGraph = () => {
   graphUpdateCount.value++;
 };
 
+const clearGraphUpdates = () => {
+  console.log("Clearing graph updates to ensure reactivity");
+  graphUpdatesRef.value = null;
+};
+
 const graphUpdatesRef: Ref<{
   nodes: RoamNode[];
   links: RoamLink[];
@@ -36,7 +42,7 @@ const graphUpdatesRef: Ref<{
 let websocket: WebSocket | null = null;
 
 const connectWebSocket = () => {
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   const wsUrl = `${protocol}//${window.location.host}/ws`;
 
   console.log(`Attempting to connect to WebSocket: ${wsUrl}`);
@@ -56,10 +62,24 @@ const connectWebSocket = () => {
 
       switch (message.type) {
         case "status_update":
-          console.log("Status update - pending changes:", message.pending_changes, "visited node:", message.visited_node);
+          console.log(
+            "Status update - pending changes:",
+            message.pending_changes,
+            "visited node:",
+            message.visited_node,
+          );
           pendingChanges.value = message.pending_changes || false;
-          if (message.updated_links.length > 0 || message.updated_nodes.length > 0) {
-            console.log("Status update with graph changes:", message.updated_nodes.length, "nodes,", message.updated_links.length, "links");
+          if (
+            message.updated_links.length > 0 ||
+            message.updated_nodes.length > 0
+          ) {
+            console.log(
+              "Status update with graph changes:",
+              message.updated_nodes.length,
+              "nodes,",
+              message.updated_links.length,
+              "links",
+            );
             graphUpdatesRef.value = {
               nodes: message.updated_nodes,
               links: message.updated_links,
@@ -83,7 +103,7 @@ const connectWebSocket = () => {
             updated_nodes: message.updated_nodes.length,
             new_links: message.new_links.length,
             removed_nodes: message.removed_nodes.length,
-            removed_links: message.removed_links.length
+            removed_links: message.removed_links.length,
           });
           // Handle the enhanced graph update format with detailed changes
           const allNodes = [...message.new_nodes, ...message.updated_nodes];
@@ -109,7 +129,10 @@ const connectWebSocket = () => {
               console.error("Failed to send pong:", error);
             }
           } else {
-            console.warn("Cannot send pong - WebSocket not open. ReadyState:", websocket?.readyState);
+            console.warn(
+              "Cannot send pong - WebSocket not open. ReadyState:",
+              websocket?.readyState,
+            );
           }
           break;
 
@@ -129,21 +152,30 @@ const connectWebSocket = () => {
   };
 
   websocket.onclose = (event) => {
-    console.log("WebSocket closed - Code:", event.code, "Reason:", event.reason, "WasClean:", event.wasClean);
+    console.log(
+      "WebSocket closed - Code:",
+      event.code,
+      "Reason:",
+      event.reason,
+      "WasClean:",
+      event.wasClean,
+    );
     console.log("Close event details:", {
       code: event.code,
       reason: event.reason,
       wasClean: event.wasClean,
-      timeStamp: event.timeStamp
+      timeStamp: event.timeStamp,
     });
     connectionStatus.value = "disconnected";
 
     // Different reconnection strategy based on close code
     let reconnectDelay = 3000;
-    if (event.code === 1006) { // Abnormal closure
+    if (event.code === 1006) {
+      // Abnormal closure
       console.warn("Abnormal closure detected, using longer reconnect delay");
       reconnectDelay = 5000;
-    } else if (event.code === 1000) { // Normal closure
+    } else if (event.code === 1000) {
+      // Normal closure
       console.log("Normal closure, shorter reconnect delay");
       reconnectDelay = 1000;
     }
@@ -163,9 +195,19 @@ onMounted(() => {
   // Add periodic connection health check
   setInterval(() => {
     if (websocket) {
-      console.log("WebSocket health check - ReadyState:", websocket.readyState, "Status:", connectionStatus.value);
-      if (websocket.readyState === WebSocket.CLOSED && connectionStatus.value !== "connecting") {
-        console.warn("WebSocket is closed but status shows connected, forcing reconnection");
+      console.log(
+        "WebSocket health check - ReadyState:",
+        websocket.readyState,
+        "Status:",
+        connectionStatus.value,
+      );
+      if (
+        websocket.readyState === WebSocket.CLOSED &&
+        connectionStatus.value !== "connecting"
+      ) {
+        console.warn(
+          "WebSocket is closed but status shows connected, forcing reconnection",
+        );
         connectionStatus.value = "connecting";
         connectWebSocket();
       }
@@ -185,22 +227,6 @@ const closeError = () => (errorMessage.value = null);
 </script>
 
 <template>
-  <header>
-    <!-- Connection Status Indicator -->
-    <div class="status-bar">
-      <div class="connection-status" :class="connectionStatus">
-        <span v-if="connectionStatus === 'connected'">🟢 Connected ({{ websocket?.readyState }})</span>
-        <span v-if="connectionStatus === 'connecting'">🟡 Connecting...</span>
-        <span v-if="connectionStatus === 'disconnected'">🔴 Disconnected - Check console for details</span>
-      </div>
-      <div v-if="pendingChanges" class="pending-changes">
-        ⏳ Processing changes...
-      </div>
-      <div class="debug-info" style="font-size: 10px; color: var(--overlay);">
-        WS State: {{ websocket?.readyState || 'null' }} | URL: {{ websocket?.url || 'none' }}
-      </div>
-    </div>
-  </header>
   <main>
     <ErrorDialog v-if="errorMessage != null" @dialog-close="closeError">{{
       errorMessage
@@ -208,6 +234,7 @@ const closeError = () => (errorMessage.value = null);
     <SearchBar @open-node="updatePreviewID"></SearchBar>
     <GraphView
       @open-node="updatePreviewID"
+      @updates-processed="clearGraphUpdates"
       :count="graphUpdateCount"
       :toggle-layouter="toggleLayouterRef"
       :zoom-node="previewID"
@@ -220,56 +247,12 @@ const closeError = () => (errorMessage.value = null);
     <SettingsPane
       @redraw-graph="redrawGraph"
       @toggle-layouter="toggleLayouter"
+      :connectionStatus="connectionStatus"
+      :pendingChanges="pendingChanges"
+      :websocketState="websocket?.readyState"
+      :websocketUrl="websocket?.url"
     ></SettingsPane>
   </main>
 </template>
 
-<style scoped>
-.status-bar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 30px;
-  background-color: var(--surface);
-  border-bottom: 1px solid var(--overlay);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 10px;
-  font-family: var(--font);
-  font-size: 12px;
-  z-index: 1000;
-}
-
-.connection-status {
-  color: var(--text);
-}
-
-.connection-status.connected {
-  color: var(--highlight-2);
-}
-
-.connection-status.connecting {
-  color: var(--warn);
-}
-
-.connection-status.disconnected {
-  color: var(--warn);
-}
-
-.pending-changes {
-  color: var(--highlight);
-  animation: pulse 1.5s ease-in-out infinite alternate;
-}
-
-@keyframes pulse {
-  from { opacity: 1; }
-  to { opacity: 0.5; }
-}
-
-/* Adjust main content to account for status bar */
-main {
-  padding-top: 30px;
-}
-</style>
+<style scoped></style>

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::Read;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -83,15 +83,6 @@ pub fn start_server(url: String, state: ServerState) -> Result<ServerRuntime, Bo
 
     let app_state = Arc::new(Mutex::new((state, Arc::new(Mutex::new(false)))));
 
-    // Start file watcher with WebSocket integration if enabled
-    if use_fs_watcher {
-        tracing::info!("Starting WebSocket-integrated file watcher.");
-        let app_state_clone = app_state.clone();
-        let watch_path = org_roam_db_path.clone();
-
-        let _watcher_handle = watcher::start_watcher_runtime(app_state_clone, watch_path)?;
-    }
-
     let app = Router::new()
         .route("/", get(default_route))
         .route("/org", get(get_org_as_html_handler))
@@ -103,13 +94,27 @@ pub fn start_server(url: String, state: ServerState) -> Result<ServerRuntime, Bo
         .route("/assets", get(serve_assets_handler))
         .fallback(fallback_handler)
         .layer(CorsLayer::permissive())
-        .with_state(app_state);
+        .with_state(app_state.clone());
 
     let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
 
     let handle = std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new()?;
         rt.block_on(async {
+            // Start file watcher with WebSocket integration if enabled
+            if use_fs_watcher {
+                tracing::info!("Starting WebSocket-integrated file watcher.");
+                let app_state_clone = app_state.clone();
+                let watch_path = org_roam_db_path.clone();
+                let runtime_handle = tokio::runtime::Handle::current();
+
+                let _watcher_handle = watcher::start_watcher_runtime(
+                    app_state_clone,
+                    watch_path,
+                    Some(runtime_handle),
+                )?;
+            }
+
             let listener = tokio::net::TcpListener::bind(&url).await?;
             tracing::info!("Server listening on {}", url);
 
@@ -271,9 +276,17 @@ async fn emacs_handler(
     }
 }
 
-async fn serve_assets_handler(AxumQuery(params): AxumQuery<HashMap<String, String>>) -> Response {
+async fn serve_assets_handler(
+    AxumQuery(params): AxumQuery<HashMap<String, String>>,
+    State(app_state): State<AppState>,
+) -> Response {
     match params.get("file") {
-        Some(path) => serve_assets(path.clone()),
+        Some(path) => {
+            let state = app_state.lock().unwrap();
+            let (ref server_state, _) = *state;
+            let org_roam_path = &server_state.org_roam_db_path;
+            serve_assets(org_roam_path, path.clone())
+        }
         None => StatusCode::NOT_FOUND.into_response(),
     }
 }
@@ -365,9 +378,14 @@ pub fn get_org_as_html(db: &mut ServerState, query: Query, scope: String) -> Org
         Subtree::get(id.into(), contents.as_str()).unwrap_or(contents)
     };
 
-    // FIXME: This is VERY BAD!! file is an absolute path, but it should be
-    //        relative to the root of the org-roam dir.
-    let mut handler = HtmlExport::new(&db.html_export_settings, file);
+    // Convert absolute path to relative path from org-roam directory
+    let relative_file = PathBuf::from(&file)
+        .strip_prefix(&db.org_roam_db_path)
+        .unwrap_or(Path::new(&file))
+        .to_string_lossy()
+        .to_string();
+
+    let mut handler = HtmlExport::new(&db.html_export_settings, relative_file);
     Org::parse(contents).traverse(&mut handler);
 
     let (org, outgoing_links) = handler.finish();
@@ -519,10 +537,10 @@ pub fn get_latex_svg(db: &mut ServerState, tex: String, color: String, id: Strin
     }
 }
 
-pub fn serve_assets(file: String) -> Response {
-    let file = PathBuf::from(file);
+pub fn serve_assets<P: AsRef<Path>>(root: P, file: String) -> Response {
+    let file_path = root.as_ref().join(&file);
 
-    let mime = match file.extension() {
+    let mime = match PathBuf::from(&file).extension() {
         Some(extension) => match extension.to_str().unwrap() {
             "jpeg" | "jpg" => "image/jpeg",
             "png" => "image/png",
@@ -535,7 +553,7 @@ pub fn serve_assets(file: String) -> Response {
     };
 
     let mut buffer = vec![];
-    let mut source_file = match File::open(file) {
+    let mut source_file = match File::open(&file_path) {
         Ok(file) => file,
         Err(_) => return StatusCode::NOT_FOUND.into_response(),
     };

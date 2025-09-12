@@ -214,34 +214,61 @@ const incrementalGraphUpdate = (updates: {
         });
         console.log(`Updated node: ${node.id} (${node.title})`);
       } else {
-        // Add new node
+        // Add new node with better positioning
+        const x = randomNumber(-50, 50);
+        const y = randomNumber(-50, 50);
         graph.addNode(node.id, {
           label: node.title,
-          x: randomNumber(1, 100),
-          y: randomNumber(1, 100),
-          size: node.num_links / 2 <= 5 ? 5 : node.num_links / 2,
+          x: x,
+          y: y,
+          size: Math.max(5, node.num_links / 2),
           color: nodeColor,
           borderColor: nodeBorderColor,
+          type: "bordered", // Ensure it uses the same type as other nodes
         });
-        console.log(`Added new node: ${node.id} (${node.title})`);
+        console.log(
+          `Added new node: ${node.id} (${node.title}) at position (${x}, ${y})`,
+        );
+        console.log(`Node attributes:`, graph.getNodeAttributes(node.id));
+        console.log(`Graph now has ${graph.order} nodes total`);
       }
     } catch (err) {
-      console.log(`${node.id} (${node.title}): ${err}`);
+      console.log(`Error with node ${node.id} (${node.title}): ${err}`);
     }
   }
 
-  // Handle link additions
+  // Handle link additions - check that both nodes exist
   const edgeColor = style.getPropertyValue("--overlay");
   for (const link of updates.links) {
     try {
-      if (!graph.hasEdge(link.from, link.to)) {
-        graph.addEdge(link.from, link.to, { color: edgeColor });
-        console.log(`Added new link: ${link.from} -> ${link.to}`);
+      if (!graph.hasNode(link.from)) {
+        console.log(
+          `Cannot add link: source node '${link.from}' does not exist in graph`,
+        );
+        continue;
       }
+      if (!graph.hasNode(link.to)) {
+        console.log(
+          `Cannot add link: target node '${link.to}' does not exist in graph`,
+        );
+        continue;
+      }
+      if (graph.hasEdge(link.from, link.to)) {
+        console.log(`Link ${link.from} -> ${link.to} already exists, skipping`);
+        continue;
+      }
+
+      graph.addEdge(link.from, link.to, { color: edgeColor });
+      console.log(`✅ Successfully added link: ${link.from} -> ${link.to}`);
     } catch (error) {
-      console.log(`${link.from}->${link.to}: ${error}`);
+      console.log(`❌ Error adding link ${link.from} -> ${link.to}: ${error}`);
     }
   }
+
+  console.log(`Link processing complete. Graph now has ${graph.size} edges`);
+
+  // Log all nodes in the graph for debugging
+  console.log("All nodes in graph:", graph.nodes());
 
   // Only rebuild the graph if we have significant changes
   const hasSignificantChanges =
@@ -254,9 +281,87 @@ const incrementalGraphUpdate = (updates: {
     document.getElementById("graph")!.innerHTML = "";
     setupGraph();
   } else {
-    // Just refresh the sigma instance for smaller changes
-    if (sigma) {
-      sigma.refresh();
+    // Force a complete refresh for new nodes to ensure they're properly rendered and clickable
+    if (
+      updates.nodes.length > 0 ||
+      (updates.removedNodes && updates.removedNodes.length > 0)
+    ) {
+      console.log(
+        "New or removed nodes detected - performing complete sigma refresh",
+      );
+      console.log(`Graph now has ${graph.order} nodes and ${graph.size} edges`);
+
+      // Re-run community detection for proper coloring
+      if (graph.order > 0) {
+        console.log("Running community detection for updated graph");
+        const c = (v: string) =>
+          getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+        const colors = [
+          c("--overlay"),
+          c("--highlight"),
+          c("--highlight-2"),
+          c("--warn"),
+          c("--clickable"),
+          c("--node"),
+          c("--node-border"),
+          c("--keyword"),
+          c("--ident"),
+          c("--comment"),
+          c("--type"),
+        ];
+
+        const communities = louvain(graph);
+        Object.entries(communities).forEach(([node, communityId]) => {
+          const color = colors[communityId % colors.length];
+          graph.mergeNodeAttributes(node, {
+            community: communityId,
+            color,
+          });
+        });
+        console.log("Community detection completed");
+      }
+
+      if (sigma) {
+        // Destroy and recreate sigma to ensure new nodes are properly integrated
+        sigma.kill();
+
+        const element = document.getElementById("graph")!;
+        const style = window.getComputedStyle(document.body);
+        const textColor = style.getPropertyValue("--text");
+
+        sigma = new Sigma(graph, element, {
+          defaultNodeType: "bordered",
+          nodeProgramClasses: {
+            bordered: NodeBorderProgram,
+          },
+          defaultDrawNodeHover: drawHover,
+          labelColor: { color: textColor },
+        });
+
+        // Re-bind click events for all nodes (including new ones)
+        sigma.on("downNode", (e) => {
+          zoomOnto(e.node, old_node);
+          emit("openNode", e.node);
+        });
+
+        console.log("Sigma instance recreated with click handlers");
+
+        // Always restart layout for new nodes to help them find their position
+        console.log("Restarting layout to position new nodes");
+        layout.start();
+        setTimeout(() => {
+          if (generalSettings.stopLayoutAfter != null) {
+            console.log("Auto-stopping layout after positioning new nodes");
+            layout.stop();
+          }
+        }, 5000); // Give more time for nodes to settle into good positions
+      }
+    } else {
+      // Just refresh for minor changes
+      if (sigma) {
+        console.log("Minor changes - just refreshing sigma");
+        sigma.refresh();
+      }
     }
   }
 
@@ -308,11 +413,14 @@ watch(prop, () => {
       removedLinks: prop.updates.removedLinks?.length || 0,
     });
     incrementalGraphUpdate(prop.updates);
+
+    // Emit event to clear the updates ref and ensure reactivity
+    emit("updatesProcessed");
   }
 });
 
 onMounted(updateGraph);
-const emit = defineEmits(["openNode"]);
+const emit = defineEmits(["openNode", "updatesProcessed"]);
 </script>
 
 <template>
