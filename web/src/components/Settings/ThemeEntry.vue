@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import { onMounted, type Ref, ref } from "vue";
-import { themeToArray, setTheme, type Theme } from "../../theme.ts";
+import { onMounted, type Ref, ref, computed } from "vue";
+import { themeToArray, setTheme, type Theme, currentTheme } from "../../theme.ts";
 
 const themeProp = defineProps<{ theme: Theme }>();
 
 const themeList: Ref<string[] | null> = ref(null);
 const themeName: Ref<string | null> = ref(null);
 const themeFlavour: Ref<"dark" | "light" | null> = ref(null);
+
+const isActive = computed(() => {
+  return currentTheme.value?.name === themeProp.theme.name;
+});
 
 const onClickSetTheme = () => {
   setTheme(themeProp.theme);
@@ -23,9 +27,9 @@ const emit = defineEmits(["redrawGraph"]);
 </script>
 
 <template>
-  <div class="theme-entry" :onclick="onClickSetTheme">
+  <div class="theme-entry" :class="{ active: isActive }" :onclick="onClickSetTheme">
     <div class="theme-title">
-      <div>{{ themeName }}</div>
+      <div>{{ themeName }} <span v-if="isActive">✓</span></div>
       <div>{{ themeFlavour }}</div>
     </div>
     <div class="theme-colors">
@@ -48,10 +52,15 @@ const emit = defineEmits(["redrawGraph"]);
   flex-direction: column;
   background-color: var(--overlay);
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 .theme-entry:hover,
 .theme-entry:focus {
   filter: brightness(125%);
+}
+.theme-entry.active {
+  border: 2px solid var(--highlight);
+  background-color: var(--surface);
 }
 .theme-title {
   display: flex;
