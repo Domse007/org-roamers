@@ -330,7 +330,7 @@ pub async fn handle_websocket(
                                 let results = {
                                     let mut state_guard = app_state_clone.lock().unwrap();
                                     let (ref mut server_state, _) = *state_guard;
-                                    crate::server::search(server_state, query)
+                                    crate::server::services::search_service::search(server_state, query)
                                 };
                                 
                                 // Extract results from the first provider (usually sqlite)

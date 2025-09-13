@@ -190,6 +190,9 @@ impl Traverser for HtmlExport<'_> {
             Event::Enter(Container::ExampleBlock(_)) => self.output += "<pre class=\"example\">",
             Event::Leave(Container::ExampleBlock(_)) => self.output += "</pre>",
 
+            Event::Enter(Container::FixedWidth(_)) => self.output += "<pre class=\"program-output\">",
+            Event::Leave(Container::FixedWidth(_)) => self.output += "</pre>",
+
             Event::Enter(Container::CenterBlock(_)) => self.output += "<div class=\"center\">",
             Event::Leave(Container::CenterBlock(_)) => self.output += "</div>",
 
@@ -429,6 +432,34 @@ mod tests {
             "<tr><td>hello</td><td>1</td></tr></thead>",
             "<tbody><tr><td>world</td><td>2</td></tr></tbody>",
             "</table></section></div>"
+        );
+        let settings = HtmlExportSettings::default();
+        let mut handler = HtmlExport::new(&settings, "".into());
+        Org::parse(org).traverse(&mut handler);
+        assert_eq!(handler.finish().0, exp);
+    }
+
+    #[test]
+    fn test_fixed_width_program_output() {
+        let org = concat!(
+            "#+BEGIN_SRC python\n",
+            "print(\"Hello, world!\")\n",
+            "#+END_SRC\n",
+            "\n",
+            ": Hello, world!\n",
+            "\n",
+            "Regular text.\n",
+            "\n",
+            ": More output\n",
+            ": Another line\n"
+        );
+        let exp = concat!(
+            "<div><section>",
+            "<pre><code class=\"language-python\">print(&quot;Hello, world!&quot;)\n</code></pre>",
+            "<pre class=\"program-output\">Hello, world!\n</pre>",
+            "<p>Regular text.\n</p>",
+            "<pre class=\"program-output\">More output\nAnother line\n</pre>",
+            "</section></div>"
         );
         let settings = HtmlExportSettings::default();
         let mut handler = HtmlExport::new(&settings, "".into());
