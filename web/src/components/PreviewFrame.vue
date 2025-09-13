@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import hljs from "highlight.js";
-import { nextTick, ref, useTemplateRef, watch, type Ref } from "vue";
+import { nextTick, ref, useTemplateRef, watch, onUnmounted, type Ref } from "vue";
 import renderMathInElement from "katex/contrib/auto-render";
 import { getScope } from "../settings.ts";
 import { type OrgAsHTMLResponse } from "../types.ts";
@@ -16,6 +16,37 @@ let current_id: string = "";
 const preview_ref = useTemplateRef("preview-ref");
 
 const history = new History<string>();
+
+// Resize functionality
+const frameWidth = ref(50); // Default width as percentage
+const isResizing = ref(false);
+
+const startResize = (event: MouseEvent) => {
+  isResizing.value = true;
+  document.addEventListener('mousemove', doResize);
+  document.addEventListener('mouseup', stopResize);
+  document.body.style.cursor = 'ew-resize';
+  document.body.style.userSelect = 'none'; // Prevent text selection during resize
+  event.preventDefault();
+};
+
+const doResize = (event: MouseEvent) => {
+  if (!isResizing.value) return;
+  
+  const windowWidth = window.innerWidth;
+  const newWidth = ((windowWidth - event.clientX) / windowWidth) * 100;
+  
+  // Constrain width between 20% and 80%
+  frameWidth.value = Math.max(20, Math.min(80, newWidth));
+};
+
+const stopResize = () => {
+  isResizing.value = false;
+  document.removeEventListener('mousemove', doResize);
+  document.removeEventListener('mouseup', stopResize);
+  document.body.style.cursor = '';
+  document.body.style.userSelect = '';
+};
 
 const preview = (id: string) => {
   emit("previewSwitch", id);
@@ -127,6 +158,14 @@ watch(rendered, async () => {
   configureIDLinks("org-preview-id-link");
   configureIDLinks("org-preview-footer-link");
 });
+
+// Cleanup event listeners on component unmount
+onUnmounted(() => {
+  if (isResizing.value) {
+    stopResize();
+  }
+});
+
 const emit = defineEmits(["previewSwitch"]);
 </script>
 
@@ -135,14 +174,21 @@ const emit = defineEmits(["previewSwitch"]);
     fg="var(--base)"
     bg="var(--clickable)"
     :onclick="resize"
-    :style="{ position: 'absolute', right: '0px', top: '0px' }"
+    :style="{ 
+      position: 'absolute', 
+      right: shown === 'flex' ? frameWidth + '%' : '0px', 
+      top: '0px', 
+      zIndex: 52
+    }"
   >
     {{ collapseIcon() }}
   </BigButton>
-  <div class="org-preview-outerframe" :style="{ display: shown }">
-    <BigButton fg="var(--base)" bg="var(--clickable)" :onclick="resize">
-      &#128448;
-    </BigButton>
+  <div class="org-preview-outerframe" :style="{ display: shown, width: frameWidth + '%' }">
+    <div 
+      class="resize-handle" 
+      @mousedown="startResize"
+      :style="{ cursor: isResizing ? 'ew-resize' : 'ew-resize' }"
+    ></div>
     <div id="org-preview-frame">
       <div
         style="
@@ -205,18 +251,34 @@ const emit = defineEmits(["previewSwitch"]);
   position: absolute;
   z-index: 50;
   display: flex;
-  width: 50%;
+}
+
+.resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  background-color: var(--clickable);
+  cursor: ew-resize;
+  z-index: 51;
+  transition: all 0.2s ease;
+}
+
+.resize-handle:hover {
+  background-color: var(--highlight);
+  width: 7px;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
 }
 
 #org-preview-frame {
   background-color: var(--surface);
-  border-left: 5px solid var(--clickable);
   color: white;
-  float: left;
   width: 100%;
   height: 100%;
   overflow-y: scroll;
   z-index: 50;
+  margin-left: 5px; /* Account for the resize handle */
 }
 
 #org-preview {
