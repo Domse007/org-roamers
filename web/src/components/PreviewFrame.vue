@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import hljs from "highlight.js";
 import { nextTick, ref, useTemplateRef, watch, onUnmounted, type Ref } from "vue";
-import renderMathInElement from "katex/contrib/auto-render";
 import { getScope } from "../settings.ts";
 import { type OrgAsHTMLResponse } from "../types.ts";
 import { History } from "../history.ts";
 import BigButton from "./basic/BigButton.vue";
+import { setLatexDebugMode, createAutoRenderConfig, createServerFallbackErrorCallback, testServerFallback } from "../latex-utils.ts";
 
 const props = defineProps<{ id: string }>();
 const shown: Ref<"none" | "flex"> = ref("none");
@@ -81,49 +81,10 @@ const resize = () => {
   }
 };
 
-const katexOptions = {
-  delimiters: [
-    { left: "$$", right: "$$", display: true },
-    { left: "\\(", right: "\\)", display: false },
-    { left: "\\begin{equation}", right: "\\end{equation}", display: true },
-    { left: "\\begin{align}", right: "\\end{align}", display: true },
-    { left: "\\begin{align*}", right: "\\end{align*}", display: true },
-    { left: "\\begin{alignat}", right: "\\end{alignat}", display: true },
-    { left: "\\begin{gather}", right: "\\end{gather}", display: true },
-    { left: "\\begin{gather*}", right: "\\end{gather*}", display: true },
-    { left: "\\begin{CD}", right: "\\end{CD}", display: true },
-    { left: "\\begin{algorithm}", right: "\\end{algorithm}", display: true },
-    {
-      left: "\\begin{algorithmic}",
-      right: "\\end{algorithmic}",
-      display: true,
-    },
-    { left: "\\begin{center}", right: "\\end{center}", display: true },
-    {
-      left: "\\begin{tikzpicture}",
-      right: "\\end{tikzpicture}",
-      display: true,
-    },
-    { left: "\\[", right: "\\]", display: true },
-  ],
-  errorCallback: (message: string) => {
-    console.log("Trying to process latex on server.");
-    let latex = message.substring(36, message.length - 7);
-    if (!latex.startsWith("\\begin")) {
-      latex = "\\( " + latex + " \\)";
-    }
-    const encoded = encodeURIComponent(latex);
-    const style = window.getComputedStyle(document.body);
-    const textColor = style.getPropertyValue("--text");
-    const colorEncoded = encodeURIComponent(textColor.substring(1));
-    const encodedTitle = encodeURIComponent(current_id);
-    fetch(`/latex?tex=${encoded}&color=${colorEncoded}&id=${encodedTitle}`)
-      .then((resp) => resp.text())
-      .then((svg) => {
-        const newHTML = rendered.value.replace(latex, svg);
-        rendered.value = newHTML;
-      });
-  },
+// Helper functions for content management
+const getCurrentContent = () => rendered.value;
+const updateContent = (newContent: string) => {
+  rendered.value = newContent;
 };
 
 // Dynamic import for COBOL syntax highlighting to avoid build issues
@@ -149,12 +110,95 @@ const configureIDLinks = (_class: string) => {
 
 const collapseIcon = () => (shown.value == "none" ? "🗁" : "🗀");
 
+// Debug mode state
+const debugLatex = ref(false);
+
+// Toggle debug mode
+const toggleLatexDebug = () => {
+  debugLatex.value = !debugLatex.value;
+  setLatexDebugMode(debugLatex.value);
+  console.log(`LaTeX debug mode ${debugLatex.value ? 'enabled' : 'disabled'}`);
+  
+  if (debugLatex.value && rendered.value) {
+    console.log('=== LATEX DEBUG ===');
+    console.log('Content length:', rendered.value.length);
+    
+    if (preview_ref.value) {
+      const katexElements = preview_ref.value.querySelectorAll('.katex');
+      console.log('KaTeX elements found:', katexElements.length);
+    }
+    
+    // Test server fallback function available in console
+    (window as any).testLatexFallback = () => {
+      const testLatex = '\\begin{algorithmic}\\State test\\end{algorithmic}';
+      testServerFallback(testLatex, current_id, updateContent, getCurrentContent);
+    };
+    
+    (window as any).testBasicLatex = () => {
+      const testLatex = '$$\\sum_{i=1}^n i = \\frac{n(n+1)}{2}$$';
+      testServerFallback(testLatex, current_id, updateContent, getCurrentContent);
+    };
+    
+    console.log('Available: testLatexFallback() and testBasicLatex()');
+    console.log('==================');
+  }
+};
+
+// Manual re-render function for LaTeX
+const reprocessLatex = async () => {
+  if (!preview_ref.value || !rendered.value) return;
+  
+  console.log("Manual LaTeX reprocessing triggered");
+  
+  try {
+    const renderMathModule = await import("katex/contrib/auto-render");
+    const errorCallback = createServerFallbackErrorCallback(current_id, updateContent, getCurrentContent);
+    renderMathModule.default(preview_ref.value, createAutoRenderConfig(errorCallback));
+    
+    console.log("Manual LaTeX reprocessing completed");
+  } catch (error) {
+    console.error("Manual LaTeX reprocessing failed:", error);
+  }
+};
+
 watch(props, () => preview(props.id));
 watch(rendered, async () => {
   await nextTick();
+  
+  // Apply syntax highlighting
   hljs.highlightAll();
-  console.log(`Ref: ${preview_ref}`);
-  renderMathInElement(preview_ref.value!, katexOptions);
+  
+  // Apply KaTeX with server fallback
+  if (preview_ref.value) {
+    try {
+      const renderMathModule = await import("katex/contrib/auto-render");
+      const errorCallback = createServerFallbackErrorCallback(current_id, updateContent, getCurrentContent);
+      
+      console.log("Content before KaTeX processing:", preview_ref.value.innerHTML.substring(0, 500));
+      
+      renderMathModule.default(preview_ref.value, createAutoRenderConfig(errorCallback));
+      
+      console.log("KaTeX processing completed");
+      console.log("Content after KaTeX processing:", preview_ref.value.innerHTML.substring(0, 500));
+      
+      // Check for unprocessed algorithmic blocks
+      const algorithmic = preview_ref.value.innerHTML.match(/\\begin\{algorithmic\}[\s\S]*?\\end\{algorithmic\}/g);
+      if (algorithmic) {
+        console.log("Found unprocessed algorithmic blocks:", algorithmic);
+        // Manually trigger server fallback for each one
+        for (let i = 0; i < algorithmic.length; i++) {
+          const testLatex = algorithmic[i];
+          console.log(`Manually triggering server fallback for block ${i+1}:`, testLatex.substring(0, 100) + "...");
+          const errorCallback = createServerFallbackErrorCallback(current_id, updateContent, getCurrentContent);
+          errorCallback(`Unprocessed algorithmic block: ${testLatex}`, new Error("Manual trigger"));
+        }
+      }
+    } catch (error) {
+      console.error("KaTeX rendering failed:", error);
+    }
+  }
+  
+  // Configure link handlers
   configureIDLinks("org-preview-id-link");
   configureIDLinks("org-preview-footer-link");
 });
@@ -222,7 +266,22 @@ const emit = defineEmits(["previewSwitch"]);
           fg="var(--base)"
           bg="var(--clickable)"
           @button-clicked="preview(current_id)"
+          title="Refresh content"
           >&circlearrowleft;
+        </BigButton>
+        <BigButton
+          fg="var(--base)"
+          bg="var(--clickable)"
+          @button-clicked="reprocessLatex"
+          title="Reprocess LaTeX"
+          >∫
+        </BigButton>
+        <BigButton
+          :fg="debugLatex ? 'var(--warn)' : 'var(--base)'"
+          :bg="debugLatex ? 'var(--surface)' : 'var(--clickable)'"
+          @button-clicked="toggleLatexDebug"
+          title="Toggle LaTeX Debug Mode"
+          >🐛
         </BigButton>
       </div>
       <div id="org-preview" ref="preview-ref" v-html="rendered"></div>
@@ -375,15 +434,117 @@ table {
   border-collapse: collapse;
 }
 
-/* This is a bit hacky. */
-.katex-html {
-  display: none;
-  visibility: hidden;
+/* Enhanced KaTeX styling */
+.katex-display {
+  margin: 1em 0 !important;
+  text-align: center !important;
+  display: block !important;
+  visibility: visible !important;
 }
 
-/* this might be broken for some svgs. */
+.katex-display-wrapper {
+  margin: 1em 0 !important;
+  text-align: center !important;
+  overflow-x: auto !important;
+  display: block !important;
+  visibility: visible !important;
+}
+
+.katex {
+  font-size: 1.1em !important;
+  color: var(--text) !important;
+  display: inline !important;
+  visibility: visible !important;
+}
+
+.katex-display .katex {
+  display: block !important;
+}
+
+.katex .base {
+  color: var(--text) !important;
+}
+
+.katex .mord,
+.katex .mop,
+.katex .mbin,
+.katex .mrel,
+.katex .mopen,
+.katex .mclose,
+.katex .mpunct,
+.katex .mspace,
+.katex .minner {
+  color: var(--text) !important;
+}
+
+/* Ensure all KaTeX sub-elements are visible */
+.katex * {
+  color: var(--text) !important;
+  visibility: visible !important;
+}
+
+/* Fix potential conflicts with org-mode styling */
+#org-preview .katex {
+  background: none !important;
+  border: none !important;
+}
+
+/* Hide MathJax-style elements that might conflict */
+.MathJax,
+.MathJax_Display,
+.math-tex {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Hide MathML elements since we're using HTML-only output */
+.katex-mathml {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Make sure KaTeX HTML elements are visible */
+.katex-html {
+  display: inline !important;
+  visibility: visible !important;
+}
+
+/* Ensure SVG elements (from server-side LaTeX) use theme colors */
 svg {
   fill: var(--text);
+  max-width: 100%;
+  height: auto;
+}
+
+/* Handle org-mode specific LaTeX classes */
+.org-latex {
+  color: var(--text);
+}
+
+.org-latex-block {
+  margin: 1em 0;
+  text-align: center;
+}
+
+/* Better handling of LaTeX errors and fallbacks */
+.katex-error {
+  color: var(--error, #ff6b6b) !important;
+  border: 1px solid var(--error, #ff6b6b);
+  background-color: var(--error-bg, rgba(255, 107, 107, 0.1));
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: monospace;
+}
+
+/* Responsive LaTeX rendering */
+@media (max-width: 768px) {
+  .katex {
+    font-size: 0.9em;
+  }
+  
+  .katex-display-wrapper {
+    margin: 0.5em 0;
+  }
 }
 
 .org-preview-id-link {

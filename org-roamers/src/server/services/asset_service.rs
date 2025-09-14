@@ -24,6 +24,20 @@ pub fn default_route_content(_db: &mut ServerState, root: String, url: Option<St
             "js" => "text/javascript",
             "css" => "text/css",
             "ico" => "image/x-icon",
+            // Font file support for KaTeX
+            "woff2" => "font/woff2",
+            "woff" => "font/woff",
+            "ttf" => "font/ttf",
+            "otf" => "font/otf",
+            "eot" => "application/vnd.ms-fontobject",
+            // Additional web asset types
+            "png" => "image/png",
+            "jpg" | "jpeg" => "image/jpeg",
+            "gif" => "image/gif",
+            "svg" => "image/svg+xml",
+            "webp" => "image/webp",
+            "json" => "application/json",
+            "xml" => "application/xml",
             _ => {
                 tracing::error!(
                     "Unsupported file extension: {:?} ({:?})",
@@ -54,6 +68,34 @@ pub fn default_route_content(_db: &mut ServerState, root: String, url: Option<St
 
     let mut headers = HeaderMap::new();
     headers.insert("content-type", mime.parse().unwrap());
+    
+    // Add caching headers - only apply aggressive caching in release builds
+    if cfg!(debug_assertions) {
+        // Development mode: minimal caching to avoid stale content
+        headers.insert("cache-control", "no-cache, must-revalidate".parse().unwrap());
+        tracing::debug!("Serving {} with no-cache headers (development mode)", rel_path.display());
+    } else {
+        // Release mode: optimized caching for better performance
+        match rel_path.extension().and_then(|ext| ext.to_str()) {
+            Some("woff2") | Some("woff") | Some("ttf") | Some("otf") | Some("eot") => {
+                // Font files can be cached for a long time (1 year)
+                headers.insert("cache-control", "public, max-age=31536000, immutable".parse().unwrap());
+            }
+            Some("css") | Some("js") => {
+                // CSS and JS can be cached for a moderate time (1 day)
+                headers.insert("cache-control", "public, max-age=86400".parse().unwrap());
+            }
+            Some("png") | Some("jpg") | Some("jpeg") | Some("gif") | Some("svg") | Some("webp") | Some("ico") => {
+                // Images can be cached for a moderate time (1 week)
+                headers.insert("cache-control", "public, max-age=604800".parse().unwrap());
+            }
+            _ => {
+                // Default caching for other files (1 hour)
+                headers.insert("cache-control", "public, max-age=3600".parse().unwrap());
+            }
+        }
+        tracing::debug!("Serving {} with optimized caching headers (release mode)", rel_path.display());
+    }
 
     (StatusCode::OK, headers, bytes).into_response()
 }
@@ -65,6 +107,15 @@ pub fn serve_assets<P: AsRef<Path>>(root: P, file: String) -> Response {
         Some(extension) => match extension.to_str().unwrap() {
             "jpeg" | "jpg" => "image/jpeg",
             "png" => "image/png",
+            "gif" => "image/gif",
+            "svg" => "image/svg+xml",
+            "webp" => "image/webp",
+            // Font file support for KaTeX
+            "woff2" => "font/woff2",
+            "woff" => "font/woff",
+            "ttf" => "font/ttf",
+            "otf" => "font/otf",
+            "eot" => "application/vnd.ms-fontobject",
             _ => return StatusCode::NOT_FOUND.into_response(),
         },
         _ => {
@@ -85,6 +136,30 @@ pub fn serve_assets<P: AsRef<Path>>(root: P, file: String) -> Response {
 
     let mut headers = HeaderMap::new();
     headers.insert("content-type", mime.parse().unwrap());
+    
+    // Add caching headers - only apply aggressive caching in release builds
+    if cfg!(debug_assertions) {
+        // Development mode: minimal caching to avoid stale content
+        headers.insert("cache-control", "no-cache, must-revalidate".parse().unwrap());
+        tracing::debug!("Serving asset {} with no-cache headers (development mode)", file);
+    } else {
+        // Release mode: optimized caching for better performance
+        match PathBuf::from(&file).extension().and_then(|ext| ext.to_str()) {
+            Some("woff2") | Some("woff") | Some("ttf") | Some("otf") | Some("eot") => {
+                // Font files can be cached for a long time
+                headers.insert("cache-control", "public, max-age=31536000, immutable".parse().unwrap());
+            }
+            Some("png") | Some("jpg") | Some("jpeg") | Some("gif") | Some("svg") | Some("webp") => {
+                // Images can be cached for a moderate time
+                headers.insert("cache-control", "public, max-age=604800".parse().unwrap());
+            }
+            _ => {
+                // Default caching for other files
+                headers.insert("cache-control", "public, max-age=3600".parse().unwrap());
+            }
+        }
+        tracing::debug!("Serving asset {} with optimized caching headers (release mode)", file);
+    }
 
     (StatusCode::OK, headers, buffer).into_response()
 }
