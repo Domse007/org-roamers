@@ -3,10 +3,13 @@ use axum::{
     response::Response,
 };
 
-use crate::websocket::handle_websocket;
 use crate::server::AppState;
+use crate::websocket::handle_websocket;
 
-pub async fn websocket_handler(ws: WebSocketUpgrade, State(app_state): State<AppState>) -> Response {
+pub async fn websocket_handler(
+    ws: WebSocketUpgrade,
+    State(app_state): State<AppState>,
+) -> Response {
     let broadcaster = {
         let state = app_state.lock().unwrap();
         let (ref server_state, _) = *state;

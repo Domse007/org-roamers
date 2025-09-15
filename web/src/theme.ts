@@ -1,4 +1,4 @@
-import { ref } from 'vue';
+import { ref } from "vue";
 
 export interface Theme {
   name: string;
@@ -45,7 +45,7 @@ export const setTheme = (theme_int: Theme) => {
   set("--ident", theme.ident);
   set("--comment", theme.comment);
   set("--type", theme.type);
-  
+
   // Update reactive state and save to localStorage
   currentTheme.value = theme_int;
   saveTheme(theme_int);
@@ -53,20 +53,20 @@ export const setTheme = (theme_int: Theme) => {
 
 export const saveTheme = (theme: Theme) => {
   try {
-    localStorage.setItem('org-roamers-theme', JSON.stringify(theme));
+    localStorage.setItem("org-roamers-theme", JSON.stringify(theme));
   } catch (error) {
-    console.warn('Failed to save theme to localStorage:', error);
+    console.warn("Failed to save theme to localStorage:", error);
   }
 };
 
 export const loadTheme = (): Theme | null => {
   try {
-    const savedTheme = localStorage.getItem('org-roamers-theme');
+    const savedTheme = localStorage.getItem("org-roamers-theme");
     if (savedTheme) {
       return JSON.parse(savedTheme) as Theme;
     }
   } catch (error) {
-    console.warn('Failed to load theme from localStorage:', error);
+    console.warn("Failed to load theme from localStorage:", error);
   }
   return null;
 };
@@ -94,7 +94,7 @@ export const initializeTheme = () => {
     set("--ident", theme.ident);
     set("--comment", theme.comment);
     set("--type", theme.type);
-    
+
     // Update reactive state
     currentTheme.value = savedTheme;
     return savedTheme;

@@ -12,7 +12,7 @@ use orgize::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 pub struct EnvAdvice {
     on: String,
     header: String,
@@ -20,7 +20,7 @@ pub struct EnvAdvice {
     text_styling: String,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 pub struct HtmlExportSettings {
     pub env_advices: Vec<EnvAdvice>,
 }
@@ -39,6 +39,8 @@ pub struct HtmlExport<'a> {
     in_special_block: bool,
     outgoing_id_links: Vec<String>,
     file: String,
+    latex_blocks: Vec<String>,
+    latex_counter: usize,
 }
 
 impl<'a> HtmlExport<'a> {
@@ -51,6 +53,8 @@ impl<'a> HtmlExport<'a> {
             in_special_block: false,
             outgoing_id_links: vec![],
             file,
+            latex_blocks: vec![],
+            latex_counter: 0,
         }
     }
 }
@@ -65,11 +69,11 @@ enum TableRow {
 }
 
 impl HtmlExport<'_> {
-    pub fn finish(self) -> (String, Vec<String>) {
+    pub fn finish(self) -> (String, Vec<String>, Vec<String>) {
         let mut outgoing = self.outgoing_id_links;
         outgoing.sort();
         outgoing.dedup();
-        (self.output, outgoing)
+        (self.output, outgoing, self.latex_blocks)
     }
 }
 
@@ -190,7 +194,9 @@ impl Traverser for HtmlExport<'_> {
             Event::Enter(Container::ExampleBlock(_)) => self.output += "<pre class=\"example\">",
             Event::Leave(Container::ExampleBlock(_)) => self.output += "</pre>",
 
-            Event::Enter(Container::FixedWidth(_)) => self.output += "<pre class=\"program-output\">",
+            Event::Enter(Container::FixedWidth(_)) => {
+                self.output += "<pre class=\"program-output\">"
+            }
             Event::Leave(Container::FixedWidth(_)) => self.output += "</pre>",
 
             Event::Enter(Container::CenterBlock(_)) => self.output += "<div class=\"center\">",
@@ -387,10 +393,24 @@ impl Traverser for HtmlExport<'_> {
             }
 
             Event::LatexFragment(latex) => {
-                let _ = write!(&mut self.output, "{}", &latex.raw());
+                let latex_content = latex.raw().to_string();
+                self.latex_blocks.push(latex_content);
+                let _ = write!(
+                    &mut self.output,
+                    r#"<span class="org-latex-placeholder" data-latex-index="{}">[LaTeX Block {}]</span>"#,
+                    self.latex_counter, self.latex_counter
+                );
+                self.latex_counter += 1;
             }
             Event::LatexEnvironment(latex) => {
-                let _ = write!(&mut self.output, "{}", &latex.raw());
+                let latex_content = latex.raw().to_string();
+                self.latex_blocks.push(latex_content);
+                let _ = write!(
+                    &mut self.output,
+                    r#"<div class="org-latex-block-placeholder" data-latex-index="{}">[LaTeX Environment {}]</div>"#,
+                    self.latex_counter, self.latex_counter
+                );
+                self.latex_counter += 1;
             }
 
             // ignores keyword

@@ -32,8 +32,9 @@ use sqlite::SqliteConnection;
 use transform::export::HtmlExportSettings;
 use websocket::WebSocketBroadcaster;
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StaticServerConfiguration {
@@ -61,6 +62,8 @@ pub struct DynamicServerState {
     pub pending_reload: bool,
     pub updated_links: Vec<RoamLink>,
     pub updated_nodes: Vec<RoamNode>,
+    /// Track files currently being processed to avoid watcher conflicts
+    pub files_being_processed: HashSet<PathBuf>,
 }
 
 impl DynamicServerState {
@@ -89,6 +92,21 @@ impl DynamicServerState {
             },
             None => None,
         }
+    }
+
+    /// Mark a file as being processed to avoid watcher conflicts
+    pub fn mark_file_processing(&mut self, file_path: PathBuf) {
+        self.files_being_processed.insert(file_path);
+    }
+
+    /// Unmark a file as being processed
+    pub fn unmark_file_processing(&mut self, file_path: &PathBuf) {
+        self.files_being_processed.remove(file_path);
+    }
+
+    /// Check if a file is currently being processed
+    pub fn is_file_being_processed(&self, file_path: &PathBuf) -> bool {
+        self.files_being_processed.contains(file_path)
     }
 }
 
@@ -125,5 +143,85 @@ impl ServerState {
             dynamic_state: DynamicServerState::default(),
             websocket_broadcaster: Arc::new(WebSocketBroadcaster::new()),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_file_processing_guard() {
+        // Create a mock server state
+        let temp_dir = std::env::temp_dir();
+        let sqlite = SqliteConnection::init(false).unwrap();
+        let server_state = ServerState {
+            sqlite,
+            html_export_settings: HtmlExportSettings::default(),
+            org_roam_db_path: temp_dir.clone(),
+            static_conf: StaticServerConfiguration::default(),
+            dynamic_state: DynamicServerState::default(),
+            websocket_broadcaster: Arc::new(WebSocketBroadcaster::new()),
+        };
+
+        let app_state = Arc::new(Mutex::new((server_state, Arc::new(Mutex::new(false)))));
+        let test_file = temp_dir.join("test.org");
+
+        // Test that guard properly tracks files
+        {
+            let guard = FileProcessingGuard::new(app_state.clone(), test_file.clone()).unwrap();
+
+            // Check that file is marked as being processed
+            let state = app_state.lock().unwrap();
+            assert!(state.0.dynamic_state.is_file_being_processed(&test_file));
+            drop(state); // Release lock before guard is dropped
+        } // Guard is dropped here
+
+        // Check that file is unmarked after guard is dropped
+        let state = app_state.lock().unwrap();
+        assert!(!state.0.dynamic_state.is_file_being_processed(&test_file));
+    }
+}
+
+/// RAII guard to automatically track file processing state
+/// When dropped, it will automatically unmark the file as being processed
+pub struct FileProcessingGuard {
+    app_state: Arc<Mutex<(ServerState, Arc<Mutex<bool>>)>>,
+    file_path: PathBuf,
+}
+
+impl FileProcessingGuard {
+    /// Create a new guard and mark the file as being processed
+    pub fn new(
+        app_state: Arc<Mutex<(ServerState, Arc<Mutex<bool>>)>>,
+        file_path: PathBuf,
+    ) -> anyhow::Result<Self> {
+        // Mark the file as being processed
+        {
+            let mut state = app_state
+                .lock()
+                .map_err(|e| anyhow::anyhow!("Failed to acquire lock: {}", e))?;
+            state
+                .0
+                .dynamic_state
+                .mark_file_processing(file_path.clone());
+        } // Lock is dropped here
+
+        Ok(FileProcessingGuard {
+            app_state,
+            file_path,
+        })
+    }
+}
+
+impl Drop for FileProcessingGuard {
+    fn drop(&mut self) {
+        if let Ok(mut state) = self.app_state.lock() {
+            state
+                .0
+                .dynamic_state
+                .unmark_file_processing(&self.file_path);
+        }
     }
 }

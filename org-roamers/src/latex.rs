@@ -20,13 +20,30 @@ fn get_temp_path() -> PathBuf {
 }
 
 const PREAMBLE: &str = concat!(
-    "\\documentclass{article}\n",
+    "\\documentclass[12pt,border=2pt]{standalone}\n",
     "\\usepackage[T1]{fontenc}\n",
-    "\\usepackage[active,tightpage]{preview}\n",
+    "\\usepackage[utf8]{inputenc}\n",
     "\\usepackage{amsmath}\n",
     "\\usepackage{amssymb}\n",
+    "\\usepackage{amsfonts}\n",
     "[PACKAGES]\n",
-    "\\usepackage{xcolor}\n"
+    "\\usepackage{xcolor}\n",
+    "\\usepackage{float}\n",
+    "\\usepackage{varwidth}\n",
+    "\\makeatletter\n",
+    "\\renewenvironment{algorithm}[1][htbp]{%\n",
+    "  \\def\\@captype{algorithm}%\n",
+    "  \\begin{varwidth}{\\linewidth}%\n",
+    "  \\centering%\n",
+    "}{%\n",
+    "  \\end{varwidth}%\n",
+    "}\n",
+    "\\renewcommand{\\caption}[2][]{%\n",
+    "  \\par\\medskip%\n",
+    "  \\noindent\\textbf{#2}%\n",
+    "  \\par\\medskip%\n",
+    "}\n",
+    "\\makeatother\n"
 );
 
 fn preamble(headers: Vec<String>) -> String {
@@ -73,10 +90,9 @@ pub fn get_image(latex: String, color: String, headers: Vec<String>) -> anyhow::
     file.write_all(preamble(headers).as_bytes())?;
     file.write_all(format!("\\definecolor{{mycolor}}{{HTML}}{{{color}}}\n").as_bytes())?;
     file.write_all("\n\\begin{document}\n".as_bytes())?;
-    file.write_all("\\begin{preview}\n".as_bytes())?;
     file.write_all("\\color{mycolor}\n".as_bytes())?;
     file.write_all(latex.as_bytes())?;
-    file.write_all("\n\\end{preview}\n\\end{document}\n".as_bytes())?;
+    file.write_all("\n\\end{document}\n".as_bytes())?;
 
     let output = Command::new("latex")
         .args([
@@ -108,8 +124,10 @@ pub fn get_image(latex: String, color: String, headers: Vec<String>) -> anyhow::
             "--optimize",
             "--clipjoin",
             "--relative",
-            "--bbox=preview",
             "--no-fonts",
+            "--exact-bbox",
+            "--precision=6",
+            "--verbosity=0",
             in_file.as_path().to_str().unwrap(),
             "-o",
             format!("{}.svg", hash).as_str(),

@@ -45,7 +45,7 @@ const searchBarRef = ref<SearchBarMethods | null>(null);
 const websocket: Ref<WebSocket | null> = ref(null);
 
 // Provide WebSocket to child components
-provide('websocket', websocket);
+provide("websocket", websocket);
 
 const connectWebSocket = () => {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -127,7 +127,10 @@ const connectWebSocket = () => {
         case "ping":
           // Respond to ping with pong
           console.log("Received ping, sending pong");
-          if (websocket.value && websocket.value.readyState === WebSocket.OPEN) {
+          if (
+            websocket.value &&
+            websocket.value.readyState === WebSocket.OPEN
+          ) {
             try {
               websocket.value.send(JSON.stringify({ type: "pong" }));
               console.log("Pong sent successfully");
@@ -144,7 +147,12 @@ const connectWebSocket = () => {
 
         case "search_response":
           // Forward search responses to SearchBar component
-          console.log("Search response received:", message.request_id, message.results.length, "results");
+          console.log(
+            "Search response received:",
+            message.request_id,
+            message.results.length,
+            "results",
+          );
           if (searchBarRef.value) {
             searchBarRef.value.handleSearchResponse(message);
           } else {
@@ -162,7 +170,10 @@ const connectWebSocket = () => {
 
   websocket.value.onerror = (error) => {
     console.error("WebSocket error occurred:", error);
-    console.log("WebSocket readyState during error:", websocket.value?.readyState);
+    console.log(
+      "WebSocket readyState during error:",
+      websocket.value?.readyState,
+    );
     connectionStatus.value = "disconnected";
     errorMessage.value = "WebSocket connection error.";
   };

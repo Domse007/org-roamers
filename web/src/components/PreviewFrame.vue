@@ -1,11 +1,18 @@
 <script setup lang="ts">
 import hljs from "highlight.js";
-import { nextTick, ref, useTemplateRef, watch, onUnmounted, type Ref } from "vue";
+import {
+  nextTick,
+  ref,
+  useTemplateRef,
+  watch,
+  onUnmounted,
+  type Ref,
+} from "vue";
 import { getScope } from "../settings.ts";
 import { type OrgAsHTMLResponse } from "../types.ts";
 import { History } from "../history.ts";
 import BigButton from "./basic/BigButton.vue";
-import { setLatexDebugMode, createAutoRenderConfig, createServerFallbackErrorCallback, testServerFallback } from "../latex-utils.ts";
+import { processLatexPlaceholders } from "../latex-utils.ts";
 
 const props = defineProps<{ id: string }>();
 const shown: Ref<"none" | "flex"> = ref("none");
@@ -13,6 +20,7 @@ const links: Ref<{ display: string; id: string }[]> = ref([]);
 
 const rendered = ref("");
 let current_id: string = "";
+let current_latex_blocks: string[] = [];
 const preview_ref = useTemplateRef("preview-ref");
 
 const history = new History<string>();
@@ -23,29 +31,29 @@ const isResizing = ref(false);
 
 const startResize = (event: MouseEvent) => {
   isResizing.value = true;
-  document.addEventListener('mousemove', doResize);
-  document.addEventListener('mouseup', stopResize);
-  document.body.style.cursor = 'ew-resize';
-  document.body.style.userSelect = 'none'; // Prevent text selection during resize
+  document.addEventListener("mousemove", doResize);
+  document.addEventListener("mouseup", stopResize);
+  document.body.style.cursor = "ew-resize";
+  document.body.style.userSelect = "none"; // Prevent text selection during resize
   event.preventDefault();
 };
 
 const doResize = (event: MouseEvent) => {
   if (!isResizing.value) return;
-  
+
   const windowWidth = window.innerWidth;
   const newWidth = ((windowWidth - event.clientX) / windowWidth) * 100;
-  
+
   // Constrain width between 20% and 80%
   frameWidth.value = Math.max(20, Math.min(80, newWidth));
 };
 
 const stopResize = () => {
   isResizing.value = false;
-  document.removeEventListener('mousemove', doResize);
-  document.removeEventListener('mouseup', stopResize);
-  document.body.style.cursor = '';
-  document.body.style.userSelect = '';
+  document.removeEventListener("mousemove", doResize);
+  document.removeEventListener("mouseup", stopResize);
+  document.body.style.cursor = "";
+  document.body.style.userSelect = "";
 };
 
 const preview = (id: string) => {
@@ -54,11 +62,31 @@ const preview = (id: string) => {
   console.log(`Previewing ${id}`);
   const scope: "file" | "node" = getScope();
   fetch(`/org?id=${id}&scope=${scope}`)
-    .then((response) => response.json())
+    .then((response) => {
+      console.log("Org response status:", response.status);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return response.json();
+    })
     .then((resp: OrgAsHTMLResponse) => {
+      console.log("Org response data:", {
+        orgLength: resp.org?.length || 0,
+        linksCount: resp.links?.length || 0,
+        latexBlocksCount: resp.latex_blocks?.length || 0,
+      });
       history.push(id);
       rendered.value = resp.org;
       links.value = resp.links;
+      current_latex_blocks = resp.latex_blocks || [];
+      console.log(
+        `Loaded content with ${current_latex_blocks.length} LaTeX blocks`,
+      );
+      expand();
+    })
+    .catch((error) => {
+      console.error("Failed to load org content:", error);
+      rendered.value = `<div class="error">Failed to load content: ${error.message}</div>`;
       expand();
     });
 };
@@ -88,11 +116,13 @@ const updateContent = (newContent: string) => {
 };
 
 // Dynamic import for COBOL syntax highlighting to avoid build issues
-import('highlightjs-cobol').then((hljsCOBOL) => {
-  hljs.registerLanguage("cobol", hljsCOBOL.default);
-}).catch((error) => {
-  console.warn('Failed to load COBOL syntax highlighting:', error);
-});
+import("highlightjs-cobol")
+  .then((hljsCOBOL) => {
+    hljs.registerLanguage("cobol", hljsCOBOL.default);
+  })
+  .catch((error) => {
+    console.warn("Failed to load COBOL syntax highlighting:", error);
+  });
 
 // Updpate the selector from 'pre code' to 'code' to autodetect inline src
 // like src_java[:exports code]{ void main() } which has no <pre></pre>.
@@ -110,94 +140,33 @@ const configureIDLinks = (_class: string) => {
 
 const collapseIcon = () => (shown.value == "none" ? "🗁" : "🗀");
 
-// Debug mode state
-const debugLatex = ref(false);
-
-// Toggle debug mode
-const toggleLatexDebug = () => {
-  debugLatex.value = !debugLatex.value;
-  setLatexDebugMode(debugLatex.value);
-  console.log(`LaTeX debug mode ${debugLatex.value ? 'enabled' : 'disabled'}`);
-  
-  if (debugLatex.value && rendered.value) {
-    console.log('=== LATEX DEBUG ===');
-    console.log('Content length:', rendered.value.length);
-    
-    if (preview_ref.value) {
-      const katexElements = preview_ref.value.querySelectorAll('.katex');
-      console.log('KaTeX elements found:', katexElements.length);
-    }
-    
-    // Test server fallback function available in console
-    (window as any).testLatexFallback = () => {
-      const testLatex = '\\begin{algorithmic}\\State test\\end{algorithmic}';
-      testServerFallback(testLatex, current_id, updateContent, getCurrentContent);
-    };
-    
-    (window as any).testBasicLatex = () => {
-      const testLatex = '$$\\sum_{i=1}^n i = \\frac{n(n+1)}{2}$$';
-      testServerFallback(testLatex, current_id, updateContent, getCurrentContent);
-    };
-    
-    console.log('Available: testLatexFallback() and testBasicLatex()');
-    console.log('==================');
-  }
-};
-
-// Manual re-render function for LaTeX
-const reprocessLatex = async () => {
-  if (!preview_ref.value || !rendered.value) return;
-  
-  console.log("Manual LaTeX reprocessing triggered");
-  
-  try {
-    const renderMathModule = await import("katex/contrib/auto-render");
-    const errorCallback = createServerFallbackErrorCallback(current_id, updateContent, getCurrentContent);
-    renderMathModule.default(preview_ref.value, createAutoRenderConfig(errorCallback));
-    
-    console.log("Manual LaTeX reprocessing completed");
-  } catch (error) {
-    console.error("Manual LaTeX reprocessing failed:", error);
-  }
-};
-
 watch(props, () => preview(props.id));
 watch(rendered, async () => {
   await nextTick();
-  
+
   // Apply syntax highlighting
   hljs.highlightAll();
-  
-  // Apply KaTeX with server fallback
-  if (preview_ref.value) {
+
+  // Process LaTeX placeholders with secure server rendering
+  if (preview_ref.value && current_id && current_latex_blocks.length > 0) {
     try {
-      const renderMathModule = await import("katex/contrib/auto-render");
-      const errorCallback = createServerFallbackErrorCallback(current_id, updateContent, getCurrentContent);
-      
-      console.log("Content before KaTeX processing:", preview_ref.value.innerHTML.substring(0, 500));
-      
-      renderMathModule.default(preview_ref.value, createAutoRenderConfig(errorCallback));
-      
-      console.log("KaTeX processing completed");
-      console.log("Content after KaTeX processing:", preview_ref.value.innerHTML.substring(0, 500));
-      
-      // Check for unprocessed algorithmic blocks
-      const algorithmic = preview_ref.value.innerHTML.match(/\\begin\{algorithmic\}[\s\S]*?\\end\{algorithmic\}/g);
-      if (algorithmic) {
-        console.log("Found unprocessed algorithmic blocks:", algorithmic);
-        // Manually trigger server fallback for each one
-        for (let i = 0; i < algorithmic.length; i++) {
-          const testLatex = algorithmic[i];
-          console.log(`Manually triggering server fallback for block ${i+1}:`, testLatex.substring(0, 100) + "...");
-          const errorCallback = createServerFallbackErrorCallback(current_id, updateContent, getCurrentContent);
-          errorCallback(`Unprocessed algorithmic block: ${testLatex}`, new Error("Manual trigger"));
-        }
-      }
+      console.log(
+        "Processing LaTeX placeholders:",
+        current_latex_blocks.length,
+      );
+
+      await processLatexPlaceholders(
+        preview_ref.value,
+        current_id,
+        current_latex_blocks,
+      );
+
+      console.log("LaTeX processing completed");
     } catch (error) {
-      console.error("KaTeX rendering failed:", error);
+      console.error("LaTeX processing failed:", error);
     }
   }
-  
+
   // Configure link handlers
   configureIDLinks("org-preview-id-link");
   configureIDLinks("org-preview-footer-link");
@@ -218,18 +187,21 @@ const emit = defineEmits(["previewSwitch"]);
     fg="var(--base)"
     bg="var(--clickable)"
     :onclick="resize"
-    :style="{ 
-      position: 'absolute', 
-      right: shown === 'flex' ? frameWidth + '%' : '0px', 
-      top: '0px', 
-      zIndex: 52
+    :style="{
+      position: 'absolute',
+      right: shown === 'flex' ? frameWidth + '%' : '0px',
+      top: '0px',
+      zIndex: 52,
     }"
   >
     {{ collapseIcon() }}
   </BigButton>
-  <div class="org-preview-outerframe" :style="{ display: shown, width: frameWidth + '%' }">
-    <div 
-      class="resize-handle" 
+  <div
+    class="org-preview-outerframe"
+    :style="{ display: shown, width: frameWidth + '%' }"
+  >
+    <div
+      class="resize-handle"
       @mousedown="startResize"
       :style="{ cursor: isResizing ? 'ew-resize' : 'ew-resize' }"
     ></div>
@@ -268,20 +240,6 @@ const emit = defineEmits(["previewSwitch"]);
           @button-clicked="preview(current_id)"
           title="Refresh content"
           >&circlearrowleft;
-        </BigButton>
-        <BigButton
-          fg="var(--base)"
-          bg="var(--clickable)"
-          @button-clicked="reprocessLatex"
-          title="Reprocess LaTeX"
-          >∫
-        </BigButton>
-        <BigButton
-          :fg="debugLatex ? 'var(--warn)' : 'var(--base)'"
-          :bg="debugLatex ? 'var(--surface)' : 'var(--clickable)'"
-          @button-clicked="toggleLatexDebug"
-          title="Toggle LaTeX Debug Mode"
-          >🐛
         </BigButton>
       </div>
       <div id="org-preview" ref="preview-ref" v-html="rendered"></div>
@@ -516,6 +474,22 @@ svg {
   height: auto;
 }
 
+/* Specific styling for LaTeX-rendered SVGs */
+svg.org-latex-rendered {
+  fill: var(--text) !important;
+  color: var(--text) !important;
+  max-width: 100%;
+  height: auto;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* Ensure all paths and elements in LaTeX SVGs use theme color */
+svg.org-latex-rendered * {
+  fill: var(--text) !important;
+  color: var(--text) !important;
+}
+
 /* Handle org-mode specific LaTeX classes */
 .org-latex {
   color: var(--text);
@@ -527,13 +501,26 @@ svg {
 }
 
 /* Better handling of LaTeX errors and fallbacks */
-.katex-error {
+.katex-error,
+.latex-error {
   color: var(--error, #ff6b6b) !important;
   border: 1px solid var(--error, #ff6b6b);
   background-color: var(--error-bg, rgba(255, 107, 107, 0.1));
   padding: 2px 4px;
   border-radius: 3px;
   font-family: monospace;
+  font-size: 0.9em;
+}
+
+/* LaTeX placeholder styling while loading */
+.org-latex-placeholder,
+.org-latex-block-placeholder {
+  color: var(--comment, #737994);
+  font-style: italic;
+  background-color: var(--base);
+  padding: 2px 4px;
+  border-radius: 3px;
+  border: 1px dashed var(--comment, #737994);
 }
 
 /* Responsive LaTeX rendering */
@@ -541,7 +528,7 @@ svg {
   .katex {
     font-size: 0.9em;
   }
-  
+
   .katex-display-wrapper {
     margin: 0.5em 0;
   }

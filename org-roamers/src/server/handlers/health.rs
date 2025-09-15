@@ -1,7 +1,4 @@
-use axum::{
-    extract::State,
-    response::Response,
-};
+use axum::{extract::State, response::Response};
 
 use crate::server::services::asset_service;
 use crate::server::AppState;

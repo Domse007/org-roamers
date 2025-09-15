@@ -123,11 +123,20 @@ impl OrgWatcher {
             }
         }
 
-        // Process all pending events
+        // Process all pending events, filtering out files currently being processed
         let mut graph_update = GraphUpdate::new();
         let events_to_process: Vec<_> = self.pending_events.drain().collect();
 
         for path in events_to_process {
+            // Skip files that are currently being processed by the application
+            if self.should_ignore_file(&path, state) {
+                tracing::debug!(
+                    "Ignoring file watcher event for file being processed: {:?}",
+                    path
+                );
+                continue;
+            }
+
             match self.process_file_change(state, &path)? {
                 Some(update) => self.merge_updates(&mut graph_update, update),
                 None => continue,
@@ -139,6 +148,11 @@ impl OrgWatcher {
         } else {
             Ok(Some(graph_update))
         }
+    }
+
+    /// Check if a file should be ignored due to being currently processed
+    fn should_ignore_file(&self, file_path: &PathBuf, state: &ServerState) -> bool {
+        state.dynamic_state.is_file_being_processed(file_path)
     }
 
     fn extract_org_events(&self, event: Event) -> anyhow::Result<Option<Vec<OrgWatcherEvent>>> {

@@ -32,6 +32,7 @@ export interface OrgAsHTMLResponse {
     display: string;
     id: string;
   }[];
+  latex_blocks: string[];
 }
 
 export interface WebSocketMessage {

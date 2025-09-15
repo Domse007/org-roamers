@@ -57,10 +57,7 @@ pub type ClientId = u64;
 pub enum WebSocketMessage {
     /// Search request from client
     #[serde(rename = "search_request")]
-    SearchRequest {
-        query: String,
-        request_id: String,
-    },
+    SearchRequest { query: String, request_id: String },
     /// Search results response
     #[serde(rename = "search_response")]
     SearchResponse {
@@ -285,7 +282,7 @@ impl WebSocketBroadcaster {
 /// * `socket` - The WebSocket connection
 /// * `broadcaster` - Shared broadcaster instance for message distribution
 pub async fn handle_websocket(
-    socket: WebSocket, 
+    socket: WebSocket,
     broadcaster: Arc<WebSocketBroadcaster>,
     app_state: Arc<std::sync::Mutex<(crate::ServerState, Arc<std::sync::Mutex<bool>>)>>,
 ) {
@@ -321,8 +318,11 @@ pub async fn handle_websocket(
                             info!("Received pong from client {}", client_id);
                         }
                         Ok(WebSocketMessage::SearchRequest { query, request_id }) => {
-                            info!("Received search request from client {}: {}", client_id, query);
-                            
+                            info!(
+                                "Received search request from client {}: {}",
+                                client_id, query
+                            );
+
                             // Process search in a separate task to avoid blocking
                             let app_state_clone = app_state.clone();
                             let broadcaster_clone = broadcaster_clone.clone();
@@ -330,20 +330,24 @@ pub async fn handle_websocket(
                                 let results = {
                                     let mut state_guard = app_state_clone.lock().unwrap();
                                     let (ref mut server_state, _) = *state_guard;
-                                    crate::server::services::search_service::search(server_state, query)
+                                    crate::server::services::search_service::search(
+                                        server_state,
+                                        query,
+                                    )
                                 };
-                                
+
                                 // Extract results from the first provider (usually sqlite)
-                                let search_results = results.providers
+                                let search_results = results
+                                    .providers
                                     .first()
                                     .map(|provider| provider.results.clone())
                                     .unwrap_or_default();
-                                
+
                                 let response = WebSocketMessage::SearchResponse {
                                     request_id,
                                     results: search_results,
                                 };
-                                
+
                                 broadcaster_clone.broadcast(response).await;
                             });
                         }

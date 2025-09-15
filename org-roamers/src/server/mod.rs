@@ -12,8 +12,7 @@ use axum::{
 
 use tower_http::cors::CorsLayer;
 
-use crate::watcher;
-use crate::ServerState;
+use crate::{watcher, ServerState};
 
 pub mod data;
 pub mod emacs;
@@ -72,9 +71,8 @@ pub fn start_server(url: String, state: ServerState) -> Result<ServerRuntime, Bo
     let handle = std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new()?;
         rt.block_on(async {
-            // Start file watcher with WebSocket integration if enabled
+            // Start file watcher with concurrency conflict resolution
             if use_fs_watcher {
-                tracing::info!("Starting WebSocket-integrated file watcher.");
                 let app_state_clone = app_state.clone();
                 let watch_path = org_roam_db_path.clone();
                 let runtime_handle = tokio::runtime::Handle::current();
@@ -84,6 +82,8 @@ pub fn start_server(url: String, state: ServerState) -> Result<ServerRuntime, Bo
                     watch_path,
                     Some(runtime_handle),
                 )?;
+
+                tracing::info!("File watcher enabled with concurrency conflict resolution");
             }
 
             let listener = tokio::net::TcpListener::bind(&url).await?;

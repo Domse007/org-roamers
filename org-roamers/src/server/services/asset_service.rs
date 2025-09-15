@@ -68,24 +68,34 @@ pub fn default_route_content(_db: &mut ServerState, root: String, url: Option<St
 
     let mut headers = HeaderMap::new();
     headers.insert("content-type", mime.parse().unwrap());
-    
+
     // Add caching headers - only apply aggressive caching in release builds
     if cfg!(debug_assertions) {
         // Development mode: minimal caching to avoid stale content
-        headers.insert("cache-control", "no-cache, must-revalidate".parse().unwrap());
-        tracing::debug!("Serving {} with no-cache headers (development mode)", rel_path.display());
+        headers.insert(
+            "cache-control",
+            "no-cache, must-revalidate".parse().unwrap(),
+        );
+        tracing::debug!(
+            "Serving {} with no-cache headers (development mode)",
+            rel_path.display()
+        );
     } else {
         // Release mode: optimized caching for better performance
         match rel_path.extension().and_then(|ext| ext.to_str()) {
             Some("woff2") | Some("woff") | Some("ttf") | Some("otf") | Some("eot") => {
                 // Font files can be cached for a long time (1 year)
-                headers.insert("cache-control", "public, max-age=31536000, immutable".parse().unwrap());
+                headers.insert(
+                    "cache-control",
+                    "public, max-age=31536000, immutable".parse().unwrap(),
+                );
             }
             Some("css") | Some("js") => {
                 // CSS and JS can be cached for a moderate time (1 day)
                 headers.insert("cache-control", "public, max-age=86400".parse().unwrap());
             }
-            Some("png") | Some("jpg") | Some("jpeg") | Some("gif") | Some("svg") | Some("webp") | Some("ico") => {
+            Some("png") | Some("jpg") | Some("jpeg") | Some("gif") | Some("svg") | Some("webp")
+            | Some("ico") => {
                 // Images can be cached for a moderate time (1 week)
                 headers.insert("cache-control", "public, max-age=604800".parse().unwrap());
             }
@@ -94,7 +104,10 @@ pub fn default_route_content(_db: &mut ServerState, root: String, url: Option<St
                 headers.insert("cache-control", "public, max-age=3600".parse().unwrap());
             }
         }
-        tracing::debug!("Serving {} with optimized caching headers (release mode)", rel_path.display());
+        tracing::debug!(
+            "Serving {} with optimized caching headers (release mode)",
+            rel_path.display()
+        );
     }
 
     (StatusCode::OK, headers, bytes).into_response()
@@ -136,18 +149,30 @@ pub fn serve_assets<P: AsRef<Path>>(root: P, file: String) -> Response {
 
     let mut headers = HeaderMap::new();
     headers.insert("content-type", mime.parse().unwrap());
-    
+
     // Add caching headers - only apply aggressive caching in release builds
     if cfg!(debug_assertions) {
         // Development mode: minimal caching to avoid stale content
-        headers.insert("cache-control", "no-cache, must-revalidate".parse().unwrap());
-        tracing::debug!("Serving asset {} with no-cache headers (development mode)", file);
+        headers.insert(
+            "cache-control",
+            "no-cache, must-revalidate".parse().unwrap(),
+        );
+        tracing::debug!(
+            "Serving asset {} with no-cache headers (development mode)",
+            file
+        );
     } else {
         // Release mode: optimized caching for better performance
-        match PathBuf::from(&file).extension().and_then(|ext| ext.to_str()) {
+        match PathBuf::from(&file)
+            .extension()
+            .and_then(|ext| ext.to_str())
+        {
             Some("woff2") | Some("woff") | Some("ttf") | Some("otf") | Some("eot") => {
                 // Font files can be cached for a long time
-                headers.insert("cache-control", "public, max-age=31536000, immutable".parse().unwrap());
+                headers.insert(
+                    "cache-control",
+                    "public, max-age=31536000, immutable".parse().unwrap(),
+                );
             }
             Some("png") | Some("jpg") | Some("jpeg") | Some("gif") | Some("svg") | Some("webp") => {
                 // Images can be cached for a moderate time
@@ -158,7 +183,10 @@ pub fn serve_assets<P: AsRef<Path>>(root: P, file: String) -> Response {
                 headers.insert("cache-control", "public, max-age=3600".parse().unwrap());
             }
         }
-        tracing::debug!("Serving asset {} with optimized caching headers (release mode)", file);
+        tracing::debug!(
+            "Serving asset {} with optimized caching headers (release mode)",
+            file
+        );
     }
 
     (StatusCode::OK, headers, buffer).into_response()

@@ -13,9 +13,6 @@ pub async fn get_org_as_html_handler(
     AxumQuery(params): AxumQuery<HashMap<String, String>>,
     State(app_state): State<AppState>,
 ) -> Response {
-    let mut state = app_state.lock().unwrap();
-    let (ref mut server_state, _) = *state;
-
     let scope = params
         .get("scope")
         .cloned()
@@ -29,5 +26,5 @@ pub async fn get_org_as_html_handler(
         },
     };
 
-    org_service::get_org_as_html(server_state, query, scope).into_response()
+    org_service::get_org_as_html(app_state, query, scope).into_response()
 }

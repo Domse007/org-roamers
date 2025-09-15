@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { onMounted, type Ref, ref, computed } from "vue";
-import { themeToArray, setTheme, type Theme, currentTheme } from "../../theme.ts";
+import {
+  themeToArray,
+  setTheme,
+  type Theme,
+  currentTheme,
+} from "../../theme.ts";
 
 const themeProp = defineProps<{ theme: Theme }>();
 
@@ -27,7 +32,11 @@ const emit = defineEmits(["redrawGraph"]);
 </script>
 
 <template>
-  <div class="theme-entry" :class="{ active: isActive }" :onclick="onClickSetTheme">
+  <div
+    class="theme-entry"
+    :class="{ active: isActive }"
+    :onclick="onClickSetTheme"
+  >
     <div class="theme-title">
       <div>{{ themeName }} <span v-if="isActive">✓</span></div>
       <div>{{ themeFlavour }}</div>

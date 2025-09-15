@@ -179,6 +179,7 @@ pub struct OutgoingLink {
 pub struct OrgAsHTMLResponse {
     pub org: String,
     pub links: Vec<OutgoingLink>,
+    pub latex_blocks: Vec<String>,
 }
 
 /// # Example
@@ -196,6 +197,7 @@ impl OrgAsHTMLResponse {
         Self {
             org: text.to_string(),
             links: vec![],
+            latex_blocks: vec![],
         }
     }
 }
@@ -297,10 +299,12 @@ mod tests {
                 display: "t".into(),
                 id: "id".into(),
             }],
+            latex_blocks: vec![],
         };
         let expected = concat!(
             "{\"org\":\"<h1>title</h1>\",",
-            "\"links\":[{\"display\":\"t\",\"id\":\"id\"}]}"
+            "\"links\":[{\"display\":\"t\",\"id\":\"id\"}],",
+            "\"latex_blocks\":[]}"
         );
         assert_eq!(serde_json::to_string(&resp).unwrap(), expected);
     }

@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, type Ref, inject, onMounted } from "vue";
-import { type SearchRequestMessage, type SearchResponseMessage } from "../types.ts";
+import {
+  type SearchRequestMessage,
+  type SearchResponseMessage,
+} from "../types.ts";
 import SearchSuggestion from "./SearchSuggestion.vue";
 
 const searchSuggestions: Ref<
@@ -10,16 +13,22 @@ const searchterm: Ref<string> = ref("");
 const showSuggestions: Ref<boolean> = ref(false);
 
 // Get WebSocket from parent component
-const websocket = inject<Ref<WebSocket | null>>('websocket', ref(null));
-const pendingSearchRequests = new Map<string, (results: { display: string; id: string; tags: string[] }[]) => void>();
+const websocket = inject<Ref<WebSocket | null>>("websocket", ref(null));
+const pendingSearchRequests = new Map<
+  string,
+  (results: { display: string; id: string; tags: string[] }[]) => void
+>();
 
 // Generate unique request IDs
-const generateRequestId = () => `search_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+const generateRequestId = () =>
+  `search_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-const search = async (query: string): Promise<{ display: string; id: string; tags: string[] }[]> => {
+const search = async (
+  query: string,
+): Promise<{ display: string; id: string; tags: string[] }[]> => {
   return new Promise((resolve, reject) => {
     if (!websocket.value || websocket.value.readyState !== WebSocket.OPEN) {
-      console.error('WebSocket is not connected');
+      console.error("WebSocket is not connected");
       resolve([]); // Return empty results if WebSocket is not available
       return;
     }
@@ -31,9 +40,9 @@ const search = async (query: string): Promise<{ display: string; id: string; tag
 
     const requestId = generateRequestId();
     const searchMessage: SearchRequestMessage = {
-      type: 'search_request',
+      type: "search_request",
       query: query.trim(),
-      request_id: requestId
+      request_id: requestId,
     };
 
     // Store the promise resolver
@@ -51,7 +60,7 @@ const search = async (query: string): Promise<{ display: string; id: string; tag
     try {
       websocket.value.send(JSON.stringify(searchMessage));
     } catch (error) {
-      console.error('Failed to send search request:', error);
+      console.error("Failed to send search request:", error);
       pendingSearchRequests.delete(requestId);
       resolve([]);
     }
@@ -65,16 +74,20 @@ const handleSearchResponse = (message: SearchResponseMessage) => {
     resolver(message.results);
     pendingSearchRequests.delete(message.request_id);
   } else {
-    console.warn(`Received search response for unknown request: ${message.request_id}`);
+    console.warn(
+      `Received search response for unknown request: ${message.request_id}`,
+    );
   }
 };
 
 const InputHandler = () => {
   showSuggestions.value = true;
-  search(searchterm.value).then((results: { display: string; id: string; tags: string[] }[]) => {
-    searchSuggestions.value = results;
-    console.log('Search results:', searchSuggestions.value);
-  });
+  search(searchterm.value).then(
+    (results: { display: string; id: string; tags: string[] }[]) => {
+      searchSuggestions.value = results;
+      console.log("Search results:", searchSuggestions.value);
+    },
+  );
 };
 
 const searchOnLeave = () => {
@@ -88,7 +101,7 @@ export interface SearchBarMethods {
 
 // Expose the search response handler to the parent component
 defineExpose<SearchBarMethods>({
-  handleSearchResponse
+  handleSearchResponse,
 });
 </script>
 
