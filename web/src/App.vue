@@ -251,6 +251,12 @@ onUnmounted(() => {
 
 const errorMessage: Ref<string | null> = ref(null);
 const closeError = () => (errorMessage.value = null);
+
+// Handle errors from child components
+const handleError = (error: string) => {
+  console.error("Application error:", error);
+  errorMessage.value = error;
+};
 </script>
 
 <template>
@@ -258,10 +264,11 @@ const closeError = () => (errorMessage.value = null);
     <ErrorDialog v-if="errorMessage != null" @dialog-close="closeError">{{
       errorMessage
     }}</ErrorDialog>
-    <SearchBar ref="searchBarRef" @open-node="updatePreviewID"></SearchBar>
+    <SearchBar ref="searchBarRef" @open-node="updatePreviewID" @error="handleError"></SearchBar>
     <GraphView
       @open-node="updatePreviewID"
       @updates-processed="clearGraphUpdates"
+      @error="handleError"
       :count="graphUpdateCount"
       :toggle-layouter="toggleLayouterRef"
       :zoom-node="previewID"
@@ -270,6 +277,7 @@ const closeError = () => (errorMessage.value = null);
     <PreviewFrame
       :id="previewID"
       @preview-switch="updatePreviewID"
+      @error="handleError"
     ></PreviewFrame>
     <SettingsPane
       @redraw-graph="redrawGraph"

@@ -66,6 +66,13 @@ const updateGraph = () => {
       );
       console.log(`Counted ${count} olp links.`);
       setupGraph();
+    })
+    .catch((error) => {
+      console.error("Failed to load graph data:", error);
+      const errorMsg = error.name === 'TypeError' && error.message.includes('fetch') 
+        ? "Server is not responding. Please check if the server is running."
+        : `Failed to load graph: ${error.message}`;
+      emit("error", errorMsg);
     });
 };
 
@@ -420,7 +427,7 @@ watch(prop, () => {
 });
 
 onMounted(updateGraph);
-const emit = defineEmits(["openNode", "updatesProcessed"]);
+const emit = defineEmits(["openNode", "updatesProcessed", "error"]);
 </script>
 
 <template>

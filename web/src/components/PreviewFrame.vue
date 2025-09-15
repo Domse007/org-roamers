@@ -86,7 +86,11 @@ const preview = (id: string) => {
     })
     .catch((error) => {
       console.error("Failed to load org content:", error);
-      rendered.value = `<div class="error">Failed to load content: ${error.message}</div>`;
+      const errorMsg = error.name === 'TypeError' && error.message.includes('fetch') 
+        ? "Server is not responding. Please check if the server is running."
+        : `Failed to load content: ${error.message}`;
+      emit("error", errorMsg);
+      rendered.value = `<div class="error">${errorMsg}</div>`;
       expand();
     });
 };
@@ -179,7 +183,7 @@ onUnmounted(() => {
   }
 });
 
-const emit = defineEmits(["previewSwitch"]);
+const emit = defineEmits(["previewSwitch", "error"]);
 </script>
 
 <template>
