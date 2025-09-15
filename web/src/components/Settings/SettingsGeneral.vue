@@ -27,77 +27,143 @@ const props = defineProps<{
 </script>
 
 <template>
-  <div id="theme-settings">
+  <div class="settings-general">
     <!-- Connection Status Section -->
-    <div class="connection-section">
-      <b style="margin-bottom: 5px">Connection Status:</b>
-      <div
-        class="connection-status"
-        :class="props.connectionStatus || 'disconnected'"
-      >
-        <span v-if="(props.connectionStatus || 'disconnected') === 'connected'"
-          >🟢 Connected ({{ props.websocketState || "unknown" }})</span
-        >
-        <span v-if="(props.connectionStatus || 'disconnected') === 'connecting'"
-          >🟡 Connecting...</span
-        >
-        <span
-          v-if="(props.connectionStatus || 'disconnected') === 'disconnected'"
-          >🔴 Disconnected - Check console for details</span
-        >
-      </div>
-      <div v-if="props.pendingChanges" class="pending-changes">
-        ⏳ Processing changes...
-      </div>
-      <div class="debug-info" style="font-size: 10px; color: var(--overlay)">
-        WS State: {{ props.websocketState || "null" }} | URL:
-        {{ props.websocketUrl || "none" }}
-      </div>
-    </div>
-    <hr :style="{ color: 'var(--highlight)' }" />
-
-    <div>
-      <b style="margin-bottom: 5px">Preview Settings:</b>
-      <div>
-        <input type="checkbox" :onchange="previewScopeChange" />
-        Fetch full file
-      </div>
-      <hr :style="{ color: 'var(--highlight)' }" />
-      <b style="margin-bottom: 5px">Graph Settings:</b>
-      <div style="display: flex">
-        <input type="checkbox" v-model="timeoutEnabled" />
-        <div>
-          Stop layouting after
-          <input type="number" v-model="timeoutTime" />
-          secs
+    <section class="settings-section">
+      <h3 class="section-title">Connection Status</h3>
+      <div class="status-grid">
+        <div class="status-item">
+          <span class="status-label">Server:</span>
+          <div class="connection-status" :class="props.connectionStatus || 'disconnected'">
+            <span v-if="(props.connectionStatus || 'disconnected') === 'connected'">
+              🟢 Connected
+            </span>
+            <span v-if="(props.connectionStatus || 'disconnected') === 'connecting'">
+              🟡 Connecting...
+            </span>
+            <span v-if="(props.connectionStatus || 'disconnected') === 'disconnected'">
+              🔴 Disconnected
+            </span>
+          </div>
+        </div>
+        <div v-if="props.pendingChanges" class="status-item">
+          <span class="status-label">Changes:</span>
+          <div class="pending-changes">⏳ Processing...</div>
+        </div>
+        <div class="status-details">
+          <span class="debug-info">
+            WebSocket State: {{ props.websocketState || "null" }}
+          </span>
         </div>
       </div>
-      <div :style="{ padding: '5px' }">
-        <StyledButton
-          text="Restart layout"
-          bg="var(--clickable)"
-          fg="var(--text)"
-          @button-clicked="$emit('toggleLayouter')"
-        >
-        </StyledButton>
+    </section>
+
+    <!-- Preview Settings Section -->
+    <section class="settings-section">
+      <h3 class="section-title">Preview Settings</h3>
+      <div class="setting-item">
+        <label class="setting-label">
+          <input 
+            type="checkbox" 
+            :checked="!generalSettings.showEntireFile"
+            @change="previewScopeChange"
+            class="setting-checkbox"
+          />
+          <span class="setting-text">Show full file content</span>
+        </label>
+        <p class="setting-description">
+          When enabled, preview shows the entire file instead of just the current node.
+        </p>
       </div>
-      <hr :style="{ color: 'var(--highlight)' }" />
-    </div>
+    </section>
+
+    <!-- Graph Settings Section -->
+    <section class="settings-section">
+      <h3 class="section-title">Graph Settings</h3>
+      <div class="setting-item">
+        <label class="setting-label">
+          <input 
+            type="checkbox" 
+            v-model="timeoutEnabled"
+            class="setting-checkbox"
+          />
+          <span class="setting-text">Auto-stop layout</span>
+        </label>
+        <div v-if="timeoutEnabled" class="setting-controls">
+          <label class="input-group">
+            <span>Stop after:</span>
+            <input 
+              type="number" 
+              v-model="timeoutTime"
+              min="1"
+              max="300"
+              class="setting-input"
+            />
+            <span>seconds</span>
+          </label>
+        </div>
+        <p class="setting-description">
+          Automatically stops the graph layout algorithm after the specified time.
+        </p>
+      </div>
+      <div class="setting-item">
+        <StyledButton
+          text="Restart Layout"
+          bg="var(--clickable)"
+          fg="var(--base)"
+          @button-clicked="$emit('toggleLayouter')"
+        />
+      </div>
+    </section>
   </div>
 </template>
 
 <style scoped>
-#theme-settings {
-  padding: 5px;
+.settings-general {
+  padding: 16px;
+  height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
-.connection-section {
-  margin-bottom: 10px;
+.settings-section {
+  margin-bottom: 24px;
+}
+
+.settings-section:last-child {
+  margin-bottom: 0;
+}
+
+.section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--highlight);
+  margin: 0 0 12px 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid color-mix(in srgb, var(--highlight) 20%, transparent);
+}
+
+.status-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-label {
+  font-weight: 500;
+  color: var(--text);
+  min-width: 60px;
 }
 
 .connection-status {
-  color: var(--text);
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .connection-status.connected {
@@ -114,21 +180,113 @@ const props = defineProps<{
 
 .pending-changes {
   color: var(--highlight);
+  font-size: 13px;
+  font-weight: 500;
   animation: pulse 1.5s ease-in-out infinite alternate;
-  font-size: 12px;
 }
 
 @keyframes pulse {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0.5;
-  }
+  from { opacity: 1; }
+  to { opacity: 0.5; }
+}
+
+.status-details {
+  margin-top: 4px;
 }
 
 .debug-info {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--overlay);
+  font-family: monospace;
+}
+
+.setting-item {
+  margin-bottom: 16px;
+}
+
+.setting-item:last-child {
+  margin-bottom: 0;
+}
+
+.setting-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.setting-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--highlight);
+  cursor: pointer;
+}
+
+.setting-text {
+  user-select: none;
+}
+
+.setting-controls {
+  margin-top: 8px;
+  margin-left: 24px;
+}
+
+.input-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.setting-input {
+  width: 60px;
+  padding: 4px 6px;
+  border: 1px solid color-mix(in srgb, var(--highlight) 30%, transparent);
+  border-radius: 3px;
+  background: var(--base);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+}
+
+.setting-input:focus {
+  outline: none;
+  border-color: var(--highlight);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--highlight) 20%, transparent);
+}
+
+.setting-description {
+  margin: 6px 0 0 24px;
+  font-size: 12px;
+  color: var(--overlay);
+  line-height: 1.4;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  .settings-general {
+    padding: 12px;
+  }
+  
+  .settings-section {
+    margin-bottom: 20px;
+  }
+  
+  .section-title {
+    font-size: 14px;
+  }
+  
+  .status-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .status-label {
+    min-width: unset;
+  }
 }
 </style>

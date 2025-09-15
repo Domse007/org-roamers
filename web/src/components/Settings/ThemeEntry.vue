@@ -32,14 +32,18 @@ const emit = defineEmits(["redrawGraph"]);
 </script>
 
 <template>
-  <div
+  <button
     class="theme-entry"
     :class="{ active: isActive }"
-    :onclick="onClickSetTheme"
+    @click="onClickSetTheme"
+    :aria-label="`Select ${themeName} ${themeFlavour} theme`"
   >
-    <div class="theme-title">
-      <div>{{ themeName }} <span v-if="isActive">✓</span></div>
-      <div>{{ themeFlavour }}</div>
+    <div class="theme-info">
+      <div class="theme-name">
+        {{ themeName }}
+        <span v-if="isActive" class="theme-checkmark">✓</span>
+      </div>
+      <div class="theme-flavour">{{ themeFlavour }}</div>
     </div>
     <div class="theme-colors">
       <div
@@ -47,44 +51,108 @@ const emit = defineEmits(["redrawGraph"]);
         :key="color"
         class="theme-color"
         :style="{ backgroundColor: color }"
+        :title="color"
       ></div>
     </div>
-  </div>
+  </button>
 </template>
 
 <style scoped>
 .theme-entry {
-  margin-bottom: 5px;
-  border-radius: 5px;
-  padding: 5px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--highlight) 20%, transparent);
+  border-radius: 4px;
+  background: var(--base);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: var(--font);
+  text-align: left;
   display: flex;
   flex-direction: column;
-  background-color: var(--overlay);
-  cursor: pointer;
-  transition: all 0.2s ease;
+  gap: 8px;
 }
-.theme-entry:hover,
+
+.theme-entry:hover {
+  border-color: color-mix(in srgb, var(--highlight) 40%, transparent);
+  background: color-mix(in srgb, var(--highlight) 5%, var(--base));
+}
+
 .theme-entry:focus {
-  filter: brightness(125%);
+  outline: none;
+  border-color: var(--highlight);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--highlight) 20%, transparent);
 }
+
 .theme-entry.active {
-  border: 2px solid var(--highlight);
-  background-color: var(--surface);
+  border-color: var(--highlight);
+  background: color-mix(in srgb, var(--highlight) 10%, var(--surface));
+  box-shadow: 0 0 0 1px var(--highlight);
 }
-.theme-title {
+
+.theme-info {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   width: 100%;
-  margin-bottom: 5px;
 }
+
+.theme-name {
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.theme-checkmark {
+  color: var(--highlight);
+  font-weight: 600;
+}
+
+.theme-flavour {
+  font-size: 12px;
+  color: var(--overlay);
+  text-transform: capitalize;
+  padding: 2px 6px;
+  background: color-mix(in srgb, var(--overlay) 15%, transparent);
+  border-radius: 3px;
+}
+
 .theme-colors {
-  width: 100%;
   display: flex;
-  justify-content: space-between;
+  gap: 4px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
 }
+
 .theme-color {
-  width: 10px;
-  height: 10px;
-  border-radius: 5px;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid color-mix(in srgb, var(--text) 20%, transparent);
+  flex-shrink: 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  .theme-entry {
+    padding: 10px;
+  }
+  
+  .theme-name {
+    font-size: 13px;
+  }
+  
+  .theme-flavour {
+    font-size: 11px;
+  }
+  
+  .theme-color {
+    width: 12px;
+    height: 12px;
+  }
 }
 </style>
