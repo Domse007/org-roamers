@@ -7,13 +7,14 @@
       <p class="section-description">
         Control which nodes and connections are displayed in the graph.
       </p>
-      
+
       <div class="filter-placeholder">
         <div class="placeholder-icon">🔧</div>
         <h4 class="placeholder-title">Filter Settings</h4>
         <p class="placeholder-text">
-          Graph filtering options will be available here in future updates.
-          This might include filtering by file type, node connections, or custom tags.
+          Graph filtering options will be available here in future updates. This
+          might include filtering by file type, node connections, or custom
+          tags.
         </p>
       </div>
     </section>
@@ -86,27 +87,27 @@
   .settings-filter {
     padding: 12px;
   }
-  
+
   .section-title {
     font-size: 14px;
   }
-  
+
   .section-description {
     font-size: 12px;
   }
-  
+
   .filter-placeholder {
     padding: 24px 12px;
   }
-  
+
   .placeholder-icon {
     font-size: 28px;
   }
-  
+
   .placeholder-title {
     font-size: 15px;
   }
-  
+
   .placeholder-text {
     font-size: 12px;
   }

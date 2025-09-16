@@ -89,9 +89,10 @@ const preview = (id: string) => {
     })
     .catch((error) => {
       console.error("Failed to load org content:", error);
-      const errorMsg = error.name === 'TypeError' && error.message.includes('fetch') 
-        ? "Server is not responding. Please check if the server is running."
-        : `Failed to load content: ${error.message}`;
+      const errorMsg =
+        error.name === "TypeError" && error.message.includes("fetch")
+          ? "Server is not responding. Please check if the server is running."
+          : `Failed to load content: ${error.message}`;
       emit("error", errorMsg);
       rendered.value = `<div class="error">${errorMsg}</div>`;
       expand();
@@ -137,19 +138,21 @@ import("highlight.js/lib/languages/lisp")
     hljs.registerLanguage("lisp", lispLang.default);
     hljs.registerLanguage("elisp", lispLang.default);
     hljs.registerLanguage("emacs-lisp", lispLang.default);
-    console.log('Registered lisp, elisp, and emacs-lisp highlighting');
+    console.log("Registered lisp, elisp, and emacs-lisp highlighting");
   })
   .catch((error) => {
     console.warn("Failed to load Lisp syntax highlighting:", error);
     // Fallback: try to register aliases if lisp is already available
     try {
-      if (hljs.getLanguage('lisp')) {
-        hljs.registerAliases('elisp', { languageName: 'lisp' });
-        hljs.registerAliases('emacs-lisp', { languageName: 'lisp' });
-        console.log('Registered elisp and emacs-lisp aliases for existing lisp');
+      if (hljs.getLanguage("lisp")) {
+        hljs.registerAliases("elisp", { languageName: "lisp" });
+        hljs.registerAliases("emacs-lisp", { languageName: "lisp" });
+        console.log(
+          "Registered elisp and emacs-lisp aliases for existing lisp",
+        );
       }
     } catch (aliasError) {
-      console.warn('Failed to register lisp aliases as fallback:', aliasError);
+      console.warn("Failed to register lisp aliases as fallback:", aliasError);
     }
   });
 
@@ -219,16 +222,17 @@ const emit = defineEmits(["previewSwitch", "error"]);
     :aria-label="'Open Preview'"
     :title="'Open Preview'"
   >
-    <svg 
-      width="16" 
-      height="16" 
-      viewBox="0 0 16 16" 
-      fill="none"
-    >
-      <path d="M6 3L11 8L6 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path
+        d="M6 3L11 8L6 13"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
     </svg>
   </button>
-  
+
   <button
     v-if="shown === 'flex'"
     class="preview-toggle-button-attached"
@@ -239,16 +243,18 @@ const emit = defineEmits(["previewSwitch", "error"]);
     :aria-label="'Close Preview'"
     :title="'Close Preview'"
   >
-    <svg 
-      width="16" 
-      height="16" 
-      viewBox="0 0 16 16" 
-      fill="none"
-    >
-      <path d="M6 3L11 8L6 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" transform="rotate(180 8 8)"/>
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path
+        d="M6 3L11 8L6 13"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        transform="rotate(180 8 8)"
+      />
     </svg>
   </button>
-  
+
   <div
     class="org-preview-outerframe"
     :style="{ display: shown, width: frameWidth + '%' }"
@@ -258,20 +264,32 @@ const emit = defineEmits(["previewSwitch", "error"]);
       @mousedown="startResize"
       :class="{ 'resize-handle-active': isResizing }"
     ></div>
-    
+
     <div class="org-preview-frame">
       <div class="preview-header">
         <div class="preview-title">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M2 3H14V13H2V3Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M2 5H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="4" cy="4" r="0.5" fill="currentColor"/>
-            <circle cx="6" cy="4" r="0.5" fill="currentColor"/>
-            <circle cx="8" cy="4" r="0.5" fill="currentColor"/>
+            <path
+              d="M2 3H14V13H2V3Z"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M2 5H14"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <circle cx="4" cy="4" r="0.5" fill="currentColor" />
+            <circle cx="6" cy="4" r="0.5" fill="currentColor" />
+            <circle cx="8" cy="4" r="0.5" fill="currentColor" />
           </svg>
           <span>Preview</span>
         </div>
-        
+
         <div class="preview-controls">
           <button
             class="preview-control-button"
@@ -281,10 +299,16 @@ const emit = defineEmits(["previewSwitch", "error"]);
             :disabled="!history.canGoBack()"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M8 11L5 7L8 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path
+                d="M8 11L5 7L8 3"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
             </svg>
           </button>
-          
+
           <button
             class="preview-control-button"
             :class="{ 'preview-control-hidden': !history.canGoForward() }"
@@ -293,50 +317,110 @@ const emit = defineEmits(["previewSwitch", "error"]);
             :disabled="!history.canGoForward()"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M6 3L9 7L6 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path
+                d="M6 3L9 7L6 11"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
             </svg>
           </button>
-          
+
           <button
             class="preview-control-button"
             @click="preview(current_id)"
             title="Refresh content"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M1 2V6H5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M13 12V8H9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M12.5 4.5C11.7 2.9 10.1 1.7 8.2 1.4C5.4 0.9 2.8 2.4 1.9 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M1.5 9.5C2.3 11.1 3.9 12.3 5.8 12.6C8.6 13.1 11.2 11.6 12.1 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path
+                d="M1 2V6H5"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M13 12V8H9"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M12.5 4.5C11.7 2.9 10.1 1.7 8.2 1.4C5.4 0.9 2.8 2.4 1.9 5"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M1.5 9.5C2.3 11.1 3.9 12.3 5.8 12.6C8.6 13.1 11.2 11.6 12.1 9"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
             </svg>
           </button>
         </div>
       </div>
-      
-      <div class="org-preview-content" ref="preview-ref" v-html="rendered"></div>
-      
+
+      <div
+        class="org-preview-content"
+        ref="preview-ref"
+        v-html="rendered"
+      ></div>
+
       <div class="org-preview-footer" v-if="links.length != 0">
-        <button 
+        <button
           class="preview-footer-header"
           @click="footerExpanded = !footerExpanded"
           :title="footerExpanded ? 'Collapse links' : 'Expand links'"
         >
           <div class="preview-footer-header-content">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M4.5 3C4.5 3 4.5 2 6 2C7.5 2 10 2 10 2V5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M6.5 1.5L10 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M8.5 6.5V9C8.5 9.5 8 10 7.5 10H3C2.5 10 2 9.5 2 9V4.5C2 4 2.5 3.5 3 3.5H5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path
+                d="M4.5 3C4.5 3 4.5 2 6 2C7.5 2 10 2 10 2V5.5"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M6.5 1.5L10 5"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M8.5 6.5V9C8.5 9.5 8 10 7.5 10H3C2.5 10 2 9.5 2 9V4.5C2 4 2.5 3.5 3 3.5H5.5"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
             </svg>
             <span>Outgoing Links ({{ links.length }})</span>
           </div>
-          <svg 
-            width="12" 
-            height="12" 
-            viewBox="0 0 12 12" 
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
             fill="none"
             class="preview-footer-chevron"
-            :style="{ transform: footerExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }"
+            :style="{
+              transform: footerExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+            }"
           >
-            <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path
+              d="M3 4.5L6 7.5L9 4.5"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
           </svg>
         </button>
         <div class="preview-footer-links" v-show="footerExpanded">
@@ -348,9 +432,27 @@ const emit = defineEmits(["previewSwitch", "error"]);
             :title="`Open ${link.display}`"
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M4.5 3C4.5 3 4.5 2 6 2C7.5 2 10 2 10 2V5.5" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M6.5 1.5L10 5" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M8.5 6.5V9C8.5 9.5 8 10 7.5 10H3C2.5 10 2 9.5 2 9V4.5C2 4 2.5 3.5 3 3.5H5.5" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+              <path
+                d="M4.5 3C4.5 3 4.5 2 6 2C7.5 2 10 2 10 2V5.5"
+                stroke="currentColor"
+                stroke-width="1"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M6.5 1.5L10 5"
+                stroke="currentColor"
+                stroke-width="1"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M8.5 6.5V9C8.5 9.5 8 10 7.5 10H3C2.5 10 2 9.5 2 9V4.5C2 4 2.5 3.5 3 3.5H5.5"
+                stroke="currentColor"
+                stroke-width="1"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
             </svg>
             <span>{{ link.display }}</span>
           </button>
@@ -369,7 +471,11 @@ const emit = defineEmits(["previewSwitch", "error"]);
   height: 36px;
   border: none;
   border-radius: 4px;
-  background: linear-gradient(135deg, var(--clickable), color-mix(in srgb, var(--clickable) 80%, black));
+  background: linear-gradient(
+    135deg,
+    var(--clickable),
+    color-mix(in srgb, var(--clickable) 80%, black)
+  );
   color: var(--surface);
   cursor: pointer;
   display: flex;
@@ -382,9 +488,11 @@ const emit = defineEmits(["previewSwitch", "error"]);
 }
 
 .preview-toggle-button-floating:hover {
-  background: linear-gradient(135deg, 
-    color-mix(in srgb, var(--clickable) 90%, white), 
-    var(--clickable));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--clickable) 90%, white),
+    var(--clickable)
+  );
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
   border-color: color-mix(in srgb, var(--clickable) 80%, white);
 }
@@ -400,7 +508,11 @@ const emit = defineEmits(["previewSwitch", "error"]);
   height: 36px;
   border: none;
   border-radius: 4px;
-  background: linear-gradient(135deg, var(--clickable), color-mix(in srgb, var(--clickable) 80%, black));
+  background: linear-gradient(
+    135deg,
+    var(--clickable),
+    color-mix(in srgb, var(--clickable) 80%, black)
+  );
   color: var(--surface);
   cursor: pointer;
   display: flex;
@@ -412,9 +524,11 @@ const emit = defineEmits(["previewSwitch", "error"]);
 }
 
 .preview-toggle-button-attached:hover {
-  background: linear-gradient(135deg, 
-    color-mix(in srgb, var(--clickable) 90%, white), 
-    var(--clickable));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--clickable) 90%, white),
+    var(--clickable)
+  );
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
   border-color: color-mix(in srgb, var(--clickable) 80%, white);
 }
@@ -430,8 +544,9 @@ const emit = defineEmits(["previewSwitch", "error"]);
   bottom: 8px;
   z-index: 50;
   display: flex;
-  background: linear-gradient(135deg, 
-    var(--surface), 
+  background: linear-gradient(
+    135deg,
+    var(--surface),
     color-mix(in srgb, var(--surface) 95%, var(--base))
   );
   border: 1px solid color-mix(in srgb, var(--highlight) 40%, transparent);
@@ -476,8 +591,9 @@ const emit = defineEmits(["previewSwitch", "error"]);
   justify-content: space-between;
   padding: 10px 14px 8px 14px;
   border-bottom: 1px solid color-mix(in srgb, var(--highlight) 30%, transparent);
-  background: linear-gradient(135deg, 
-    color-mix(in srgb, var(--surface) 98%, var(--highlight)), 
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--surface) 98%, var(--highlight)),
     color-mix(in srgb, var(--surface) 95%, var(--base))
   );
   flex-shrink: 0;
@@ -543,8 +659,9 @@ const emit = defineEmits(["previewSwitch", "error"]);
 
 .org-preview-footer {
   border-top: 1px solid color-mix(in srgb, var(--highlight) 20%, transparent);
-  background: linear-gradient(135deg, 
-    color-mix(in srgb, var(--base) 98%, var(--surface)), 
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--base) 98%, var(--surface)),
     var(--base)
   );
   flex-shrink: 0;
@@ -662,33 +779,33 @@ const emit = defineEmits(["previewSwitch", "error"]);
     top: 4px;
     bottom: 4px;
   }
-  
+
   .preview-toggle-button-floating {
     top: 4px;
     right: 4px;
     width: 32px;
     height: 32px;
   }
-  
+
   .preview-toggle-button-attached {
     top: 4px;
     width: 32px;
     height: 32px;
   }
-  
+
   .preview-header {
     padding: 8px 12px 6px 12px;
   }
-  
+
   .preview-title {
     font-size: 13px;
   }
-  
+
   .preview-control-button {
     width: 26px;
     height: 26px;
   }
-  
+
   .org-preview-content {
     padding: 12px;
   }
@@ -698,7 +815,7 @@ const emit = defineEmits(["previewSwitch", "error"]);
   .preview-footer-links {
     max-height: 120px;
   }
-  
+
   .org-preview-footer-link {
     padding: 6px 8px;
     font-size: 12px;
@@ -728,7 +845,8 @@ const emit = defineEmits(["previewSwitch", "error"]);
 .org-preview-content h5,
 .org-preview-content h6 {
   color: var(--highlight-2);
-  border-bottom: 1px solid color-mix(in srgb, var(--highlight-2) 40%, transparent);
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--highlight-2) 40%, transparent);
   padding-bottom: 4px;
   margin-top: 1.5em;
   margin-bottom: 0.75em;
@@ -746,8 +864,9 @@ const emit = defineEmits(["previewSwitch", "error"]);
   margin-top: 0.5em;
   margin-bottom: 1.2em;
   padding: 0.8em 1em;
-  background: linear-gradient(135deg, 
-    color-mix(in srgb, var(--highlight-2) 15%, transparent), 
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--highlight-2) 15%, transparent),
     color-mix(in srgb, var(--highlight-2) 8%, transparent)
   );
   border: none;
@@ -768,9 +887,10 @@ const emit = defineEmits(["previewSwitch", "error"]);
 .org-preview-content hr {
   border: none;
   height: 1px;
-  background: linear-gradient(90deg, 
-    transparent, 
-    color-mix(in srgb, var(--highlight) 60%, transparent), 
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--highlight) 60%, transparent),
     transparent
   );
   margin: 1.5em 0;
@@ -782,8 +902,9 @@ const emit = defineEmits(["previewSwitch", "error"]);
 
 .org-preview-content .quote {
   margin: 1em 0;
-  background: linear-gradient(135deg, 
-    color-mix(in srgb, var(--base) 95%, var(--surface)), 
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--base) 95%, var(--surface)),
     var(--base)
   );
   border-left: 3px solid var(--highlight);
@@ -797,8 +918,9 @@ const emit = defineEmits(["previewSwitch", "error"]);
 }
 
 .org-preview-content pre {
-  background: linear-gradient(135deg, 
-    var(--base), 
+  background: linear-gradient(
+    135deg,
+    var(--base),
     color-mix(in srgb, var(--base) 95%, var(--surface))
   );
   border: 1px solid color-mix(in srgb, var(--highlight) 20%, transparent);
@@ -810,11 +932,12 @@ const emit = defineEmits(["previewSwitch", "error"]);
 }
 
 .org-preview-content pre.program-output {
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.9em;
   line-height: 1.4;
-  background: linear-gradient(135deg, 
-    color-mix(in srgb, var(--base) 90%, black), 
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--base) 90%, black),
     var(--base)
   );
   border-color: color-mix(in srgb, var(--overlay) 40%, transparent);
@@ -841,8 +964,9 @@ const emit = defineEmits(["previewSwitch", "error"]);
 }
 
 .org-preview-content .src {
-  background: linear-gradient(135deg, 
-    var(--base), 
+  background: linear-gradient(
+    135deg,
+    var(--base),
     color-mix(in srgb, var(--base) 95%, var(--surface))
   ) !important;
   border: 1px solid color-mix(in srgb, var(--highlight) 20%, transparent) !important;
@@ -869,8 +993,9 @@ const emit = defineEmits(["previewSwitch", "error"]);
 }
 
 .org-preview-content th {
-  background: linear-gradient(135deg, 
-    var(--base), 
+  background: linear-gradient(
+    135deg,
+    var(--base),
     color-mix(in srgb, var(--base) 90%, var(--highlight))
   );
   font-weight: 600;
@@ -1057,7 +1182,7 @@ const emit = defineEmits(["previewSwitch", "error"]);
   .org-preview-content .katex {
     font-size: 1em !important;
   }
-  
+
   .org-preview-content .katex-display-wrapper {
     margin: 1em 0 !important;
     padding: 4px 0;
@@ -1069,11 +1194,11 @@ const emit = defineEmits(["previewSwitch", "error"]);
   .org-preview-outerframe {
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
   }
-  
+
   .preview-toggle-button {
     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
   }
-  
+
   .preview-toggle-button:hover {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
   }

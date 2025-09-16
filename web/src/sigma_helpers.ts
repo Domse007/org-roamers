@@ -18,12 +18,12 @@ export default function drawHover(
 
   context.font = `${weight} ${size}px ${font}`;
 
-  // Then we draw the label background
+  // Then we draw the label background with modern styling
   context.fillStyle = getColor(background);
   context.shadowOffsetX = 0;
-  context.shadowOffsetY = 0;
-  context.shadowBlur = 8;
-  context.shadowColor = "#000";
+  context.shadowOffsetY = 2;
+  context.shadowBlur = 6;
+  context.shadowColor = "rgba(0, 0, 0, 0.15)";
 
   const PADDING = 2;
 
@@ -75,9 +75,21 @@ function drawLabel(
   context.font = `${weight} ${size}px ${font}`;
   const width = context.measureText(data.label).width + 8;
 
-  context.fillStyle = getColor(background);
-  context.fillRect(data.x + data.size, data.y + size / 3 - 15, width, 20);
+  // Modern label background
+  const labelX = data.x + data.size + 4;
+  const labelY = data.y + size / 3 - 15;
+  const labelHeight = 20;
 
+  context.fillStyle = getColor(background);
+  context.shadowOffsetX = 0;
+  context.shadowOffsetY = 1;
+  context.shadowBlur = 3;
+  context.shadowColor = "rgba(0, 0, 0, 0.1)";
+
+  // Create rectangle background
+  context.fillRect(labelX, labelY, width, labelHeight);
+
+  context.shadowBlur = 0;
   context.fillStyle = getColor("--text");
-  context.fillText(data.label, data.x + data.size + 3, data.y + size / 3);
+  context.fillText(data.label, labelX + 4, data.y + size / 3);
 }

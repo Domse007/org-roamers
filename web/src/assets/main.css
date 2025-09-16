@@ -19,7 +19,8 @@
   --type: #ca9ee6;
 }
 
-html, body {
+html,
+body {
   background-color: var(--base);
   overflow: hidden;
   height: 100vh;

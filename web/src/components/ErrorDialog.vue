@@ -7,9 +7,18 @@ defineEmits(["dialogClose"]);
     <div class="error-header">
       <div class="error-icon">⚠️</div>
       <div class="error-title">Error</div>
-      <button class="error-close-button" @click="$emit('dialogClose')" aria-label="Close error dialog">
+      <button
+        class="error-close-button"
+        @click="$emit('dialogClose')"
+        aria-label="Close error dialog"
+      >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path
+            d="M1 1l12 12M13 1L1 13"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          />
         </svg>
       </button>
     </div>
@@ -27,13 +36,14 @@ defineEmits(["dialogClose"]);
   transform: translateX(-50%);
   width: min(400px, 90vw);
   z-index: 150;
-  background: linear-gradient(135deg, 
-    color-mix(in srgb, var(--warn) 15%, var(--surface)), 
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--warn) 15%, var(--surface)),
     color-mix(in srgb, var(--warn) 8%, var(--surface))
   );
   border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
   border-radius: 12px;
-  box-shadow: 
+  box-shadow:
     0 4px 20px rgba(0, 0, 0, 0.15),
     0 1px 3px rgba(0, 0, 0, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
@@ -92,12 +102,14 @@ defineEmits(["dialogClose"]);
 }
 
 .error-close-button:before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at center, 
-    color-mix(in srgb, var(--text) 15%, transparent) 0%, 
-    transparent 70%);
+  background: radial-gradient(
+    circle at center,
+    color-mix(in srgb, var(--text) 15%, transparent) 0%,
+    transparent 70%
+  );
   opacity: 0;
   transition: opacity 0.2s ease;
 }
@@ -144,19 +156,19 @@ defineEmits(["dialogClose"]);
     top: 10px;
     width: min(350px, 95vw);
   }
-  
+
   .error-header {
     padding: 14px 16px 10px 16px;
   }
-  
+
   .error-content {
     padding: 10px 16px 16px 16px;
   }
-  
+
   .error-title {
     font-size: 15px;
   }
-  
+
   .error-message {
     font-size: 13px;
   }
@@ -165,7 +177,7 @@ defineEmits(["dialogClose"]);
 /* Dark theme enhancements */
 @media (prefers-color-scheme: dark) {
   .error-dialog {
-    box-shadow: 
+    box-shadow:
       0 4px 20px rgba(0, 0, 0, 0.3),
       0 1px 3px rgba(0, 0, 0, 0.2),
       inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -177,15 +189,15 @@ defineEmits(["dialogClose"]);
   .error-dialog {
     animation: none;
   }
-  
+
   .error-close-button {
     transition: none;
   }
-  
+
   .error-close-button svg {
     transition: none;
   }
-  
+
   .error-close-button:hover svg {
     transform: none;
   }

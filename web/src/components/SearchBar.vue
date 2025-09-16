@@ -112,25 +112,31 @@ const handleKeyDown = (event: KeyboardEvent) => {
   }
 
   switch (event.key) {
-    case 'ArrowDown':
+    case "ArrowDown":
       event.preventDefault();
-      selectedIndex.value = Math.min(selectedIndex.value + 1, searchSuggestions.value.length - 1);
+      selectedIndex.value = Math.min(
+        selectedIndex.value + 1,
+        searchSuggestions.value.length - 1,
+      );
       break;
-    case 'ArrowUp':
+    case "ArrowUp":
       event.preventDefault();
       selectedIndex.value = Math.max(selectedIndex.value - 1, -1);
       break;
-    case 'Enter':
+    case "Enter":
       event.preventDefault();
-      if (selectedIndex.value >= 0 && selectedIndex.value < searchSuggestions.value.length) {
+      if (
+        selectedIndex.value >= 0 &&
+        selectedIndex.value < searchSuggestions.value.length
+      ) {
         const selectedItem = searchSuggestions.value[selectedIndex.value];
-        emit('openNode', selectedItem.id);
+        emit("openNode", selectedItem.id);
         showSuggestions.value = false;
         selectedIndex.value = -1;
-        searchterm.value = '';
+        searchterm.value = "";
       }
       break;
-    case 'Escape':
+    case "Escape":
       event.preventDefault();
       showSuggestions.value = false;
       selectedIndex.value = -1;
@@ -140,10 +146,10 @@ const handleKeyDown = (event: KeyboardEvent) => {
 
 // Handle suggestion click
 const onSuggestionClick = (id: string) => {
-  emit('openNode', id);
+  emit("openNode", id);
   showSuggestions.value = false;
   selectedIndex.value = -1;
-  searchterm.value = '';
+  searchterm.value = "";
 };
 
 // Handle suggestion hover
@@ -161,15 +167,30 @@ defineExpose<SearchBarMethods>({
   handleSearchResponse,
 });
 
-const emit = defineEmits(['openNode']);
+const emit = defineEmits(["openNode"]);
 </script>
 
 <template>
   <div class="search-wrapper">
     <div class="search-input-container">
-      <svg class="search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
-        <path d="M7 12C9.76142 12 12 9.76142 12 7C12 4.23858 9.76142 2 7 2C4.23858 2 2 4.23858 2 7C2 9.76142 4.23858 12 7 12Z" stroke="currentColor" stroke-width="1.5"/>
-        <path d="M15 15L10.5 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      <svg
+        class="search-icon"
+        width="16"
+        height="16"
+        viewBox="0 0 16 16"
+        fill="none"
+      >
+        <path
+          d="M7 12C9.76142 12 12 9.76142 12 7C12 4.23858 9.76142 2 7 2C4.23858 2 2 4.23858 2 7C2 9.76142 4.23858 12 7 12Z"
+          stroke="currentColor"
+          stroke-width="1.5"
+        />
+        <path
+          d="M15 15L10.5 10.5"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+        />
       </svg>
       <input
         ref="searchInput"
@@ -184,23 +205,49 @@ const emit = defineEmits(['openNode']);
         autocomplete="off"
         spellcheck="false"
       />
-      <button 
+      <button
         v-if="searchterm.length > 0"
         class="search-clear"
-        @click="searchterm = ''; showSuggestions = false; selectedIndex = -1;"
+        @click="
+          searchterm = '';
+          showSuggestions = false;
+          selectedIndex = -1;
+        "
         tabindex="-1"
       >
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <path
+            d="M1 1l10 10M11 1L1 11"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+          />
         </svg>
       </button>
     </div>
-    
-    <div v-if="showSuggestions && (searchSuggestions.length > 0 || searchterm.trim())" class="search-suggestions">
-      <div v-if="searchSuggestions.length === 0 && searchterm.trim()" class="search-no-results">
+
+    <div
+      v-if="
+        showSuggestions && (searchSuggestions.length > 0 || searchterm.trim())
+      "
+      class="search-suggestions"
+    >
+      <div
+        v-if="searchSuggestions.length === 0 && searchterm.trim()"
+        class="search-no-results"
+      >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M7 12C9.76142 12 12 9.76142 12 7C12 4.23858 9.76142 2 7 2C4.23858 2 2 4.23858 2 7C2 9.76142 4.23858 12 7 12Z" stroke="currentColor" stroke-width="1.5"/>
-          <path d="M15 15L10.5 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <path
+            d="M7 12C9.76142 12 12 9.76142 12 7C12 4.23858 9.76142 2 7 2C4.23858 2 2 4.23858 2 7C2 9.76142 4.23858 12 7 12Z"
+            stroke="currentColor"
+            stroke-width="1.5"
+          />
+          <path
+            d="M15 15L10.5 10.5"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+          />
         </svg>
         <span>No results found for "{{ searchterm }}"</span>
       </div>
@@ -226,8 +273,9 @@ const emit = defineEmits(['openNode']);
   left: 12px;
   z-index: 45;
   font-family: var(--font);
-  background: linear-gradient(135deg, 
-    color-mix(in srgb, var(--surface) 95%, var(--base)), 
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--surface) 95%, var(--base)),
     var(--surface)
   );
   border: 1px solid color-mix(in srgb, var(--highlight) 30%, transparent);
@@ -335,16 +383,16 @@ const emit = defineEmits(['openNode']);
     width: min(350px, 90vw);
     top: 8px;
   }
-  
+
   .search-input {
     font-size: 16px; /* Prevents zoom on mobile */
     padding: 9px 12px 9px 32px;
   }
-  
+
   .search-icon {
     left: 8px;
   }
-  
+
   .search-clear {
     right: 4px;
   }

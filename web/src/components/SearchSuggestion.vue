@@ -1,7 +1,7 @@
 <script setup lang="ts">
-defineProps<{ 
-  display: string; 
-  id: string; 
+defineProps<{
+  display: string;
+  id: string;
   tags: string[];
   isSelected?: boolean;
 }>();
@@ -12,8 +12,8 @@ const formatTags = (taglist: string[]) => {
 </script>
 
 <template>
-  <div 
-    class="suggestion" 
+  <div
+    class="suggestion"
     :class="{ 'suggestion-selected': isSelected }"
     @click="$emit('click')"
     @mouseenter="$emit('mouseenter')"
@@ -28,7 +28,13 @@ const formatTags = (taglist: string[]) => {
     </div>
     <div class="suggestion-arrow">
       <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-        <path d="M4 2L8 6L4 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path
+          d="M4 2L8 6L4 10"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
       </svg>
     </div>
   </div>
@@ -105,11 +111,11 @@ const formatTags = (taglist: string[]) => {
   .suggestion {
     padding: 8px 10px;
   }
-  
+
   .suggestion-title {
     font-size: 12px;
   }
-  
+
   .suggestion-tags {
     font-size: 10px;
   }

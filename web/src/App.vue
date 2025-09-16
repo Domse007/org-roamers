@@ -264,7 +264,11 @@ const handleError = (error: string) => {
     <ErrorDialog v-if="errorMessage != null" @dialog-close="closeError">{{
       errorMessage
     }}</ErrorDialog>
-    <SearchBar ref="searchBarRef" @open-node="updatePreviewID" @error="handleError"></SearchBar>
+    <SearchBar
+      ref="searchBarRef"
+      @open-node="updatePreviewID"
+      @error="handleError"
+    ></SearchBar>
     <GraphView
       @open-node="updatePreviewID"
       @updates-processed="clearGraphUpdates"

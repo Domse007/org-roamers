@@ -18,9 +18,9 @@ let sigma: Sigma | null = null;
 
 const updateGraph = () => {
   const style = window.getComputedStyle(document.body);
-  const nodeColor = style.getPropertyValue("--node");
-  const edgeColor = style.getPropertyValue("--overlay");
-  const nodeBorderColor = style.getPropertyValue("--node-border");
+  const nodeColor = style.getPropertyValue("--node").trim();
+  const edgeColor = style.getPropertyValue("--overlay").trim();
+  const nodeBorderColor = style.getPropertyValue("--node-border").trim();
 
   fetch(`/graph`)
     .then((resp) => resp.json())
@@ -36,9 +36,10 @@ const updateGraph = () => {
             label: node.title,
             x: randomNumber(1, 100),
             y: randomNumber(1, 100),
-            size: node.num_links / 2 <= 5 ? 5 : node.num_links / 2,
+            size: Math.max(5, Math.min(20, node.num_links / 2)), // Cap max size
             color: nodeColor,
             borderColor: nodeBorderColor,
+            borderSize: 2, // Consistent border size
           });
         },
       );
@@ -69,9 +70,10 @@ const updateGraph = () => {
     })
     .catch((error) => {
       console.error("Failed to load graph data:", error);
-      const errorMsg = error.name === 'TypeError' && error.message.includes('fetch') 
-        ? "Server is not responding. Please check if the server is running."
-        : `Failed to load graph: ${error.message}`;
+      const errorMsg =
+        error.name === "TypeError" && error.message.includes("fetch")
+          ? "Server is not responding. Please check if the server is running."
+          : `Failed to load graph: ${error.message}`;
       emit("error", errorMsg);
     });
 };
@@ -122,6 +124,12 @@ function setupGraph() {
     },
     defaultDrawNodeHover: drawHover,
     labelColor: { color: textColor },
+    allowInvalidContainer: true,
+    renderEdgeLabels: false,
+    enableEdgeEvents: false,
+    labelFont: "Arial, sans-serif",
+    labelSize: 12,
+    labelWeight: "500",
   });
 
   sigma.on("downNode", (e) => {
@@ -177,8 +185,8 @@ const incrementalGraphUpdate = (updates: {
   removedLinks?: RoamLink[];
 }) => {
   const style = window.getComputedStyle(document.body);
-  const nodeColor = style.getPropertyValue("--node");
-  const nodeBorderColor = style.getPropertyValue("--node-border");
+  const nodeColor = style.getPropertyValue("--node").trim();
+  const nodeBorderColor = style.getPropertyValue("--node-border").trim();
 
   // Handle node removals first
   if (updates.removedNodes) {
@@ -212,13 +220,24 @@ const incrementalGraphUpdate = (updates: {
   for (const node of updates.nodes) {
     try {
       if (graph.hasNode(node.id)) {
-        // Update existing node
-        graph.mergeNodeAttributes(node.id, {
-          label: node.title,
-          size: node.num_links / 2 <= 5 ? 5 : node.num_links / 2,
-          color: nodeColor,
-          borderColor: nodeBorderColor,
-        });
+        // Update existing node only if values actually changed
+        const currentAttrs = graph.getNodeAttributes(node.id);
+        const newSize = Math.max(5, Math.min(20, node.num_links / 2));
+
+        if (
+          currentAttrs.label !== node.title ||
+          currentAttrs.size !== newSize ||
+          currentAttrs.color !== nodeColor ||
+          currentAttrs.borderColor !== nodeBorderColor
+        ) {
+          graph.mergeNodeAttributes(node.id, {
+            label: node.title,
+            size: newSize,
+            color: nodeColor,
+            borderColor: nodeBorderColor,
+            borderSize: 2,
+          });
+        }
         console.log(`Updated node: ${node.id} (${node.title})`);
       } else {
         // Add new node with better positioning
@@ -228,9 +247,10 @@ const incrementalGraphUpdate = (updates: {
           label: node.title,
           x: x,
           y: y,
-          size: Math.max(5, node.num_links / 2),
+          size: Math.max(5, Math.min(20, node.num_links / 2)),
           color: nodeColor,
           borderColor: nodeBorderColor,
+          borderSize: 2,
           type: "bordered", // Ensure it uses the same type as other nodes
         });
         console.log(
@@ -343,6 +363,12 @@ const incrementalGraphUpdate = (updates: {
           },
           defaultDrawNodeHover: drawHover,
           labelColor: { color: textColor },
+          allowInvalidContainer: true,
+          renderEdgeLabels: false,
+          enableEdgeEvents: false,
+          labelFont: "Arial, sans-serif",
+          labelSize: 12,
+          labelWeight: "500",
         });
 
         // Re-bind click events for all nodes (including new ones)
@@ -443,6 +469,37 @@ const emit = defineEmits(["openNode", "updatesProcessed", "error"]);
   width: 100%;
   height: 100%;
   position: absolute;
-  background-color: var(--base);
+  background: linear-gradient(
+    135deg,
+    var(--base),
+    color-mix(in srgb, var(--base) 97%, var(--surface))
+  );
+  border-radius: 0;
+  transition: background 0.3s ease;
+}
+
+/* Add subtle grid pattern for depth */
+#graph::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    color-mix(in srgb, var(--overlay) 15%, transparent) 1px,
+    transparent 0
+  );
+  background-size: 30px 30px;
+  pointer-events: none;
+  opacity: 0.3;
+  z-index: 1;
+}
+
+/* Ensure graph canvas is above the grid */
+#graph canvas {
+  position: relative;
+  z-index: 2;
 }
 </style>

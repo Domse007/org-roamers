@@ -34,14 +34,25 @@ const props = defineProps<{
       <div class="status-grid">
         <div class="status-item">
           <span class="status-label">Server:</span>
-          <div class="connection-status" :class="props.connectionStatus || 'disconnected'">
-            <span v-if="(props.connectionStatus || 'disconnected') === 'connected'">
+          <div
+            class="connection-status"
+            :class="props.connectionStatus || 'disconnected'"
+          >
+            <span
+              v-if="(props.connectionStatus || 'disconnected') === 'connected'"
+            >
               🟢 Connected
             </span>
-            <span v-if="(props.connectionStatus || 'disconnected') === 'connecting'">
+            <span
+              v-if="(props.connectionStatus || 'disconnected') === 'connecting'"
+            >
               🟡 Connecting...
             </span>
-            <span v-if="(props.connectionStatus || 'disconnected') === 'disconnected'">
+            <span
+              v-if="
+                (props.connectionStatus || 'disconnected') === 'disconnected'
+              "
+            >
               🔴 Disconnected
             </span>
           </div>
@@ -63,8 +74,8 @@ const props = defineProps<{
       <h3 class="section-title">Preview Settings</h3>
       <div class="setting-item">
         <label class="setting-label">
-          <input 
-            type="checkbox" 
+          <input
+            type="checkbox"
             :checked="!generalSettings.showEntireFile"
             @change="previewScopeChange"
             class="setting-checkbox"
@@ -72,7 +83,8 @@ const props = defineProps<{
           <span class="setting-text">Show full file content</span>
         </label>
         <p class="setting-description">
-          When enabled, preview shows the entire file instead of just the current node.
+          When enabled, preview shows the entire file instead of just the
+          current node.
         </p>
       </div>
     </section>
@@ -82,8 +94,8 @@ const props = defineProps<{
       <h3 class="section-title">Graph Settings</h3>
       <div class="setting-item">
         <label class="setting-label">
-          <input 
-            type="checkbox" 
+          <input
+            type="checkbox"
             v-model="timeoutEnabled"
             class="setting-checkbox"
           />
@@ -92,8 +104,8 @@ const props = defineProps<{
         <div v-if="timeoutEnabled" class="setting-controls">
           <label class="input-group">
             <span>Stop after:</span>
-            <input 
-              type="number" 
+            <input
+              type="number"
               v-model="timeoutTime"
               min="1"
               max="300"
@@ -103,7 +115,8 @@ const props = defineProps<{
           </label>
         </div>
         <p class="setting-description">
-          Automatically stops the graph layout algorithm after the specified time.
+          Automatically stops the graph layout algorithm after the specified
+          time.
         </p>
       </div>
       <div class="setting-item">
@@ -186,8 +199,12 @@ const props = defineProps<{
 }
 
 @keyframes pulse {
-  from { opacity: 1; }
-  to { opacity: 0.5; }
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.5;
+  }
 }
 
 .status-details {
@@ -270,21 +287,21 @@ const props = defineProps<{
   .settings-general {
     padding: 12px;
   }
-  
+
   .settings-section {
     margin-bottom: 20px;
   }
-  
+
   .section-title {
     font-size: 14px;
   }
-  
+
   .status-item {
     flex-direction: column;
     align-items: flex-start;
     gap: 4px;
   }
-  
+
   .status-label {
     min-width: unset;
   }

@@ -50,57 +50,124 @@ const props = defineProps<{
     title="Settings"
   >
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-      <path d="M10 6.5C8.067 6.5 6.5 8.067 6.5 10S8.067 13.5 10 13.5S13.5 11.933 13.5 10S11.933 6.5 10 6.5Z" stroke="currentColor" stroke-width="1.5"/>
-      <path d="M8.5 1.5H11.5L12 3.5C12.5 3.7 13 3.9 13.4 4.2L15.5 3.5L17 6L15.3 7.3C15.4 7.7 15.4 8.3 15.3 8.7L17 10L15.5 12.5L13.4 11.8C13 12.1 12.5 12.3 12 12.5L11.5 14.5H8.5L8 12.5C7.5 12.3 7 12.1 6.6 11.8L4.5 12.5L3 10L4.7 8.7C4.6 8.3 4.6 7.7 4.7 7.3L3 6L4.5 3.5L6.6 4.2C7 3.9 7.5 3.7 8 3.5L8.5 1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+      <path
+        d="M10 6.5C8.067 6.5 6.5 8.067 6.5 10S8.067 13.5 10 13.5S13.5 11.933 13.5 10S11.933 6.5 10 6.5Z"
+        stroke="currentColor"
+        stroke-width="1.5"
+      />
+      <path
+        d="M8.5 1.5H11.5L12 3.5C12.5 3.7 13 3.9 13.4 4.2L15.5 3.5L17 6L15.3 7.3C15.4 7.7 15.4 8.3 15.3 8.7L17 10L15.5 12.5L13.4 11.8C13 12.1 12.5 12.3 12 12.5L11.5 14.5H8.5L8 12.5C7.5 12.3 7 12.1 6.6 11.8L4.5 12.5L3 10L4.7 8.7C4.6 8.3 4.6 7.7 4.7 7.3L3 6L4.5 3.5L6.6 4.2C7 3.9 7.5 3.7 8 3.5L8.5 1.5Z"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linejoin="round"
+      />
     </svg>
   </button>
-  
+
   <div class="settings-pane" :style="{ display: shown }">
     <div class="settings-header">
       <div class="settings-title">
         <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-          <path d="M10 6.5C8.067 6.5 6.5 8.067 6.5 10S8.067 13.5 10 13.5S13.5 11.933 13.5 10S11.933 6.5 10 6.5Z" stroke="currentColor" stroke-width="1.5"/>
-          <path d="M8.5 1.5H11.5L12 3.5C12.5 3.7 13 3.9 13.4 4.2L15.5 3.5L17 6L15.3 7.3C15.4 7.7 15.4 8.3 15.3 8.7L17 10L15.5 12.5L13.4 11.8C13 12.1 12.5 12.3 12 12.5L11.5 14.5H8.5L8 12.5C7.5 12.3 7 12.1 6.6 11.8L4.5 12.5L3 10L4.7 8.7C4.6 8.3 4.6 7.7 4.7 7.3L3 6L4.5 3.5L6.6 4.2C7 3.9 7.5 3.7 8 3.5L8.5 1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          <path
+            d="M10 6.5C8.067 6.5 6.5 8.067 6.5 10S8.067 13.5 10 13.5S13.5 11.933 13.5 10S11.933 6.5 10 6.5Z"
+            stroke="currentColor"
+            stroke-width="1.5"
+          />
+          <path
+            d="M8.5 1.5H11.5L12 3.5C12.5 3.7 13 3.9 13.4 4.2L15.5 3.5L17 6L15.3 7.3C15.4 7.7 15.4 8.3 15.3 8.7L17 10L15.5 12.5L13.4 11.8C13 12.1 12.5 12.3 12 12.5L11.5 14.5H8.5L8 12.5C7.5 12.3 7 12.1 6.6 11.8L4.5 12.5L3 10L4.7 8.7C4.6 8.3 4.6 7.7 4.7 7.3L3 6L4.5 3.5L6.6 4.2C7 3.9 7.5 3.7 8 3.5L8.5 1.5Z"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linejoin="round"
+          />
         </svg>
         <span>Settings</span>
       </div>
-      <button 
-        class="settings-close-button" 
-        @click="resize" 
+      <button
+        class="settings-close-button"
+        @click="resize"
         aria-label="Close Settings"
         title="Close"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M1 1l14 14M15 1L1 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path
+            d="M1 1l14 14M15 1L1 15"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          />
         </svg>
       </button>
     </div>
-    
+
     <div class="settings-content">
       <nav class="settings-tabs">
         <button
           v-for="page in settingsPages"
           :key="page"
-          :class="['settings-tab', { 'settings-tab-active': page === activePage }]"
+          :class="[
+            'settings-tab',
+            { 'settings-tab-active': page === activePage },
+          ]"
           @click="activePage = page"
           :aria-selected="page === activePage"
         >
           <div class="settings-tab-icon">
-            <svg v-if="page === 'General'" width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M8 4V2M8 14V12M12 8H14M2 8H4M11.314 4.686L12.728 3.272M3.272 12.728L4.686 11.314M11.314 11.314L12.728 12.728M3.272 3.272L4.686 4.686" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-              <circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.5"/>
+            <svg
+              v-if="page === 'General'"
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+            >
+              <path
+                d="M8 4V2M8 14V12M12 8H14M2 8H4M11.314 4.686L12.728 3.272M3.272 12.728L4.686 11.314M11.314 11.314L12.728 12.728M3.272 3.272L4.686 4.686"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+              />
+              <circle
+                cx="8"
+                cy="8"
+                r="3"
+                stroke="currentColor"
+                stroke-width="1.5"
+              />
             </svg>
-            <svg v-else-if="page === 'Theme'" width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M14 8A6 6 0 1 1 8 2V8H14Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <svg
+              v-else-if="page === 'Theme'"
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+            >
+              <path
+                d="M14 8A6 6 0 1 1 8 2V8H14Z"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
             </svg>
-            <svg v-else-if="page === 'Filter'" width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M2 3H14L9 9V13L7 14V9L2 3Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <svg
+              v-else-if="page === 'Filter'"
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+            >
+              <path
+                d="M2 3H14L9 9V13L7 14V9L2 3Z"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
             </svg>
           </div>
           <span class="settings-tab-label">{{ page }}</span>
         </button>
       </nav>
-      
+
       <div class="settings-panel">
         <SettingsTheme
           v-if="activePage === 'Theme'"
@@ -129,7 +196,11 @@ const props = defineProps<{
   height: 44px;
   border: none;
   border-radius: 4px;
-  background: linear-gradient(135deg, var(--clickable), color-mix(in srgb, var(--clickable) 80%, black));
+  background: linear-gradient(
+    135deg,
+    var(--clickable),
+    color-mix(in srgb, var(--clickable) 80%, black)
+  );
   color: var(--base);
   cursor: pointer;
   display: flex;
@@ -141,9 +212,11 @@ const props = defineProps<{
 }
 
 .settings-open-button:hover {
-  background: linear-gradient(135deg, 
-    color-mix(in srgb, var(--clickable) 110%, white), 
-    color-mix(in srgb, var(--clickable) 90%, black));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--clickable) 110%, white),
+    color-mix(in srgb, var(--clickable) 90%, black)
+  );
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
 }
 
@@ -157,8 +230,9 @@ const props = defineProps<{
   left: 8px;
   width: min(680px, 90vw);
   height: min(500px, 75vh);
-  background: linear-gradient(135deg, 
-    var(--surface), 
+  background: linear-gradient(
+    135deg,
+    var(--surface),
     color-mix(in srgb, var(--surface) 95%, var(--base))
   );
   border: 1px solid color-mix(in srgb, var(--highlight) 40%, transparent);
@@ -177,8 +251,9 @@ const props = defineProps<{
   justify-content: space-between;
   padding: 12px 16px 10px 16px;
   border-bottom: 1px solid color-mix(in srgb, var(--highlight) 30%, transparent);
-  background: linear-gradient(135deg, 
-    color-mix(in srgb, var(--surface) 98%, var(--highlight)), 
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--surface) 98%, var(--highlight)),
     color-mix(in srgb, var(--surface) 95%, var(--base))
   );
 }
@@ -227,8 +302,9 @@ const props = defineProps<{
   display: flex;
   flex-direction: column;
   min-width: 140px;
-  background: linear-gradient(135deg, 
-    var(--base), 
+  background: linear-gradient(
+    135deg,
+    var(--base),
     color-mix(in srgb, var(--base) 95%, var(--surface))
   );
   border-right: 1px solid color-mix(in srgb, var(--highlight) 25%, transparent);
@@ -256,7 +332,7 @@ const props = defineProps<{
 }
 
 .settings-tab:before {
-  content: '';
+  content: "";
   position: absolute;
   left: 0;
   top: 0;
@@ -276,8 +352,9 @@ const props = defineProps<{
 }
 
 .settings-tab-active {
-  background: linear-gradient(135deg, 
-    color-mix(in srgb, var(--highlight) 20%, var(--surface)), 
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--highlight) 20%, var(--surface)),
     color-mix(in srgb, var(--highlight) 10%, var(--surface))
   );
   color: var(--highlight);
@@ -338,20 +415,20 @@ const props = defineProps<{
     width: min(580px, 95vw);
     height: min(450px, 80vh);
   }
-  
+
   .settings-header {
     padding: 10px 14px 8px 14px;
   }
-  
+
   .settings-title {
     font-size: 15px;
   }
-  
+
   .settings-tabs {
     min-width: 120px;
     padding: 4px;
   }
-  
+
   .settings-tab {
     padding: 8px 10px;
     font-size: 13px;
@@ -363,29 +440,30 @@ const props = defineProps<{
     width: min(500px, 98vw);
     height: min(400px, 85vh);
   }
-  
+
   .settings-content {
     flex-direction: column;
   }
-  
+
   .settings-tabs {
     flex-direction: row;
     min-width: unset;
     border-right: none;
-    border-bottom: 1px solid color-mix(in srgb, var(--highlight) 25%, transparent);
+    border-bottom: 1px solid
+      color-mix(in srgb, var(--highlight) 25%, transparent);
     overflow-x: auto;
   }
-  
+
   .settings-tab {
     white-space: nowrap;
     min-width: fit-content;
   }
-  
+
   .settings-tab:hover,
   .settings-tab-active {
     background: color-mix(in srgb, var(--clickable) 15%, transparent);
   }
-  
+
   .settings-tab:before {
     left: 0;
     right: 0;
@@ -395,11 +473,11 @@ const props = defineProps<{
     height: 3px;
     transform: scaleX(0);
   }
-  
+
   .settings-tab:hover:before {
     transform: scaleX(0.5);
   }
-  
+
   .settings-tab-active:before {
     transform: scaleX(1);
   }
@@ -410,11 +488,11 @@ const props = defineProps<{
   .settings-pane {
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
   }
-  
+
   .settings-open-button {
     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
   }
-  
+
   .settings-open-button:hover {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
   }

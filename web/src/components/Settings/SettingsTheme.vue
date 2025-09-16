@@ -61,11 +61,11 @@ import ThemeEntry from "./ThemeEntry.vue";
   .settings-theme {
     padding: 12px;
   }
-  
+
   .section-title {
     font-size: 14px;
   }
-  
+
   .section-description {
     font-size: 12px;
   }

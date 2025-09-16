@@ -141,15 +141,15 @@ const emit = defineEmits(["redrawGraph"]);
   .theme-entry {
     padding: 10px;
   }
-  
+
   .theme-name {
     font-size: 13px;
   }
-  
+
   .theme-flavour {
     font-size: 11px;
   }
-  
+
   .theme-color {
     width: 12px;
     height: 12px;
