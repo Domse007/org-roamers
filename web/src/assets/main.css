@@ -19,6 +19,10 @@
   --type: #ca9ee6;
 }
 
-body {
+html, body {
   background-color: var(--base);
+  overflow: hidden;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
 }
