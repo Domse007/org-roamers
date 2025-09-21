@@ -1,5 +1,22 @@
 {
     "root": "web/dist/",
     "strict": false,
-    "fs_watcher": true
+    "fs_watcher": true,
+    "latex_config": {
+        "latex_cmd": "latex",
+        "latex_opt": [
+            "-interaction",
+            "nonstopmode"
+        ],
+        "dvisvgm_cmd": "dvisvgm",
+        "dvisvgm_opt": [
+            "--optimize",
+            "--clipjoin",
+            "--relative",
+            "--no-fonts",
+            "--exact-bbox",
+            "--precision=6",
+            "--verbosity=0"
+        ]
+    }
 }

@@ -12,8 +12,10 @@ use crate::sqlite::helpers;
 use crate::transform::export::HtmlExport;
 use crate::transform::subtree::Subtree;
 use crate::FileProcessingGuard;
+use crate::StaticServerConfiguration;
 
 pub fn get_latex_svg_by_index(
+    config: &StaticServerConfiguration,
     app_state: AppState,
     id: String,
     latex_index: usize,
@@ -122,7 +124,7 @@ pub fn get_latex_svg_by_index(
     };
 
     // Render the LaTeX
-    let svg = latex::get_image_with_ctx(latex_content.clone(), color, &file);
+    let svg = latex::get_image_with_ctx(&config.latex_config, latex_content.clone(), color, &file);
 
     match svg {
         Ok(svg) => {

@@ -36,6 +36,8 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
+use crate::latex::LatexConfig;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StaticServerConfiguration {
     /// Root path to the website files. e.g. .js / .html / .css
@@ -44,6 +46,8 @@ pub struct StaticServerConfiguration {
     pub strict: bool,
     /// Use the filesystem watcher
     pub fs_watcher: bool,
+    /// LaTeX settings for rendering fragments
+    pub latex_config: LatexConfig,
 }
 
 impl Default for StaticServerConfiguration {
@@ -52,6 +56,7 @@ impl Default for StaticServerConfiguration {
             root: "./web/dist/".to_string(),
             strict: false,
             fs_watcher: false,
+            latex_config: LatexConfig::default(),
         }
     }
 }
@@ -149,8 +154,6 @@ impl ServerState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
-
     #[test]
     fn test_file_processing_guard() {
         // Create a mock server state
@@ -170,7 +173,7 @@ mod tests {
 
         // Test that guard properly tracks files
         {
-            let guard = FileProcessingGuard::new(app_state.clone(), test_file.clone()).unwrap();
+            let _guard = FileProcessingGuard::new(app_state.clone(), test_file.clone()).unwrap();
 
             // Check that file is marked as being processed
             let state = app_state.lock().unwrap();

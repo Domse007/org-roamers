@@ -20,13 +20,22 @@ pub async fn get_latex_svg_handler(
                 .cloned()
                 .unwrap_or_else(|| "file".to_string());
             match index_str.parse::<usize>() {
-                Ok(index) => latex_service::get_latex_svg_by_index(
-                    app_state,
-                    id.clone(),
-                    index,
-                    color.clone(),
-                    scope,
-                ),
+                Ok(index) => {
+                    // Extract the static config from app_state
+                    let static_config = {
+                        let state = app_state.lock().unwrap();
+                        state.0.static_conf.clone()
+                    };
+
+                    latex_service::get_latex_svg_by_index(
+                        &static_config,
+                        app_state,
+                        id.clone(),
+                        index,
+                        color.clone(),
+                        scope,
+                    )
+                }
                 Err(_) => (StatusCode::BAD_REQUEST, "Invalid index parameter").into_response(),
             }
         }
