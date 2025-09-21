@@ -12,19 +12,18 @@ import { getScope } from "../settings.ts";
 import { type OrgAsHTMLResponse } from "../types.ts";
 import { History } from "../history.ts";
 import BigButton from "./basic/BigButton.vue";
+import LinksSection from "./LinksSection.vue";
 import { processLatexPlaceholders } from "../latex-utils.ts";
 
 const props = defineProps<{ id: string }>();
 const shown: Ref<"none" | "flex"> = ref("none");
 const links: Ref<{ display: string; id: string }[]> = ref([]);
+const incomingLinks: Ref<{ display: string; id: string }[]> = ref([]);
 
 const rendered = ref("");
 let current_id: string = "";
 let current_latex_blocks: string[] = [];
 const preview_ref = useTemplateRef("preview-ref");
-
-// Footer collapse state
-const footerExpanded = ref(false);
 
 const history = new History<string>();
 
@@ -75,12 +74,13 @@ const preview = (id: string) => {
     .then((resp: OrgAsHTMLResponse) => {
       console.log("Org response data:", {
         orgLength: resp.org?.length || 0,
-        linksCount: resp.links?.length || 0,
+        linksCount: resp.outgoing_links?.length || 0,
         latexBlocksCount: resp.latex_blocks?.length || 0,
       });
       history.push(id);
       rendered.value = resp.org;
-      links.value = resp.links;
+      links.value = resp.outgoing_links;
+      incomingLinks.value = resp.incoming_links || [];
       current_latex_blocks = resp.latex_blocks || [];
       console.log(
         `Loaded content with ${current_latex_blocks.length} LaTeX blocks`,
@@ -372,92 +372,21 @@ const emit = defineEmits(["previewSwitch", "error"]);
         v-html="rendered"
       ></div>
 
-      <div class="org-preview-footer" v-if="links.length != 0">
-        <button
-          class="preview-footer-header"
-          @click="footerExpanded = !footerExpanded"
-          :title="footerExpanded ? 'Collapse links' : 'Expand links'"
-        >
-          <div class="preview-footer-header-content">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path
-                d="M4.5 3C4.5 3 4.5 2 6 2C7.5 2 10 2 10 2V5.5"
-                stroke="currentColor"
-                stroke-width="1.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-              <path
-                d="M6.5 1.5L10 5"
-                stroke="currentColor"
-                stroke-width="1.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-              <path
-                d="M8.5 6.5V9C8.5 9.5 8 10 7.5 10H3C2.5 10 2 9.5 2 9V4.5C2 4 2.5 3.5 3 3.5H5.5"
-                stroke="currentColor"
-                stroke-width="1.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-            <span>Outgoing Links ({{ links.length }})</span>
-          </div>
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 12 12"
-            fill="none"
-            class="preview-footer-chevron"
-            :style="{
-              transform: footerExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-            }"
-          >
-            <path
-              d="M3 4.5L6 7.5L9 4.5"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-        </button>
-        <div class="preview-footer-links" v-show="footerExpanded">
-          <button
-            class="org-preview-footer-link"
-            :key="link.id"
-            v-for="link in links"
-            @click="preview(link.id)"
-            :title="`Open ${link.display}`"
-          >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path
-                d="M4.5 3C4.5 3 4.5 2 6 2C7.5 2 10 2 10 2V5.5"
-                stroke="currentColor"
-                stroke-width="1"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-              <path
-                d="M6.5 1.5L10 5"
-                stroke="currentColor"
-                stroke-width="1"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-              <path
-                d="M8.5 6.5V9C8.5 9.5 8 10 7.5 10H3C2.5 10 2 9.5 2 9V4.5C2 4 2.5 3.5 3 3.5H5.5"
-                stroke="currentColor"
-                stroke-width="1"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-            <span>{{ link.display }}</span>
-          </button>
-        </div>
-      </div>
+      <!-- Incoming Links Section -->
+      <LinksSection
+        :links="incomingLinks"
+        title="Incoming Links"
+        icon-type="incoming"
+        @link-click="preview"
+      />
+
+      <!-- Outgoing Links Section -->
+      <LinksSection
+        :links="links"
+        title="Outgoing Links"
+        icon-type="outgoing"
+        @link-click="preview"
+      />
     </div>
   </div>
 </template>
@@ -657,118 +586,23 @@ const emit = defineEmits(["previewSwitch", "error"]);
   background: var(--surface);
 }
 
-.org-preview-footer {
-  border-top: 1px solid color-mix(in srgb, var(--highlight) 20%, transparent);
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--base) 98%, var(--surface)),
-    var(--base)
-  );
-  flex-shrink: 0;
-}
-
-.preview-footer-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 10px 14px;
-  border: none;
-  background: transparent;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--highlight);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  border-bottom: 1px solid color-mix(in srgb, var(--highlight) 15%, transparent);
-}
-
-.preview-footer-header:hover {
-  background: color-mix(in srgb, var(--highlight) 10%, transparent);
-}
-
-.preview-footer-header-content {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.preview-footer-header-content svg {
-  opacity: 0.7;
-}
-
-.preview-footer-chevron {
-  opacity: 0.6;
-  transition: transform 0.2s ease;
-}
-
-.preview-footer-links {
-  max-height: 200px;
-  overflow-y: auto;
-  padding: 4px;
-  transition: all 0.2s ease;
-}
-
-.org-preview-footer-link {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 8px 10px;
-  margin: 1px 0;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--clickable);
-  font-family: var(--font);
-  font-size: 13px;
-  text-align: left;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.org-preview-footer-link:hover {
-  background: color-mix(in srgb, var(--clickable) 15%, transparent);
-  color: color-mix(in srgb, var(--clickable) 110%, white);
-}
-
-.org-preview-footer-link:active {
-  transform: scale(0.98);
-}
-
-.org-preview-footer-link svg {
-  opacity: 0.6;
-  flex-shrink: 0;
-}
-
-.org-preview-footer-link span {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* Custom scrollbar styling */
-.org-preview-content::-webkit-scrollbar,
-.preview-footer-links::-webkit-scrollbar {
+.org-preview-content::-webkit-scrollbar {
   width: 6px;
 }
 
-.org-preview-content::-webkit-scrollbar-track,
-.preview-footer-links::-webkit-scrollbar-track {
+.org-preview-content::-webkit-scrollbar-track {
   background: color-mix(in srgb, var(--base) 50%, transparent);
   border-radius: 3px;
 }
 
-.org-preview-content::-webkit-scrollbar-thumb,
-.preview-footer-links::-webkit-scrollbar-thumb {
+.org-preview-content::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--text) 30%, transparent);
   border-radius: 3px;
   transition: background 0.2s ease;
 }
 
-.org-preview-content::-webkit-scrollbar-thumb:hover,
-.preview-footer-links::-webkit-scrollbar-thumb:hover {
+.org-preview-content::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--text) 50%, transparent);
 }
 
@@ -808,17 +642,6 @@ const emit = defineEmits(["previewSwitch", "error"]);
 
   .org-preview-content {
     padding: 12px;
-  }
-}
-
-@media (max-width: 480px) {
-  .preview-footer-links {
-    max-height: 120px;
-  }
-
-  .org-preview-footer-link {
-    padding: 6px 8px;
-    font-size: 12px;
   }
 }
 </style>

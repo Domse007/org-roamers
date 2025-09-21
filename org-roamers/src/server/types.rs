@@ -176,9 +176,16 @@ pub struct OutgoingLink {
 }
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub struct IncomingLink {
+    pub display: RoamTitle,
+    pub id: RoamID,
+}
+
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct OrgAsHTMLResponse {
     pub org: String,
-    pub links: Vec<OutgoingLink>,
+    pub outgoing_links: Vec<OutgoingLink>,
+    pub incoming_links: Vec<IncomingLink>,
     pub latex_blocks: Vec<String>,
 }
 
@@ -196,7 +203,8 @@ impl OrgAsHTMLResponse {
     pub fn simple(text: impl ToString) -> Self {
         Self {
             org: text.to_string(),
-            links: vec![],
+            outgoing_links: vec![],
+            incoming_links: vec![],
             latex_blocks: vec![],
         }
     }

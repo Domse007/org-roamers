@@ -28,7 +28,11 @@ export interface SearchResponse {
 
 export interface OrgAsHTMLResponse {
   org: string;
-  links: {
+  outgoing_links: {
+    display: string;
+    id: string;
+  }[];
+  incoming_links: {
     display: string;
     id: string;
   }[];
