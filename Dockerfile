@@ -14,10 +14,10 @@ WORKDIR /app
 
 COPY ./ ./backend
 
-RUN cd backend && cargo build --release --bin org-roamers-cli
+RUN cd backend && cargo build --release --bin org-roamers-cli --features static_assets
 
 # ----------- Final stage: Runtime container ------------
-FROM debian:bookworm-slim
+FROM debian
 
 RUN apt-get update && apt-get install -y \
     ca-certificates libsqlite3-0 \
