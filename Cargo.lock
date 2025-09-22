@@ -3014,8 +3014,7 @@ dependencies = [
 [[package]]
 name = "orgize"
 version = "0.10.0-alpha.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b747231437c1d8e68355427250c167d3e4d94874727923511e4572b7f5fecd51"
+source = "git+https://github.com/Domse007/orgize?branch=table-fix#2acc70d872042998f9c3de740cd00ad1d69bf153"
 dependencies = [
  "bytecount",
  "cfg-if",

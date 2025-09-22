@@ -12,7 +12,7 @@ anyhow = "1.0.96"
 chardetng = "0.1.17"
 encoding_rs = "0.8.35"
 notify = "8.0.0"
-orgize = "0.10.0-alpha.10"
+orgize = { git = "https://github.com/Domse007/orgize", branch = "table-fix" }
 axum = { version = "0.7", features = ["ws"] }
 tokio = { version = "1.0", features = ["full"] }
 tower = "0.4"

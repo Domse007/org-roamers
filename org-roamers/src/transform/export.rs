@@ -31,6 +31,23 @@ impl HtmlExportSettings {
     }
 }
 
+/// This is needed because if we have the table
+///
+/// ```org
+/// | / | <> |
+/// |   | b  |
+/// ```
+///
+/// we only want the second column in the final html output.
+/// (while also skipping the first line)
+#[derive(Default)]
+struct OrgTableHints {
+    /// Flag that the current table has a formating row
+    has_formating: bool,
+    /// Flag that is set at row start to check if a cell is the first in the row.
+    next_is_first: bool,
+}
+
 pub struct HtmlExport<'a> {
     settings: &'a HtmlExportSettings,
     output: String,
@@ -41,6 +58,7 @@ pub struct HtmlExport<'a> {
     file: String,
     latex_blocks: Vec<String>,
     latex_counter: usize,
+    table_hints: OrgTableHints,
 }
 
 impl<'a> HtmlExport<'a> {
@@ -55,6 +73,7 @@ impl<'a> HtmlExport<'a> {
             file,
             latex_blocks: vec![],
             latex_counter: 0,
+            table_hints: OrgTableHints::default(),
         }
     }
 }
@@ -274,6 +293,7 @@ impl Traverser for HtmlExport<'_> {
             Event::Enter(Container::OrgTableRow(row)) => {
                 if let Some(child) = row.syntax().first_child() {
                     if child.text().to_string().trim() == "/" {
+                        self.table_hints.has_formating = true;
                         ctx.skip();
                         return;
                     }
@@ -305,6 +325,7 @@ impl Traverser for HtmlExport<'_> {
                     }
                     self.output += "<tr>";
                 }
+                self.table_hints.next_is_first = true;
             }
             Event::Leave(Container::OrgTableRow(row)) => {
                 if row.is_rule() {
@@ -324,7 +345,14 @@ impl Traverser for HtmlExport<'_> {
                     self.output += "</tr>";
                 }
             }
-            Event::Enter(Container::OrgTableCell(_)) => self.output += "<td>",
+            Event::Enter(Container::OrgTableCell(_)) => {
+                if self.table_hints.next_is_first && self.table_hints.has_formating {
+                    self.table_hints.next_is_first = false;
+                    ctx.skip();
+                } else {
+                    self.output += "<td>"
+                }
+            }
             Event::Leave(Container::OrgTableCell(_)) => self.output += "</td>",
 
             Event::Enter(Container::Link(link)) => {
@@ -435,6 +463,7 @@ impl Traverser for HtmlExport<'_> {
 
 #[cfg(test)]
 mod tests {
+    use axum::handler;
     use orgize::Org;
 
     use super::*;
@@ -486,23 +515,36 @@ mod tests {
         Org::parse(org).traverse(&mut handler);
         assert_eq!(handler.finish().0, exp);
     }
-    // #[test]
-    // fn test_org_table_export_empty_cells() {
-    //     let org = concat!(
-    //         "|-------+---|\n",
-    //         "|       | 1 |\n",
-    //         "|-------+---|\n",
-    //         "| world |   |\n"
-    //     );
-    //     let exp = concat!(
-    //         "<div><section><table><thead>",
-    //         "<tr><td></td><td>1</td></tr></thead>",
-    //         "<tbody><tr><td>world</td><td></td></tr></tbody>",
-    //         "</table></section></div>"
-    //     );
-    //     let settings = HtmlExportSettings::default();
-    //     let mut handler = HtmlExport::new(&settings);
-    //     Org::parse(org).traverse(&mut handler);
-    //     assert_eq!(handler.finish(), exp);
-    // }
+    #[test]
+    fn test_org_table_export_empty_cells() {
+        let org = concat!(
+            "|-------+---|\n",
+            "|       | 1 |\n",
+            "|-------+---|\n",
+            "| world |   |\n"
+        );
+        let exp = concat!(
+            "<div><section><table><thead>",
+            "<tr><td></td><td>1</td></tr></thead>",
+            "<tbody><tr><td>world</td><td></td></tr></tbody>",
+            "</table></section></div>"
+        );
+        let settings = HtmlExportSettings::default();
+        let mut handler = HtmlExport::new(&settings, "".into());
+        Org::parse(org).traverse(&mut handler);
+        assert_eq!(handler.finish().0, exp);
+    }
+    #[test]
+    fn test_org_table_export_format_args() {
+        let org = concat!("| / | <> |\n", "|   |  a |\n",);
+        let exp = concat!(
+            "<div><section><table><tbody>",
+            "<tr><td>a</td></tr>",
+            "</tbody></table></section></div>"
+        );
+        let settings = HtmlExportSettings::default();
+        let mut handler = HtmlExport::new(&settings, "".into());
+        Org::parse(org).traverse(&mut handler);
+        assert_eq!(handler.finish().0, exp);
+    }
 }

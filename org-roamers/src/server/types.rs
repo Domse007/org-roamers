@@ -303,16 +303,17 @@ mod tests {
     fn test_org_as_html_serialization() {
         let resp = OrgAsHTMLResponse {
             org: "<h1>title</h1>".to_string(),
-            links: vec![OutgoingLink {
+            outgoing_links: vec![OutgoingLink {
                 display: "t".into(),
                 id: "id".into(),
             }],
+            incoming_links: vec![],
             latex_blocks: vec![],
         };
         let expected = concat!(
-            "{\"org\":\"<h1>title</h1>\",",
-            "\"links\":[{\"display\":\"t\",\"id\":\"id\"}],",
-            "\"latex_blocks\":[]}"
+            "{\"org\":\"<h1>title</h1>\",\"outgoing_links\":",
+            "[{\"display\":\"t\",\"id\":\"id\"}],",
+            "\"incoming_links\":[],\"latex_blocks\":[]}"
         );
         assert_eq!(serde_json::to_string(&resp).unwrap(), expected);
     }
