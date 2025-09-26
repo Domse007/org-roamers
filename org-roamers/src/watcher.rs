@@ -211,11 +211,13 @@ impl OrgWatcher {
             state.dynamic_state.updated_nodes.clear();
             state.dynamic_state.updated_links.clear();
 
-            // Update the database
-            if let Err(err) = diff::diff(state, path) {
-                tracing::error!("Error processing file changes for {:?}: {}", path, err);
-                return Ok(None);
-            }
+            // // Update the database
+            // if let Err(err) = diff::diff(state, path) {
+            //     tracing::error!("Error processing file changes for {:?}: {}", path, err);
+            //     return Ok(None);
+            // }
+            
+            state.cache.invalidate(path.to_owned());
 
             // Use the changes detected by diff::diff
             update

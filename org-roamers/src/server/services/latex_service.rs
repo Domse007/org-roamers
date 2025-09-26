@@ -4,7 +4,6 @@ use axum::{
 };
 use orgize::Org;
 
-
 use crate::latex;
 use crate::server::AppState;
 use crate::transform::export::HtmlExport;
@@ -25,7 +24,6 @@ pub fn get_latex_svg_by_index(
         color,
         scope
     );
-
 
     let mut state = app_state.lock().unwrap();
     let (ref mut server_state, _) = *state;

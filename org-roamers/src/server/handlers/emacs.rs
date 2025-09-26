@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use axum::{
     extract::{Query as AxumQuery, State},
@@ -55,9 +55,7 @@ pub async fn emacs_handler(
                             .await;
                     });
 
-                    if let Err(err) = diff::diff(server_state, file) {
-                        tracing::error!("An error occurred while updating db: {err}");
-                    }
+                    server_state.cache.invalidate(PathBuf::from(file));
                 }
             }
             StatusCode::NO_CONTENT.into_response()

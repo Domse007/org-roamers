@@ -3,6 +3,7 @@ use rusqlite::{Connection, Params};
 
 use crate::error::ServerError;
 
+pub mod files;
 pub mod init;
 pub mod olp;
 pub mod rebuild;

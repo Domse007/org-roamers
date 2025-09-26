@@ -1,16 +1,9 @@
 use rusqlite::Connection;
 
+pub use super::files::init_files_table;
+
 pub fn init_version(con: &mut Connection, version: usize) -> anyhow::Result<()> {
     con.execute(format!("PRAGMA user_version = {}", version).as_str(), [])?;
-    Ok(())
-}
-
-pub fn init_files_table(con: &mut Connection) -> anyhow::Result<()> {
-    const STMNT: &str = concat!(
-        "CREATE TABLE files (file UNIQUE PRIMARY KEY, title,",
-        "hash NOT NULL, atime NOT NULL, mtime NOT NULL);"
-    );
-    con.execute(STMNT, [])?;
     Ok(())
 }
 

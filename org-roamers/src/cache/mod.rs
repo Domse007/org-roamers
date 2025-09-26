@@ -5,6 +5,7 @@
 
 use std::{
     collections::HashMap,
+    hash::{DefaultHasher, Hash, Hasher},
     io,
     ops::Deref,
     path::{Path, PathBuf},
@@ -16,6 +17,7 @@ use rusqlite::Connection;
 use crate::{
     cache::{file::OrgFile, fileiter::FileIter},
     server::types::RoamID,
+    sqlite::files::insert_file,
     transform::org,
 };
 
@@ -44,6 +46,30 @@ impl OrgCacheEntry {
     pub fn path(&self) -> &Path {
         self.path.as_path()
     }
+
+    pub fn get_hash(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.content.hash(&mut hasher);
+        hasher.finish()
+    }
+}
+
+#[derive(Debug)]
+pub enum InvalidatedBy {
+    Path(PathBuf),
+    Id(RoamID),
+}
+
+impl From<PathBuf> for InvalidatedBy {
+    fn from(value: PathBuf) -> Self {
+	Self::Path(value)
+    }
+}
+
+impl From<RoamID> for InvalidatedBy {
+    fn from(value: RoamID) -> Self {
+	Self::Id(value)
+    }
 }
 
 #[derive(Debug)]
@@ -51,6 +77,8 @@ pub struct OrgCache {
     /// Path to the root of the org-roamers directory.
     path: PathBuf,
     lookup: HashMap<RoamID, Arc<OrgCacheEntry>>,
+    // TODO: currently not processed. diff::diff will be required at some point...
+    invalidated: Vec<InvalidatedBy>
 }
 
 impl OrgCache {
@@ -58,6 +86,7 @@ impl OrgCache {
         Self {
             path: root,
             lookup: HashMap::new(),
+	    invalidated: Vec::new()
         }
     }
 
@@ -80,6 +109,10 @@ impl OrgCache {
                     continue;
                 }
             };
+
+            if let Err(err) = insert_file(con, cache_entry.path(), cache_entry.get_hash()) {
+                tracing::error!("{err}");
+            }
 
             let nodes = org::get_nodes(cache_entry.content());
 
@@ -135,8 +168,8 @@ impl OrgCache {
         self.lookup.get(id).map(|e| e.deref())
     }
 
-    pub fn invalidate(&mut self, _id: &RoamID) -> anyhow::Result<()> {
-        todo!("Not yet implemented.")
+    pub fn invalidate<T: Into<InvalidatedBy>>(&mut self, by: T) {
+	self.invalidated.push(by.into());
     }
 
     /// Under most circumstances: DO NOT USE!
