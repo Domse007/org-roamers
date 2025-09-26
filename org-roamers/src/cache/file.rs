@@ -44,8 +44,3 @@ impl OrgFile {
         Ok(cow.into_owned())
     }
 }
-
-pub fn read_to_string<P: AsRef<Path>>(path: P) -> io::Result<String> {
-    let mut file = OrgFile::open(path)?;
-    file.read_to_string()
-}

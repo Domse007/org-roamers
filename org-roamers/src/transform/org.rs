@@ -1,4 +1,4 @@
-use std::{collections::HashSet, path::Path};
+use std::collections::HashSet;
 
 use orgize::{
     ast::{Document, Keyword, Link},
@@ -8,7 +8,7 @@ use orgize::{
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
-use crate::{file::OrgFile, sqlite::rebuild};
+use crate::sqlite::rebuild;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct Timestamps {
@@ -27,7 +27,6 @@ pub struct NodeFromOrg {
     pub(crate) uuid: String,
     pub(crate) title: String,
     pub(crate) content: String,
-    pub(crate) file: String,
     pub(crate) level: u64,
     pub(crate) parent: Option<String>,
     pub(crate) olp: Vec<String>,
@@ -42,42 +41,53 @@ pub struct NodeFromOrg {
 
 impl NodeFromOrg {
     #[rustfmt::skip]
-    pub fn insert_into(&self, con: &mut Connection) -> anyhow::Result<()> {
+    pub fn insert_node(&self, con: &mut Connection) -> anyhow::Result<()> {
         // this does not insert olp, tags, etc. -- why?
         rebuild::insert_node(
-            con, &self.uuid, self.file.as_str(), self.level,
+            con, &self.uuid, "", self.level,
             false, 0, "", "", self.title.as_str(), &self.actual_olp
         )
     }
+
+    pub fn insert_tags(&self, con: &mut Connection) -> anyhow::Result<()> {
+        for tag in &self.tags {
+            rebuild::insert_tag(con, &self.uuid, &tag)?;
+        }
+        Ok(())
+    }
+
+    pub fn insert_links(&self, con: &mut Connection) -> anyhow::Result<()> {
+        for link in &self.links {
+            rebuild::insert_link(con, &self.uuid, &link.0)?;
+        }
+        Ok(())
+    }
 }
 
-fn get_orgize<P: AsRef<Path>>(path: P) -> anyhow::Result<Org> {
-    let mut file = OrgFile::open(path)?;
-    let content = file.read_to_string()?;
-
-    Ok(Org::parse(&content))
+pub fn insert_nodes(con: &mut Connection, nodes: Vec<NodeFromOrg>) {
+    for node in nodes {
+        if let Err(err) = node.insert_node(con) {
+            tracing::error!("{err}");
+        }
+        if let Err(err) = node.insert_tags(con) {
+            tracing::error!("{err}");
+        }
+        if let Err(err) = node.insert_links(con) {
+            tracing::error!("{err}");
+        }
+    }
 }
 
-pub fn get_nodes_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<NodeFromOrg>> {
-    let org = get_orgize(path.as_ref())?;
+pub fn get_nodes(content: &str) -> Vec<NodeFromOrg> {
+    let org = Org::parse(content);
 
-    Ok(get_nodes_from_document(
-        org,
-        path.as_ref()
-            .to_str()
-            .ok_or(anyhow::anyhow!("Invalid path"))?,
-    ))
-}
-
-pub fn get_nodes_from_document(org: Org, file: &str) -> Vec<NodeFromOrg> {
-    let mut traverser = RoamersTraverser::new(file.to_string());
+    let mut traverser = RoamersTraverser::new();
     org.traverse(&mut traverser);
     traverser.nodes
 }
 
 #[derive(Default)]
 pub struct RoamersTraverser {
-    file: String,
     nodes: Vec<NodeFromOrg>,
     id_stack: Vec<(String, String)>,
     tags_stack: Vec<Vec<String>>,
@@ -86,11 +96,8 @@ pub struct RoamersTraverser {
 }
 
 impl RoamersTraverser {
-    pub fn new(file: String) -> Self {
-        Self {
-            file,
-            ..Default::default()
-        }
+    pub fn new() -> Self {
+        Default::default()
     }
 
     pub fn current_olp(&self) -> Vec<String> {
@@ -136,7 +143,6 @@ impl Traverser for RoamersTraverser {
                             content,
                             level: 0,
                             tags: tags.clone(),
-                            file: self.file.to_string(),
                             aliases,
                             parent: None,
                             olp: vec![],
@@ -208,7 +214,6 @@ impl Traverser for RoamersTraverser {
                             level,
                             parent: my_parent,
                             tags: self.get_tags(),
-                            file: self.file.to_string(),
                             olp,
                             actual_olp,
                             aliases,
@@ -298,8 +303,8 @@ fn get_tags_from_keywords(iter: impl Iterator<Item = Keyword>) -> Vec<String> {
         .collect()
 }
 
-pub fn get_latex_header<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<String>> {
-    let org = get_orgize(path)?;
+pub fn get_latex_header(content: &str) -> anyhow::Result<Vec<String>> {
+    let org = Org::parse(content);
     get_latex_header_from_document(org.document())
 }
 

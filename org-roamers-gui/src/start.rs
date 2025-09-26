@@ -50,7 +50,7 @@ pub fn start_server(ctx: &OrgRoamersGUI) -> anyhow::Result<ServerRuntime> {
     )
     .unwrap();
 
-    if let Err(err) = state.sqlite.insert_files(&ctx.settings.roam_path) {
+    if let Err(err) = state.cache.rebuild(&mut state.sqlite.connection()) {
         anyhow::bail!("An error occured: {err}");
     }
 

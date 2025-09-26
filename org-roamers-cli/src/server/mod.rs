@@ -75,7 +75,7 @@ pub fn entry(args: Vec<String>) -> Result<ExitCode> {
         }
     };
 
-    if let Err(err) = global.sqlite.insert_files(&configuration.roam_path) {
+    if let Err(err) = global.cache.rebuild(&mut global.sqlite.connection()) {
         tracing::error!("An error occured: {err}");
     }
 

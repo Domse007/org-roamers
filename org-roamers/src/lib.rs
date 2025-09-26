@@ -11,9 +11,9 @@
 //!
 //! See: the provided server implementation `org_roamers::bin::server::main.rs`.
 
+mod cache;
 mod diff;
 pub mod error;
-pub mod file;
 mod latex;
 
 pub mod search;
@@ -36,6 +36,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
+use crate::cache::OrgCache;
 use crate::latex::LatexConfig;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -118,7 +119,8 @@ impl DynamicServerState {
 pub struct ServerState {
     pub sqlite: SqliteConnection,
     pub html_export_settings: HtmlExportSettings,
-    pub org_roam_db_path: PathBuf,
+    pub cache: OrgCache,
+    // pub org_roam_db_path: PathBuf,
     pub static_conf: StaticServerConfiguration,
     pub dynamic_state: DynamicServerState,
     pub websocket_broadcaster: Arc<WebSocketBroadcaster>,
@@ -127,7 +129,7 @@ pub struct ServerState {
 impl ServerState {
     pub fn new<P: AsRef<Path>>(
         html_export_settings_path: P,
-        org_roam_db_path: P,
+        org_roam_path: P,
         static_conf: StaticServerConfiguration,
     ) -> Result<ServerState, Box<dyn std::error::Error>> {
         let sqlite_con = match SqliteConnection::init(static_conf.strict) {
@@ -143,7 +145,7 @@ impl ServerState {
             sqlite: sqlite_con,
             html_export_settings: HtmlExportSettings::new(html_export_settings_path)
                 .unwrap_or_default(),
-            org_roam_db_path: org_roam_db_path.as_ref().to_path_buf(),
+            cache: OrgCache::new(org_roam_path.as_ref().to_path_buf()),
             static_conf,
             dynamic_state: DynamicServerState::default(),
             websocket_broadcaster: Arc::new(WebSocketBroadcaster::new()),

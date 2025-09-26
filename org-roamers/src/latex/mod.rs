@@ -1,6 +1,6 @@
 use std::io::Read;
 use std::process::Command;
-use std::{fs::File, io::Write, path::Path};
+use std::{fs::File, io::Write};
 
 use anyhow::bail;
 use serde::{Deserialize, Serialize};
@@ -38,13 +38,13 @@ impl Default for LatexConfig {
     }
 }
 
-pub fn get_image_with_ctx<P: AsRef<Path>>(
+pub fn get_image_with_ctx(
     config: &LatexConfig,
     latex: String,
     color: String,
-    file: P,
+    org_content: &str,
 ) -> anyhow::Result<Vec<u8>> {
-    let headers = org::get_latex_header(file)?;
+    let headers = org::get_latex_header(org_content)?;
     get_image(config, latex, color, headers)
 }
 

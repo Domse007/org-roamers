@@ -48,7 +48,7 @@ pub fn start_server(url: String, state: ServerState) -> Result<ServerRuntime, Bo
         serde_json::to_string(&state.html_export_settings).unwrap()
     );
 
-    let org_roam_db_path = state.org_roam_db_path.clone();
+    let org_roam_db_path = state.cache.path().to_path_buf();
     let use_fs_watcher = state.static_conf.fs_watcher;
 
     let app_state = Arc::new(Mutex::new((state, Arc::new(Mutex::new(false)))));

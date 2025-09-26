@@ -1,7 +1,4 @@
-use std::path::Path;
-
 use anyhow::{bail, Result};
-use rebuild::{IterFilesError, IterFilesStats};
 use rusqlite::{Connection, Params};
 
 use crate::error::ServerError;
@@ -95,17 +92,6 @@ impl SqliteConnection {
 
     pub fn connection(&mut self) -> &mut Connection {
         &mut self.connection
-    }
-
-    pub fn insert_files<P: AsRef<Path>>(&mut self, roam_path: P) -> Result<(), IterFilesError> {
-        let mut stats = IterFilesStats::default();
-        let res = rebuild::iter_files(&mut self.connection, roam_path, &mut stats);
-        #[rustfmt::skip]
-        tracing::info!(
-            "Indexed {} nodes over {} files containing {} links and {} tags",
-            stats.num_nodes, stats.num_files, stats.num_links, stats.num_tags
-        );
-        res
     }
 }
 

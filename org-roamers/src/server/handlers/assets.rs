@@ -17,7 +17,7 @@ pub async fn serve_assets_handler(
         Some(path) => {
             let state = app_state.lock().unwrap();
             let (ref server_state, _) = *state;
-            let org_roam_path = &server_state.org_roam_db_path;
+            let org_roam_path = server_state.cache.path();
             asset_service::serve_assets(org_roam_path, path.clone())
         }
         None => StatusCode::NOT_FOUND.into_response(),

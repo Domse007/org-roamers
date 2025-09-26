@@ -4,14 +4,10 @@ use axum::{
 };
 use orgize::Org;
 
-use std::path::PathBuf;
 
 use crate::latex;
 use crate::server::AppState;
-use crate::sqlite::helpers;
 use crate::transform::export::HtmlExport;
-use crate::transform::subtree::Subtree;
-use crate::FileProcessingGuard;
 use crate::StaticServerConfiguration;
 
 pub fn get_latex_svg_by_index(
@@ -30,73 +26,14 @@ pub fn get_latex_svg_by_index(
         scope
     );
 
-    // First, find the node and get the file path without holding the lock too long
-    let (file_path, node_id, db_result) = {
-        let mut state = app_state.lock().unwrap();
-        let (ref mut server_state, _) = *state;
 
-        // Find the node by ID
-        let [_title, node_id, file] =
-            match helpers::get_all_nodes(server_state.sqlite.connection(), ["title", "id", "file"])
-                .into_iter()
-                .find(|[_, node, _]| node.contains(&id))
-            {
-                Some(node) => node,
-                None => {
-                    tracing::error!("Node not found: {}", id);
-                    return (StatusCode::NOT_FOUND, "Node not found").into_response();
-                }
-            };
+    let mut state = app_state.lock().unwrap();
+    let (ref mut server_state, _) = *state;
 
-        let file = file.replace('"', "");
-        (
-            PathBuf::from(&file),
-            node_id,
-            (
-                file,
-                server_state.org_roam_db_path.clone(),
-                server_state.html_export_settings.clone(),
-            ),
-        )
-    }; // Lock is released here
+    let content = server_state.cache.retrieve(&id.into()).unwrap().content();
 
-    // Create file processing guard to prevent watcher conflicts
-    let _guard = match FileProcessingGuard::new(app_state, file_path.clone()) {
-        Ok(guard) => guard,
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Could not acquire file processing lock",
-            )
-                .into_response();
-        }
-    };
-
-    let (file, org_roam_db_path, html_export_settings) = db_result;
-
-    let contents = match std::fs::read_to_string(&file) {
-        Ok(f) => f,
-        Err(err) => {
-            let error_msg = format!("Could not read file contents: {err}");
-            return (StatusCode::INTERNAL_SERVER_ERROR, error_msg).into_response();
-        }
-    };
-
-    let contents = if scope == "file" {
-        contents
-    } else {
-        Subtree::get(node_id.into(), contents.as_str()).unwrap_or(contents)
-    };
-
-    // Extract LaTeX blocks from the content
-    let relative_file = std::path::PathBuf::from(&file)
-        .strip_prefix(&org_roam_db_path)
-        .unwrap_or(std::path::Path::new(&file))
-        .to_string_lossy()
-        .to_string();
-
-    let mut handler = HtmlExport::new(&html_export_settings, relative_file);
-    Org::parse(contents).traverse(&mut handler);
+    let mut handler = HtmlExport::new(&server_state.html_export_settings, String::new());
+    Org::parse(content).traverse(&mut handler);
 
     let (_, _, latex_blocks) = handler.finish();
 
@@ -124,7 +61,8 @@ pub fn get_latex_svg_by_index(
     };
 
     // Render the LaTeX
-    let svg = latex::get_image_with_ctx(&config.latex_config, latex_content.clone(), color, &file);
+    let svg =
+        latex::get_image_with_ctx(&config.latex_config, latex_content.clone(), color, content);
 
     match svg {
         Ok(svg) => {
