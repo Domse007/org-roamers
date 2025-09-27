@@ -463,7 +463,7 @@ impl Traverser for HtmlExport<'_> {
 
 #[cfg(test)]
 mod tests {
-    use axum::handler;
+
     use orgize::Org;
 
     use super::*;

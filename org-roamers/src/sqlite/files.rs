@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, Transaction};
 
 pub fn init_files_table(con: &mut Connection) -> anyhow::Result<()> {
     const STMNT: &str = concat!(
@@ -21,6 +21,20 @@ pub fn insert_file<P: AsRef<Path>>(
 
     const STMNT: &str = r#"INSERT OR REPLACE INTO files (file, hash) VALUES (?1, ?2);"#;
     con.execute(STMNT, params![filename, hash])
+        .map_err(Into::into)
+}
+
+/// Transaction-aware version of insert_file
+pub fn insert_file_tx<P: AsRef<Path>>(
+    tx: &Transaction,
+    filename: P,
+    hash: u64,
+) -> anyhow::Result<usize> {
+    let filename = filename.as_ref().to_string_lossy();
+    let hash = hash as u32;
+
+    const STMNT: &str = r#"INSERT OR REPLACE INTO files (file, hash) VALUES (?1, ?2);"#;
+    tx.execute(STMNT, params![filename, hash])
         .map_err(Into::into)
 }
 

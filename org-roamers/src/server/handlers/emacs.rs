@@ -6,7 +6,6 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
-use crate::diff;
 use crate::server::emacs::{route_emacs_traffic, EmacsRequest};
 use crate::server::types::RoamID;
 use crate::server::AppState;

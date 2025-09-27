@@ -337,8 +337,7 @@ Welcome
 :END:
 some text
 ";
-        let org = Org::parse(ORG);
-        let res = get_nodes_from_document(org, "");
+        let res = get_nodes(ORG);
         assert_eq!(
             res,
             vec![
@@ -383,8 +382,7 @@ Welcome
 :END:
 some text
 ";
-        let org = Org::parse(ORG);
-        let res = get_nodes_from_document(org, "");
+        let res = get_nodes(ORG);
         assert_eq!(
             res,
             vec![
@@ -437,8 +435,7 @@ Welcome
 :END:
 some text
 ";
-        let org = Org::parse(ORG);
-        let res = get_nodes_from_document(org, "");
+        let res = get_nodes(ORG);
         assert_eq!(
             res,
             vec![
@@ -490,8 +487,7 @@ test
 :END:
 some text
 ";
-        let org = Org::parse(ORG);
-        let res = get_nodes_from_document(org, "");
+        let res = get_nodes(ORG);
         assert_eq!(
             res,
             vec![
@@ -556,8 +552,7 @@ some text
 :PROPERTIES:
 :ID:       e655725f-97db-4eec-925a-b80d66ad97e9
 :END:";
-        let org = Org::parse(ORG);
-        let res = get_nodes_from_document(org, "");
+        let res = get_nodes(ORG);
         assert_eq!(
             res,
             vec![
@@ -604,8 +599,7 @@ some text
 :ID:       e655725f-97db-4eec-925a-b80d66ad97e9
 :END:
 Linking to [[id:e655725f-97db-4eec-925a-b80d66ad97e8][Test]]";
-        let org = Org::parse(ORG);
-        let res = get_nodes_from_document(org, "");
+        let res = get_nodes(ORG);
         assert_eq!(res[0].links, vec![]);
         assert_eq!(
             res[1].links,
@@ -624,8 +618,7 @@ Linking to [[id:e655725f-97db-4eec-925a-b80d66ad97e8][Test]]";
 #+title: Test
 * other
 Linking to [[id:e655725f-97db-4eec-925a-b80d66ad97e8][Test]]";
-        let org = Org::parse(ORG);
-        let res = get_nodes_from_document(org, "");
+        let res = get_nodes(ORG);
         assert_eq!(
             res[0].links,
             vec![(
@@ -647,8 +640,7 @@ Linking to [[id:e655725f-97db-4eec-925a-b80d66ad97e8][Test]]";
 :ID:       e655725f-97db-4eec-925a-b80d66ad97e9
 :ROAM_ALIASES: test3 test4
 :END:";
-        let org = Org::parse(ORG);
-        let res = get_nodes_from_document(org, "");
+        let res = get_nodes(ORG);
         assert_eq!(
             res[0].aliases,
             vec!["test1".to_string(), "test2".to_string()]

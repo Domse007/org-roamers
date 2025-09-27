@@ -12,7 +12,6 @@
 //! See: the provided server implementation `org_roamers::bin::server::main.rs`.
 
 mod cache;
-mod diff;
 pub mod error;
 mod latex;
 
@@ -164,7 +163,7 @@ mod tests {
         let server_state = ServerState {
             sqlite,
             html_export_settings: HtmlExportSettings::default(),
-            org_roam_db_path: temp_dir.clone(),
+            cache: OrgCache::new(temp_dir.clone()),
             static_conf: StaticServerConfiguration::default(),
             dynamic_state: DynamicServerState::default(),
             websocket_broadcaster: Arc::new(WebSocketBroadcaster::new()),

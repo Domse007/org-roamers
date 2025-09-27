@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use rusqlite::{Connection, Params};
+use rusqlite::{Connection, Params, Transaction};
 
 use crate::error::ServerError;
 
@@ -93,6 +93,11 @@ impl SqliteConnection {
 
     pub fn connection(&mut self) -> &mut Connection {
         &mut self.connection
+    }
+
+    /// Start a database transaction for atomic operations
+    pub fn transaction(&mut self) -> Result<Transaction<'_>, ServerError> {
+        self.connection.transaction().map_err(Into::into)
     }
 }
 
