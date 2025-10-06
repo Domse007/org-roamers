@@ -2,6 +2,7 @@ pub struct CliArgs {
     pub path: String,
     pub dump: bool,
     pub fs_watcher: bool,
+    pub get_config: bool,
 }
 
 impl CliArgs {
@@ -10,6 +11,7 @@ impl CliArgs {
             path: "".to_string(),
             dump: false,
             fs_watcher: false,
+            get_config: false,
         };
 
         for arg in args {
@@ -17,6 +19,7 @@ impl CliArgs {
                 match arg.as_str() {
                     "--dump" => cli_args.dump = true,
                     "--fs-watcher" => cli_args.fs_watcher = true,
+                    "--get-config" => cli_args.get_config = true,
                     _ => anyhow::bail!("Unsupported argument: {arg}"),
                 }
             } else {

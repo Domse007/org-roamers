@@ -1,6 +1,6 @@
 use std::{fs, path::PathBuf};
 
-use org_roamers::{ServerState, StaticServerConfiguration, server::ServerRuntime};
+use org_roamers::{ServerState, config::Config, server::ServerRuntime};
 
 use crate::OrgRoamersGUI;
 
@@ -37,22 +37,13 @@ pub fn start_server(ctx: &OrgRoamersGUI) -> anyhow::Result<ServerRuntime> {
         Ok(content) => serde_json::from_str(content.as_str()).unwrap(),
         Err(err) => {
             tracing::error!("Failed to load config: {err}");
-            StaticServerConfiguration::default()
+            Config::default()
         }
     };
 
     server_configuration.fs_watcher = ctx.settings.fs_watcher;
 
-    let mut state = ServerState::new(
-        html_path(),
-        ctx.settings.roam_path.clone().into(),
-        server_configuration,
-    )
-    .unwrap();
-
-    if let Err(err) = state.cache.rebuild(&mut state.sqlite.connection()) {
-        anyhow::bail!("An error occured: {err}");
-    }
+    let mut state = ServerState::new(server_configuration)?;
 
     Ok(org_roamers::server::start_server(url, state).unwrap())
 }

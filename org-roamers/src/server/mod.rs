@@ -41,15 +41,13 @@ impl ServerRuntime {
 }
 
 pub fn start_server(url: String, state: ServerState) -> Result<ServerRuntime, Box<dyn Error>> {
-    tracing::info!("Using server configuration: {:?}", state.static_conf);
-
     tracing::info!(
-        "Using HTML settings: {}",
-        serde_json::to_string(&state.html_export_settings).unwrap()
+        "Using server configuration: {:?}",
+        serde_json::to_string(&state.config)
     );
 
     let org_roam_db_path = state.cache.path().to_path_buf();
-    let use_fs_watcher = state.static_conf.fs_watcher;
+    let use_fs_watcher = state.config.fs_watcher;
 
     let app_state = Arc::new(Mutex::new((state, Arc::new(Mutex::new(false)))));
 

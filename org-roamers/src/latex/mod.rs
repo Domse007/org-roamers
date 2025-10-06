@@ -3,40 +3,13 @@ use std::process::Command;
 use std::{fs::File, io::Write};
 
 use anyhow::bail;
-use serde::{Deserialize, Serialize};
 use tracing::info;
 
+use crate::config::LatexConfig;
 use crate::latex::builder::{LatexBuilder, LatexPathBuilder};
 use crate::transform::org;
 
 mod builder;
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LatexConfig {
-    latex_cmd: String,
-    latex_opt: Vec<String>,
-    dvisvgm_cmd: String,
-    dvisvgm_opt: Vec<String>,
-}
-
-impl Default for LatexConfig {
-    fn default() -> Self {
-        Self {
-            latex_cmd: "latex".to_string(),
-            latex_opt: vec!["-interaction".into(), "nonstopmode".into()],
-            dvisvgm_cmd: "dvisvgm".to_string(),
-            dvisvgm_opt: vec![
-                "--optimize".into(),
-                "--clipjoin".into(),
-                "--relative".into(),
-                "--no-fonts".into(),
-                "--exact-bbox".into(),
-                "--precision=6".into(),
-                "--verbosity=0".into(),
-            ],
-        }
-    }
-}
 
 pub fn get_image_with_ctx(
     config: &LatexConfig,

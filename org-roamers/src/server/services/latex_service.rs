@@ -5,13 +5,11 @@ use axum::{
 use orgize::Org;
 
 use crate::latex;
-use crate::server::AppState;
 use crate::transform::export::HtmlExport;
-use crate::StaticServerConfiguration;
+use crate::ServerState;
 
 pub fn get_latex_svg_by_index(
-    config: &StaticServerConfiguration,
-    app_state: AppState,
+    state: &ServerState,
     id: String,
     latex_index: usize,
     color: String,
@@ -25,12 +23,9 @@ pub fn get_latex_svg_by_index(
         scope
     );
 
-    let mut state = app_state.lock().unwrap();
-    let (ref mut server_state, _) = *state;
+    let content = state.cache.retrieve(&id.into()).unwrap().content();
 
-    let content = server_state.cache.retrieve(&id.into()).unwrap().content();
-
-    let mut handler = HtmlExport::new(&server_state.html_export_settings, String::new());
+    let mut handler = HtmlExport::new(&state.config.org_to_html, String::new());
     Org::parse(content).traverse(&mut handler);
 
     let (_, _, latex_blocks) = handler.finish();
@@ -59,8 +54,12 @@ pub fn get_latex_svg_by_index(
     };
 
     // Render the LaTeX
-    let svg =
-        latex::get_image_with_ctx(&config.latex_config, latex_content.clone(), color, content);
+    let svg = latex::get_image_with_ctx(
+        &state.config.latex_config,
+        latex_content.clone(),
+        color,
+        content,
+    );
 
     match svg {
         Ok(svg) => {

@@ -9,6 +9,10 @@ fn main() -> ExitCode {
     if let Some(cmd) = args.next() {
         match cmd.as_str() {
             "--server" => server::entry(args.collect()).unwrap(),
+            "--get-config" => {
+                server::print_config();
+                ExitCode::SUCCESS
+            }
             "--cli" => {
                 cli::entry();
                 ExitCode::SUCCESS
@@ -19,7 +23,7 @@ fn main() -> ExitCode {
             }
         }
     } else {
-        eprintln!("No command provided. Use --server or --cli");
+        eprintln!("No command provided. Use --server, --cli or --get-config");
         ExitCode::FAILURE
     }
 }

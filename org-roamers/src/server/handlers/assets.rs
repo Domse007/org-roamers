@@ -27,6 +27,11 @@ pub async fn serve_assets_handler(
 pub async fn fallback_handler(uri: axum::http::Uri, State(app_state): State<AppState>) -> Response {
     let mut state = app_state.lock().unwrap();
     let (ref mut server_state, _) = *state;
-    let conf = server_state.static_conf.root.to_string();
+    let conf = server_state
+        .config
+        .org_roamers_root
+        .to_str()
+        .unwrap()
+        .to_string();
     asset_service::default_route_content(server_state, conf, Some(uri.path().to_string()))
 }

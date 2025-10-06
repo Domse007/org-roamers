@@ -21,15 +21,11 @@ pub async fn get_latex_svg_handler(
                 .unwrap_or_else(|| "file".to_string());
             match index_str.parse::<usize>() {
                 Ok(index) => {
-                    // Extract the static config from app_state
-                    let static_config = {
-                        let state = app_state.lock().unwrap();
-                        state.0.static_conf.clone()
-                    };
+                    let mut state = app_state.lock().unwrap();
+                    let (ref mut server_state, _) = *state;
 
                     latex_service::get_latex_svg_by_index(
-                        &static_config,
-                        app_state,
+                        server_state,
                         id.clone(),
                         index,
                         color.clone(),

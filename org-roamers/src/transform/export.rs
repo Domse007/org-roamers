@@ -1,35 +1,14 @@
 use std::cmp::min;
 use std::fmt::Write;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use anyhow::Result;
+use crate::config::HtmlExportSettings;
 use orgize::rowan::ast::AstNode;
 use orgize::{
     export::{Container, Event, HtmlEscape, TraversalContext, Traverser},
     rowan::NodeOrToken,
     SyntaxKind,
 };
-use serde::{Deserialize, Serialize};
-
-#[derive(Serialize, Deserialize, Default, Clone)]
-pub struct EnvAdvice {
-    on: String,
-    header: String,
-    css_style: String,
-    text_styling: String,
-}
-
-#[derive(Serialize, Deserialize, Default, Clone)]
-pub struct HtmlExportSettings {
-    pub env_advices: Vec<EnvAdvice>,
-}
-
-impl HtmlExportSettings {
-    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
-        serde_json::from_str(fs::read_to_string(path)?.as_str()).map_err(Into::into)
-    }
-}
 
 /// This is needed because if we have the table
 ///

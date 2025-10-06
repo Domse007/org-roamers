@@ -20,46 +20,24 @@ pub mod server;
 pub mod sqlite;
 pub mod transform;
 pub mod watcher;
-pub mod websocket;
+// pub mod websocket;
+mod client;
+pub mod config;
 
-use serde::Deserialize;
-use serde::Serialize;
+use axum::http::header::ORIGIN;
 use server::types::RoamID;
 use server::types::RoamLink;
 use server::types::RoamNode;
 use sqlite::SqliteConnection;
-use transform::export::HtmlExportSettings;
-use websocket::WebSocketBroadcaster;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use tokio::sync::mpsc;
 
 use crate::cache::OrgCache;
-use crate::latex::LatexConfig;
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct StaticServerConfiguration {
-    /// Root path to the website files. e.g. .js / .html / .css
-    pub root: String,
-    /// Use stricter policy like foreign_keys = ON.
-    pub strict: bool,
-    /// Use the filesystem watcher
-    pub fs_watcher: bool,
-    /// LaTeX settings for rendering fragments
-    pub latex_config: LatexConfig,
-}
-
-impl Default for StaticServerConfiguration {
-    fn default() -> Self {
-        Self {
-            root: "./web/dist/".to_string(),
-            strict: false,
-            fs_watcher: false,
-            latex_config: LatexConfig::default(),
-        }
-    }
-}
+use crate::client::message::WebSocketMessage;
+use crate::config::Config;
 
 #[derive(Default, Debug)]
 pub struct DynamicServerState {
@@ -116,39 +94,67 @@ impl DynamicServerState {
 }
 
 pub struct ServerState {
+    pub config: Config,
     pub sqlite: SqliteConnection,
-    pub html_export_settings: HtmlExportSettings,
     pub cache: OrgCache,
-    // pub org_roam_db_path: PathBuf,
-    pub static_conf: StaticServerConfiguration,
     pub dynamic_state: DynamicServerState,
-    pub websocket_broadcaster: Arc<WebSocketBroadcaster>,
+    pub websocket_connections: HashMap<u64, mpsc::UnboundedSender<WebSocketMessage>>,
+    pub next_connection_id: u64,
 }
 
 impl ServerState {
-    pub fn new<P: AsRef<Path>>(
-        html_export_settings_path: P,
-        org_roam_path: P,
-        static_conf: StaticServerConfiguration,
-    ) -> Result<ServerState, Box<dyn std::error::Error>> {
-        let sqlite_con = match SqliteConnection::init(static_conf.strict) {
+    pub fn new(conf: Config) -> anyhow::Result<ServerState> {
+        let mut sqlite_con = match SqliteConnection::init(conf.strict) {
             Ok(con) => con,
             Err(e) => {
-                return Err(
-                    format!("ERROR: could not initialize the sqlite connection: {e}").into(),
-                )
+                anyhow::bail!("ERROR: could not initialize the sqlite connection: {e}");
             }
         };
 
+        let mut org_cache = OrgCache::new(conf.org_roamers_root.to_path_buf());
+
+        org_cache.rebuild(sqlite_con.connection())?;
+
         Ok(ServerState {
             sqlite: sqlite_con,
-            html_export_settings: HtmlExportSettings::new(html_export_settings_path)
-                .unwrap_or_default(),
-            cache: OrgCache::new(org_roam_path.as_ref().to_path_buf()),
-            static_conf,
+            cache: org_cache,
+            config: conf,
             dynamic_state: DynamicServerState::default(),
-            websocket_broadcaster: Arc::new(WebSocketBroadcaster::new()),
+            websocket_connections: HashMap::new(),
+            next_connection_id: 1,
         })
+    }
+
+    /// Register a new WebSocket connection
+    pub fn register_websocket_connection(
+        &mut self,
+        sender: mpsc::UnboundedSender<WebSocketMessage>,
+    ) -> u64 {
+        let connection_id = self.next_connection_id;
+        self.next_connection_id += 1;
+        self.websocket_connections.insert(connection_id, sender);
+        connection_id
+    }
+
+    /// Unregister a WebSocket connection
+    pub fn unregister_websocket_connection(&mut self, connection_id: u64) {
+        self.websocket_connections.remove(&connection_id);
+    }
+
+    /// Send a message to all connected WebSocket clients
+    pub fn broadcast_to_websockets(&mut self, message: WebSocketMessage) {
+        let mut failed_connections = Vec::new();
+
+        for (connection_id, sender) in &self.websocket_connections {
+            if sender.send(message.clone()).is_err() {
+                failed_connections.push(*connection_id);
+            }
+        }
+
+        // Remove failed connections
+        for connection_id in failed_connections {
+            self.websocket_connections.remove(&connection_id);
+        }
     }
 }
 
@@ -161,12 +167,12 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let sqlite = SqliteConnection::init(false).unwrap();
         let server_state = ServerState {
-            sqlite,
-            html_export_settings: HtmlExportSettings::default(),
+            config: Config::default(),
+            sqlite: sqlite,
             cache: OrgCache::new(temp_dir.clone()),
-            static_conf: StaticServerConfiguration::default(),
             dynamic_state: DynamicServerState::default(),
-            websocket_broadcaster: Arc::new(WebSocketBroadcaster::new()),
+            websocket_connections: HashMap::new(),
+            next_connection_id: 1,
         };
 
         let app_state = Arc::new(Mutex::new((server_state, Arc::new(Mutex::new(false)))));

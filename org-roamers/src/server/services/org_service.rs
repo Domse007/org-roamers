@@ -33,7 +33,7 @@ pub fn get_org_as_html(app_state: AppState, query: Query, scope: String) -> OrgA
     // Convert absolute path to relative path from org-roam directory
     let relative_file = cache_entry.path().to_string_lossy().into_owned();
 
-    let mut handler = HtmlExport::new(&server_state.html_export_settings, relative_file);
+    let mut handler = HtmlExport::new(&server_state.config.org_to_html, relative_file);
     Org::parse(contents).traverse(&mut handler);
 
     let (org, outgoing_links, latex_blocks) = handler.finish();

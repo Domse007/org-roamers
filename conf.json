@@ -1,0 +1,39 @@
+{
+   "org_roamers_root": "~/notes/",
+   "org_to_html": {
+      "env_advices": [
+	  {
+	      "on": "important",
+	      "header": "<div style=\"width: 100%; color: var(--warn)\"><b>! important</b></div>",
+	      "css_style": "border-left: 2px solid var(--warn); padding: 5px; background-color: color-mix(in srgb, var(--warn), var(--surface))",
+	      "text_styling": "margin-bottom: 0px; margin-top: 5px;"
+	  },
+	  {
+	      "on": "note",
+	      "header": "<div style=\"width: 100%; color: var(--highlight-2)\"><b>! note</b></div>",
+	      "css_style": "border-left: 2px solid var(--highlight-2); padding: 5px; background-color: color-mix(in srgb, var(--highlight-2), var(--surface))",
+	      "text_styling": "margin-bottom: 0px; margin-top: 5px;"
+	  }
+      ]
+   },
+   "root": "./web/dist/",
+   "strict": false,
+   "fs_watcher": false,
+   "latex_config": {
+      "latex_cmd": "latex",
+      "latex_opt": [
+         "-interaction",
+         "nonstopmode"
+      ],
+      "dvisvgm_cmd": "dvisvgm",
+      "dvisvgm_opt": [
+         "--optimize",
+         "--clipjoin",
+         "--relative",
+         "--no-fonts",
+         "--exact-bbox",
+         "--precision=6",
+         "--verbosity=0"
+      ]
+   }
+}
