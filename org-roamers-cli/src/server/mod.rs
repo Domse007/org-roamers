@@ -14,7 +14,6 @@ use org_roamers::{
     server::start_server,
 };
 use tracing::{error, info};
-use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 pub fn print_config() {
     eprintln!("Install the file by calling");
@@ -83,7 +82,7 @@ pub fn entry(args: Vec<String>) -> Result<ExitCode> {
 
     server_configuration.fs_watcher = cli_args.fs_watcher;
 
-    let mut global = match ServerState::new(server_configuration) {
+    let global = match ServerState::new(server_configuration) {
         Ok(g) => g,
         Err(e) => {
             tracing::error!("An error occured: {e}");
@@ -97,10 +96,11 @@ pub fn entry(args: Vec<String>) -> Result<ExitCode> {
         if std::fs::exists(&dump_path).unwrap() {
             std::fs::remove_file(&dump_path).unwrap();
         }
-        global
-            .sqlite
-            .connection()
-            .backup(rusqlite::DatabaseName::Main, &dump_path, None)?;
+        global.sqlite.lock().unwrap().connection().backup(
+            rusqlite::DatabaseName::Main,
+            &dump_path,
+            None,
+        )?;
         tracing::info!("Saved db dump to {}", dump_path.display());
         return Ok(ExitCode::SUCCESS);
     }

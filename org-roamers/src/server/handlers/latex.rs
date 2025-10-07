@@ -22,7 +22,7 @@ pub async fn get_latex_svg_handler(
             match index_str.parse::<usize>() {
                 Ok(index) => {
                     let mut state = app_state.lock().unwrap();
-                    let (ref mut server_state, _) = *state;
+                    let ref mut server_state = *state;
 
                     latex_service::get_latex_svg_by_index(
                         server_state,

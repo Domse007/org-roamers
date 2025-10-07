@@ -19,7 +19,7 @@ pub async fn emacs_handler(
     match route_emacs_traffic(params) {
         Ok(req) => {
             let mut state = app_state.lock().unwrap();
-            let (ref mut server_state, _) = *state;
+            let ref mut server_state = *state;
 
             match req {
                 EmacsRequest::BufferOpened(id) => {
@@ -28,31 +28,15 @@ pub async fn emacs_handler(
                         .dynamic_state
                         .update_working_id(roam_id.clone());
 
-                    // Broadcast node visit via WebSocket
-                    let broadcaster = server_state.websocket_broadcaster.clone();
-                    tokio::spawn(async move {
-                        broadcaster.broadcast_node_visited(roam_id).await;
-                    });
+                    // Notify all WebSocket clients about node visit
+                    let message =
+                        crate::client::message::WebSocketMessage::NodeVisited { node_id: roam_id };
+                    server_state.broadcast_to_websockets(message);
                 }
                 EmacsRequest::BufferModified(file) => {
-                    // Broadcast pending changes status
-                    let broadcaster = server_state.websocket_broadcaster.clone();
-                    let visited_node = server_state
-                        .dynamic_state
-                        .working_id
-                        .as_ref()
-                        .map(|(id, _)| id.clone());
-
-                    tokio::spawn(async move {
-                        broadcaster
-                            .broadcast_status_update(
-                                visited_node,
-                                true,   // pending_changes = true
-                                vec![], // updated_nodes will be populated by watcher
-                                vec![], // updated_links will be populated by watcher
-                            )
-                            .await;
-                    });
+                    // Notify all WebSocket clients about pending changes
+                    let message = crate::client::message::WebSocketMessage::BufferModified;
+                    server_state.broadcast_to_websockets(message);
 
                     server_state.cache.invalidate(PathBuf::from(file));
                 }

@@ -11,16 +11,17 @@ pub fn get_graph_data(db: &mut ServerState) -> GraphData {
         sanitizer.process(title)
     };
 
-    let mut nodes = helpers::get_all_nodes(db.sqlite.connection(), ["id", "title"])
+    let mut sqlite = db.sqlite.lock().unwrap();
+
+    let mut nodes = helpers::get_all_nodes(sqlite.connection(), ["id", "title"])
         .into_iter()
         .map(|e| {
-            let parent = olp::get_olp(db.sqlite.connection(), &e[0])
+            let parent = olp::get_olp(sqlite.connection(), &e[0])
                 .unwrap_or_default()
                 .pop()
                 .unwrap_or_default();
             let stmnt = "SELECT title, id FROM nodes WHERE title = ?1;";
-            let parent = db
-                .sqlite
+            let parent = sqlite
                 .query_one(stmnt, [parent], |row| {
                     Ok(row.get::<usize, String>(1).unwrap())
                 })
@@ -41,7 +42,7 @@ pub fn get_graph_data(db: &mut ServerState) -> GraphData {
         "AND (dest = ?1 OR source = ?1)"
     );
 
-    let mut stmnt = db.sqlite.connection().prepare(STMNT).unwrap();
+    let mut stmnt = sqlite.connection().prepare(STMNT).unwrap();
     for node in &mut nodes {
         let num = stmnt.query([node.id.id()]).unwrap().count().unwrap();
         node.num_links = num;
@@ -55,8 +56,7 @@ pub fn get_graph_data(db: &mut ServerState) -> GraphData {
         "WHERE type = 'id';"
     );
 
-    let mut links: Vec<RoamLink> = db
-        .sqlite
+    let mut links: Vec<RoamLink> = sqlite
         .query_many(ALL_LINKS, [], |row| {
             Ok(RoamLink {
                 from: row.get::<usize, String>(0).unwrap().into(),
@@ -70,7 +70,7 @@ pub fn get_graph_data(db: &mut ServerState) -> GraphData {
     const PARENT_STMNT: &str = "SELECT id, title FROM nodes WHERE id = ?1;";
 
     for node in &nodes {
-        if let Ok(parent_id) = db.sqlite.query_one(PARENT_STMNT, [&node.id.id()], |row| {
+        if let Ok(parent_id) = sqlite.query_one(PARENT_STMNT, [&node.id.id()], |row| {
             row.get::<usize, String>(0)
         }) {
             links.push(RoamLink {

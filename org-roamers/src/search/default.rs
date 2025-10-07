@@ -1,9 +1,11 @@
-use std::collections::HashSet;
-
 use anyhow::Result;
 use rusqlite::Connection;
 
-use crate::{server::types::SearchResponseElement, transform::title::TitleSanitizer};
+use crate::{
+    search::{Configuration, SearchResultSender},
+    server::AppState,
+    transform::title::TitleSanitizer,
+};
 
 #[derive(PartialEq, Debug)]
 pub struct ForNode<'a> {
@@ -31,8 +33,9 @@ impl<'a> ForNode<'a> {
     fn search<F: Fn(&str) -> String>(
         &self,
         con: &mut Connection,
+        sender: SearchResultSender,
         title_sanitizer: F,
-    ) -> Result<Vec<SearchResponseElement>> {
+    ) -> anyhow::Result<()> {
         let param = format_search_param(&self.node_search);
         let stmnt = "SELECT id, title FROM nodes WHERE LOWER(title) LIKE ?1";
         let mut stmnt = con.prepare(stmnt)?;
@@ -44,7 +47,6 @@ impl<'a> ForNode<'a> {
                 ))
             })?
             .map(Result::unwrap);
-        let mut result = vec![];
         if !self.tag_filters.is_empty() {
             for element in elements {
                 let to_query = &element.0;
@@ -61,41 +63,40 @@ impl<'a> ForNode<'a> {
                         .any(|f| f.to_lowercase() == e.to_lowercase())
                 });
                 if p {
-                    result.push(SearchResponseElement {
-                        display: title_sanitizer(&element.1),
-                        id: element.0.into(),
-                        tags: tags.collect(),
-                    });
+                    if let Err(err) = sender.send(
+                        title_sanitizer(&element.1).into(),
+                        element.0.into(),
+                        tags.collect(),
+                        None,
+                    ) {
+                        tracing::error!("Error sending: {err}");
+                    };
                 }
             }
         } else {
-            result = elements
-                .map(|row| {
-                    let to_query = &row.0;
-                    let stmnt = "SELECT node_id, tag FROM tags WHERE node_id = ?1";
-                    let mut stmnt = con.prepare(stmnt).unwrap();
-                    let tags = stmnt
-                        .query_map(rusqlite::params![to_query], |row| {
-                            Ok(row.get_unwrap::<usize, String>(1))
-                        })
-                        .unwrap()
-                        .map(Result::unwrap)
-                        .collect();
-                    let title = if row.1.is_empty() {
-                        tracing::error!("Title is empty: {:?}", row);
-                        String::new()
-                    } else {
-                        title_sanitizer(&row.1)
-                    };
-                    SearchResponseElement {
-                        display: title,
-                        id: row.0.into(),
-                        tags,
-                    }
-                })
-                .collect();
+            for row in elements {
+                let to_query = &row.0;
+                let stmnt = "SELECT node_id, tag FROM tags WHERE node_id = ?1";
+                let mut stmnt = con.prepare(stmnt).unwrap();
+                let tags = stmnt
+                    .query_map(rusqlite::params![to_query], |row| {
+                        Ok(row.get_unwrap::<usize, String>(1))
+                    })
+                    .unwrap()
+                    .map(Result::unwrap)
+                    .collect();
+                let title = if row.1.is_empty() {
+                    tracing::error!("Title is empty: {:?}", row);
+                    String::new()
+                } else {
+                    title_sanitizer(&row.1)
+                };
+                if let Err(err) = sender.send(title.into(), row.0.into(), tags, None) {
+                    tracing::error!("Error sending: {err}");
+                };
+            }
         }
-        Ok(result)
+        Ok(())
     }
 }
 
@@ -121,8 +122,9 @@ impl<'a> ForTag<'a> {
     fn search<F: Fn(&str) -> String>(
         &self,
         con: &mut Connection,
+        sender: SearchResultSender,
         title_sanitizer: F,
-    ) -> Result<Vec<SearchResponseElement>> {
+    ) -> anyhow::Result<()> {
         let params = format_tag_param(&self.tag_search);
         let stmnt = format!(
             "SELECT node_id, tag FROM tags WHERE LOWER(tag) IN {}",
@@ -138,7 +140,6 @@ impl<'a> ForTag<'a> {
             })?
             .map(Result::unwrap)
             .unzip();
-        let mut res = HashSet::new();
         const STMNT: &str = "SELECT id, title FROM nodes WHERE id = ?1";
         let mut stmnt = con.prepare(STMNT)?;
         for id in ids {
@@ -146,19 +147,22 @@ impl<'a> ForTag<'a> {
             let elem = stmnt
                 .query_map([id], |row| {
                     let display: String = row.get_unwrap(1);
-                    Ok(SearchResponseElement {
-                        display: title_sanitizer(&display[1..display.len() - 1]),
-                        id: row.get_unwrap::<usize, String>(0).into(),
-                        tags: tags.clone(),
-                    })
+                    Ok((
+                        title_sanitizer(&display[1..display.len() - 1]),
+                        row.get_unwrap::<usize, String>(0).into(),
+                        tags.clone(),
+                    ))
                 })?
                 .map(Result::unwrap)
                 .next();
-            if let Some(elem) = elem {
-                res.insert(elem);
+            if let Some((title, id, tags)) = elem {
+                if let Err(err) = sender.send(title.into(), id, tags, None) {
+                    tracing::error!("Error sending: {err}");
+                };
             }
         }
-        Ok(res.into_iter().collect())
+
+        Ok(())
     }
 }
 
@@ -204,16 +208,40 @@ impl<'a> Search<'a> {
         }
     }
 
-    pub fn search(&self, con: &mut Connection) -> Result<Vec<SearchResponseElement>> {
+    pub fn search(&self, sender: SearchResultSender, con: &mut Connection) -> Result<()> {
         let title_sanitizer = |title: &str| {
             let sanitier = TitleSanitizer::new();
             sanitier.process(title)
         };
 
         match self {
-            Self::ForNode(node) => node.search(con, title_sanitizer),
-            Self::ForTag(tag) => tag.search(con, title_sanitizer),
+            Self::ForNode(node) => node.search(con, sender, title_sanitizer),
+            Self::ForTag(tag) => tag.search(con, sender, title_sanitizer),
         }
+    }
+}
+
+pub struct DefaultSearch;
+
+impl DefaultSearch {
+    pub fn configuration(&self) -> super::Configuration {
+        Configuration {
+            returns_preview: false,
+        }
+    }
+
+    pub async fn feed(
+        &mut self,
+        state: AppState,
+        sender: SearchResultSender,
+        f: &super::Feeder,
+    ) -> anyhow::Result<()> {
+        let mut state = state.lock().unwrap();
+        let ref mut state = *state;
+
+        let search = Search::new(&f.s);
+        let res = search.search(sender, state.sqlite.lock().unwrap().connection());
+        res
     }
 }
 

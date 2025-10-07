@@ -192,6 +192,10 @@ impl OrgCache {
     pub fn path(&self) -> &Path {
         &self.path
     }
+
+    pub fn iter<'a>(&self) -> impl Iterator<Item = (&RoamID, &Arc<OrgCacheEntry>)> {
+        self.lookup.iter()
+    }
 }
 
 #[cfg(test)]

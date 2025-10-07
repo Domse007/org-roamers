@@ -133,42 +133,6 @@ impl IntoResponse for GraphData {
     }
 }
 
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Hash, Eq)]
-pub struct SearchResponseElement {
-    pub display: String,
-    pub id: RoamID,
-    pub tags: Vec<String>,
-}
-
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub struct SearchResponseProvider {
-    pub source: String,
-    pub results: Vec<SearchResponseElement>,
-}
-
-/// # Example
-/// ```json
-/// {
-///   "providers": [{
-///       "source": "sqlite",
-///       "results": [{
-///           "display": "Vec<T>",
-///           "id": "bcb77e31-b4c6-4cf9-a05d-47b766349e57"
-///       }]
-///   }]
-/// }
-/// ```
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub struct SearchResponse {
-    pub providers: Vec<SearchResponseProvider>,
-}
-
-impl IntoResponse for SearchResponse {
-    fn into_response(self) -> Response {
-        Json(self).into_response()
-    }
-}
-
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct OutgoingLink {
     pub display: RoamTitle,

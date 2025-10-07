@@ -13,14 +13,17 @@ pub enum Query {
 
 pub fn get_org_as_html(app_state: AppState, query: Query, scope: String) -> OrgAsHTMLResponse {
     let mut state = app_state.lock().unwrap();
-    let (ref mut server_state, _) = *state;
+    let ref mut server_state = *state;
 
     // TODO: remove unwraps
     let (id, cache_entry) = match query {
-        Query::ByTitle(ref title) => server_state
-            .cache
-            .get_by_name(&mut server_state.sqlite.connection(), title.title())
-            .unwrap(),
+        Query::ByTitle(ref title) => {
+            let mut sqlite = server_state.sqlite.lock().unwrap();
+            server_state
+                .cache
+                .get_by_name(sqlite.connection(), title.title())
+                .unwrap()
+        }
         Query::ById(ref id) => (id.clone(), server_state.cache.retrieve(&id).unwrap()),
     };
 
@@ -46,11 +49,12 @@ pub fn get_org_as_html(app_state: AppState, query: Query, scope: String) -> OrgA
     );
 
     let outgoing_links = {
+        let sqlite = server_state.sqlite.lock().unwrap();
         outgoing_links
             .iter()
             .map(|bare| {
                 const STMNT: &str = "SELECT id, title FROM nodes WHERE id = ?1";
-                server_state.sqlite.query_one(STMNT, [bare], |row| {
+                sqlite.query_one(STMNT, [bare], |row| {
                     Ok(OutgoingLink {
                         display: row.get::<usize, String>(1).unwrap().into(),
                         id: row.get::<usize, String>(0).unwrap().into(),
@@ -68,11 +72,11 @@ pub fn get_org_as_html(app_state: AppState, query: Query, scope: String) -> OrgA
     };
 
     let incoming_links = {
+        let mut sqlite = server_state.sqlite.lock().unwrap();
         let id = match query {
             Query::ByTitle(title) => {
                 const STMNT: &str = "SELECT n.id FROM nodes n WHERE n.id = ?1";
-                server_state
-                    .sqlite
+                sqlite
                     .query_one(STMNT, [title.title()], |row| {
                         Ok(RoamID::from(row.get::<usize, String>(0).unwrap()))
                     })
@@ -87,7 +91,7 @@ pub fn get_org_as_html(app_state: AppState, query: Query, scope: String) -> OrgA
             JOIN nodes n ON l.source = n.id
             WHERE l.dest = ?1;
         "#;
-        let mut stmnt = server_state.sqlite.connection().prepare(STMNT).unwrap();
+        let mut stmnt = sqlite.connection().prepare(STMNT).unwrap();
         stmnt
             .query_map([id.id()], |row| {
                 Ok(IncomingLink {

@@ -16,7 +16,7 @@ pub async fn serve_assets_handler(
     match params.get("file") {
         Some(path) => {
             let state = app_state.lock().unwrap();
-            let (ref server_state, _) = *state;
+            let ref server_state = *state;
             let org_roam_path = server_state.cache.path();
             asset_service::serve_assets(org_roam_path, path.clone())
         }
@@ -26,7 +26,7 @@ pub async fn serve_assets_handler(
 
 pub async fn fallback_handler(uri: axum::http::Uri, State(app_state): State<AppState>) -> Response {
     let mut state = app_state.lock().unwrap();
-    let (ref mut server_state, _) = *state;
+    let ref mut server_state = *state;
     let conf = server_state
         .config
         .org_roamers_root

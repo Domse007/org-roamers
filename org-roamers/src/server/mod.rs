@@ -20,9 +20,9 @@ pub mod handlers;
 pub mod services;
 pub mod types;
 
-use handlers::{assets, emacs as emacs_handler, graph, health, latex, org, search, websocket};
+use handlers::{assets, emacs as emacs_handler, graph, health, latex, org, websocket};
 
-pub type AppState = Arc<Mutex<(ServerState, Arc<Mutex<bool>>)>>;
+pub type AppState = Arc<Mutex<ServerState>>;
 
 pub struct ServerRuntime {
     handle: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>>,
@@ -49,12 +49,12 @@ pub fn start_server(url: String, state: ServerState) -> Result<ServerRuntime, Bo
     let org_roam_db_path = state.cache.path().to_path_buf();
     let use_fs_watcher = state.config.fs_watcher;
 
-    let app_state = Arc::new(Mutex::new((state, Arc::new(Mutex::new(false)))));
+    let app_state = Arc::new(Mutex::new(state));
 
     let app = Router::new()
         .route("/", get(health::default_route))
         .route("/org", get(org::get_org_as_html_handler))
-        .route("/search", get(search::search_handler))
+        // .route("/search", get(search::search_handler))
         .route("/graph", get(graph::get_graph_data_handler))
         .route("/latex", get(latex::get_latex_svg_handler))
         .route("/ws", get(websocket::websocket_handler))

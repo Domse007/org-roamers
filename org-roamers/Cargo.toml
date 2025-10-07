@@ -26,6 +26,8 @@ tracing = { version = "0.1.41", features = ["log"] }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 tokio-tungstenite = "0.21"
 futures-util = "0.3"
+tokio-util = "0.7.16"
+fuzzy-matcher = "0.3.7"
 
 [dependencies.include_dir]
 version = "0.7.4"

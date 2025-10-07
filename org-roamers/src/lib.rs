@@ -20,18 +20,16 @@ pub mod server;
 pub mod sqlite;
 pub mod transform;
 pub mod watcher;
-// pub mod websocket;
 mod client;
 pub mod config;
 
-use axum::http::header::ORIGIN;
 use server::types::RoamID;
 use server::types::RoamLink;
 use server::types::RoamNode;
 use sqlite::SqliteConnection;
 
 use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 
@@ -95,7 +93,7 @@ impl DynamicServerState {
 
 pub struct ServerState {
     pub config: Config,
-    pub sqlite: SqliteConnection,
+    pub sqlite: Mutex<SqliteConnection>,
     pub cache: OrgCache,
     pub dynamic_state: DynamicServerState,
     pub websocket_connections: HashMap<u64, mpsc::UnboundedSender<WebSocketMessage>>,
@@ -116,7 +114,7 @@ impl ServerState {
         org_cache.rebuild(sqlite_con.connection())?;
 
         Ok(ServerState {
-            sqlite: sqlite_con,
+            sqlite: Mutex::new(sqlite_con),
             cache: org_cache,
             config: conf,
             dynamic_state: DynamicServerState::default(),
@@ -168,7 +166,7 @@ mod tests {
         let sqlite = SqliteConnection::init(false).unwrap();
         let server_state = ServerState {
             config: Config::default(),
-            sqlite: sqlite,
+            sqlite: Mutex::new(sqlite),
             cache: OrgCache::new(temp_dir.clone()),
             dynamic_state: DynamicServerState::default(),
             websocket_connections: HashMap::new(),

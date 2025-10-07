@@ -3,7 +3,6 @@ use std::{
     path::PathBuf,
     sync::{
         mpsc::{self, Receiver},
-        Arc, Mutex,
     },
     thread::{self, JoinHandle},
     time::Duration,
@@ -16,6 +15,7 @@ use notify::{
 
 use crate::{
     cache::OrgCacheEntry,
+    server::AppState,
     sqlite::{files::insert_file_tx, rebuild},
     transform::org,
     ServerState,
@@ -79,7 +79,8 @@ impl OrgWatcher {
         let relative_path = path.strip_prefix(state.cache.path())?;
 
         // Start database transaction for atomic operations
-        let tx = state.sqlite.transaction()?;
+        let mut sqlite = state.sqlite.lock().unwrap();
+        let tx = sqlite.transaction()?;
 
         // Remove existing data for this file (clean slate)
         self.remove_file_data_tx(&tx, path)?;
@@ -92,7 +93,7 @@ impl OrgWatcher {
 
         // After successful database cleanup, extract and insert nodes with correct file association
         let nodes = org::get_nodes(cache_entry.content());
-        self.insert_nodes_with_file(state.sqlite.connection(), nodes, relative_path)?;
+        self.insert_nodes_with_file(sqlite.connection(), nodes, relative_path)?;
 
         // Invalidate cache to trigger refresh
         state.cache.invalidate(path.clone());
@@ -115,17 +116,14 @@ impl OrgWatcher {
     fn remove_file_data(&self, state: &mut ServerState, path: &PathBuf) -> anyhow::Result<()> {
         let file_str = path.to_string_lossy();
 
+        let sqlite = state.sqlite.lock().unwrap();
         // Remove links first, then nodes, then file entry
-        state.sqlite.execute(
+        sqlite.execute(
             "DELETE FROM links WHERE source IN (SELECT id FROM nodes WHERE file = ?1) OR dest IN (SELECT id FROM nodes WHERE file = ?1)",
             [&file_str],
         )?;
-        state
-            .sqlite
-            .execute("DELETE FROM nodes WHERE file = ?1", [&file_str])?;
-        state
-            .sqlite
-            .execute("DELETE FROM files WHERE file = ?1", [&file_str])?;
+        sqlite.execute("DELETE FROM nodes WHERE file = ?1", [&file_str])?;
+        sqlite.execute("DELETE FROM files WHERE file = ?1", [&file_str])?;
 
         Ok(())
     }
@@ -200,11 +198,11 @@ pub fn watcher(path: PathBuf) -> anyhow::Result<OrgWatcher> {
     })
 }
 
-/// Starts a background thread that processes file changes and broadcasts updates via WebSocket
+/// Starts a background thread that processes file changes and notifies WebSocket clients
 pub fn start_watcher_runtime(
-    app_state: Arc<Mutex<(ServerState, Arc<Mutex<bool>>)>>,
+    app_state: AppState,
     watch_path: PathBuf,
-    runtime_handle: Option<tokio::runtime::Handle>,
+    _runtime_handle: Option<tokio::runtime::Handle>,
 ) -> anyhow::Result<JoinHandle<()>> {
     let mut watcher = watcher(watch_path.clone())?;
 
@@ -214,7 +212,7 @@ pub fn start_watcher_runtime(
         loop {
             thread::sleep(Duration::from_millis(500)); // Debounce
 
-            let (broadcaster, changed_files) = {
+            let _changed_files = {
                 let mut state_guard = match app_state.lock() {
                     Ok(guard) => guard,
                     Err(e) => {
@@ -223,8 +221,7 @@ pub fn start_watcher_runtime(
                     }
                 };
 
-                let broadcaster = state_guard.0.websocket_broadcaster.clone();
-                let changed_files = match watcher.process_events(&mut state_guard.0) {
+                let changed_files = match watcher.process_events(&mut state_guard) {
                     Ok(files) => files,
                     Err(e) => {
                         tracing::error!("Error processing watcher events: {}", e);
@@ -232,20 +229,23 @@ pub fn start_watcher_runtime(
                     }
                 };
 
-                (broadcaster, changed_files)
-            };
+                // If there are changes, notify all WebSocket clients
+                if !changed_files.is_empty() {
+                    // Create a simple status update message
+                    let update_message = crate::client::message::WebSocketMessage::StatusUpdate {
+                        files_changed: changed_files.len(),
+                    };
 
-            if !changed_files.is_empty() {
-                tracing::info!("Broadcasting updates for {} files", changed_files.len());
-
-                if let Some(ref handle) = runtime_handle {
-                    handle.spawn(async move {
-                        broadcaster
-                            .broadcast_graph_update(vec![], vec![], vec![], vec![], vec![])
-                            .await;
-                    });
+                    state_guard.broadcast_to_websockets(update_message);
+                    tracing::info!(
+                        "Notified {} WebSocket clients about {} file changes",
+                        state_guard.websocket_connections.len(),
+                        changed_files.len()
+                    );
                 }
-            }
+
+                changed_files
+            };
         }
     });
 
@@ -255,21 +255,21 @@ pub fn start_watcher_runtime(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        cache::OrgCache, sqlite::SqliteConnection, websocket::WebSocketBroadcaster,
-        DynamicServerState, StaticServerConfiguration,
-    };
+    use crate::config::Config;
+    use crate::{cache::OrgCache, sqlite::SqliteConnection, DynamicServerState};
+    use std::collections::HashMap;
     use std::{fs, path::Path};
     use tempfile::TempDir;
 
     fn create_test_server_state(temp_dir: &Path) -> ServerState {
+        let sqlite = SqliteConnection::init(false).unwrap();
         ServerState {
-            sqlite: SqliteConnection::init(false).unwrap(),
-            html_export_settings: Default::default(),
+            config: Config::default(),
+            sqlite: Mutex::new(sqlite),
             cache: OrgCache::new(temp_dir.to_path_buf()),
-            static_conf: StaticServerConfiguration::default(),
             dynamic_state: DynamicServerState::default(),
-            websocket_broadcaster: Arc::new(WebSocketBroadcaster::new()),
+            websocket_connections: HashMap::new(),
+            next_connection_id: 1,
         }
     }
 
@@ -316,21 +316,23 @@ mod tests {
 
         // Insert some test data
         let file_str = test_file.to_string_lossy();
-        state
-            .sqlite
-            .execute(
-                "INSERT OR REPLACE INTO files (file, hash) VALUES (?1, 123)",
-                [&file_str],
-            )
-            .unwrap();
-        state.sqlite.execute("INSERT OR REPLACE INTO nodes (id, title, file, level) VALUES ('test-id', 'Test', ?1, 1)", [&file_str]).unwrap();
+        {
+            let mut sqlite = state.sqlite.lock().unwrap();
+            sqlite
+                .execute(
+                    "INSERT OR REPLACE INTO files (file, hash) VALUES (?1, 123)",
+                    [&file_str],
+                )
+                .unwrap();
+            sqlite.execute("INSERT OR REPLACE INTO nodes (id, title, file, level) VALUES ('test-id', 'Test', ?1, 1)", [&file_str]).unwrap();
+        }
 
         // Test removal
         watcher.remove_file_data(&mut state, &test_file).unwrap();
 
         // Verify data was removed
-        let file_count: i32 = state
-            .sqlite
+        let sqlite = state.sqlite.lock().unwrap();
+        let file_count: i32 = sqlite
             .connection()
             .query_row(
                 "SELECT COUNT(*) FROM files WHERE file = ?1",
@@ -340,8 +342,7 @@ mod tests {
             .unwrap();
         assert_eq!(file_count, 0);
 
-        let node_count: i32 = state
-            .sqlite
+        let node_count: i32 = sqlite
             .connection()
             .query_row(
                 "SELECT COUNT(*) FROM nodes WHERE file = ?1",
@@ -396,8 +397,8 @@ This is test content.
         watcher.process_file_change(&mut state, &org_file).unwrap();
 
         // Verify file was processed (check if nodes were inserted)
-        let node_count: i32 = state
-            .sqlite
+        let sqlite = state.sqlite.lock().unwrap();
+        let node_count: i32 = sqlite
             .connection()
             .query_row(
                 "SELECT COUNT(*) FROM nodes WHERE id = 'test-id-123'",
@@ -444,8 +445,8 @@ This is test content.
         assert!(result.is_ok());
 
         // Verify the file path is handled correctly in database
-        let count: i32 = state
-            .sqlite
+        let sqlite = state.sqlite.lock().unwrap();
+        let count: i32 = sqlite
             .connection()
             .query_row(
                 "SELECT COUNT(*) FROM nodes WHERE id = 'test-123'",
@@ -474,45 +475,45 @@ This is test content.
         watcher.process_file_change(&mut state, &org_file).unwrap();
 
         // Verify initial data exists
-        let initial_count: i32 = state
-            .sqlite
-            .connection()
-            .query_row(
-                "SELECT COUNT(*) FROM nodes WHERE id = 'test-node'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(initial_count, 1);
-
-        // Debug: check what file path is in the database
-        let files_in_db: Vec<String> = {
-            let mut stmt = state
-                .sqlite
+        {
+            let sqlite = state.sqlite.lock().unwrap();
+            let initial_count: i32 = sqlite
                 .connection()
-                .prepare("SELECT file FROM files")
+                .query_row(
+                    "SELECT COUNT(*) FROM nodes WHERE id = 'test-node'",
+                    [],
+                    |row| row.get(0),
+                )
                 .unwrap();
-            stmt.query_map([], |row| row.get::<usize, String>(0))
+            assert_eq!(initial_count, 1);
+
+            // Debug: check what file path is in the database
+            let files_in_db: Vec<String> = {
+                let mut stmt = sqlite
+                    .connection()
+                    .prepare("SELECT file FROM files")
+                    .unwrap();
+                stmt.query_map([], |row| row.get::<usize, String>(0))
+                    .unwrap()
+                    .collect::<std::result::Result<Vec<_>, rusqlite::Error>>()
+                    .unwrap()
+            };
+            tracing::info!("Files in database: {:?}", files_in_db);
+
+            let nodes_in_db: Vec<(String, String)> = {
+                let mut stmt = sqlite
+                    .connection()
+                    .prepare("SELECT id, file FROM nodes")
+                    .unwrap();
+                stmt.query_map([], |row| {
+                    Ok((row.get::<usize, String>(0)?, row.get::<usize, String>(1)?))
+                })
                 .unwrap()
                 .collect::<std::result::Result<Vec<_>, rusqlite::Error>>()
                 .unwrap()
-        };
-        tracing::info!("Files in database: {:?}", files_in_db);
-
-        let nodes_in_db: Vec<(String, String)> = {
-            let mut stmt = state
-                .sqlite
-                .connection()
-                .prepare("SELECT id, file FROM nodes")
-                .unwrap();
-            stmt.query_map([], |row| {
-                Ok((row.get::<usize, String>(0)?, row.get::<usize, String>(1)?))
-            })
-            .unwrap()
-            .collect::<std::result::Result<Vec<_>, rusqlite::Error>>()
-            .unwrap()
-        };
-        tracing::info!("Nodes in database: {:?}", nodes_in_db);
+            };
+            tracing::info!("Nodes in database: {:?}", nodes_in_db);
+        }
 
         // Test with the correct file path
         let org_file_relative = org_file
@@ -525,8 +526,8 @@ This is test content.
             .unwrap();
 
         // Verify node was removed
-        let after_remove_count: i32 = state
-            .sqlite
+        let sqlite = state.sqlite.lock().unwrap();
+        let after_remove_count: i32 = sqlite
             .connection()
             .query_row(
                 "SELECT COUNT(*) FROM nodes WHERE id = 'test-node'",

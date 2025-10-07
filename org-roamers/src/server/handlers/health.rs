@@ -5,7 +5,7 @@ use crate::server::AppState;
 
 pub async fn default_route(State(app_state): State<AppState>) -> Response {
     let mut state = app_state.lock().unwrap();
-    let (ref mut server_state, _) = *state;
+    let ref mut server_state = *state;
     let conf = server_state
         .config
         .org_roamers_root
