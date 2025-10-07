@@ -15,13 +15,13 @@ mod cache;
 pub mod error;
 mod latex;
 
+mod client;
+pub mod config;
 pub mod search;
 pub mod server;
 pub mod sqlite;
 pub mod transform;
 pub mod watcher;
-mod client;
-pub mod config;
 
 use server::types::RoamID;
 use server::types::RoamLink;

@@ -147,14 +147,22 @@ const connectWebSocket = () => {
 
         case "search_response":
           // Forward search responses to SearchBar component
-          console.log(
-            "Search response received:",
-            message.request_id,
-            message.results.length,
-            "results",
-          );
           if (searchBarRef.value) {
             searchBarRef.value.handleSearchResponse(message);
+          } else {
+            console.warn("SearchBar component not available");
+          }
+          break;
+
+        case "SearchConfigurationResponse":
+          // Forward search configuration to SearchBar component
+          console.log(
+            "Search configuration received:",
+            message.config.length,
+            "providers",
+          );
+          if (searchBarRef.value) {
+            searchBarRef.value.handleSearchConfigResponse(message);
           } else {
             console.warn("SearchBar component not available");
           }

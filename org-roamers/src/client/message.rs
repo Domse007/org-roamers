@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use crate::{
+    client::WebSocketClient,
     search::{Feeder, SearchProviderList, SearchResultEntry},
     server::AppState,
 };
@@ -26,6 +27,12 @@ pub enum WebSocketMessage {
         request_id: String,
         results: SearchResultEntry,
     },
+    /// Request for search configuration.
+    SearchConfigurationRequest,
+    /// Mapping between provider_id and name of provider.
+    SearchConfigurationResponse { config: Vec<(usize, String)> },
+    /// Stop the current search operation.
+    SearchStop,
 
     /// Status update about file changes
     #[serde(rename = "status_update")]
@@ -55,13 +62,28 @@ impl WebSocketMessage {
         &self,
         app_state: AppState,
         sender: &mut SplitSink<WebSocket, Message>,
-        client_id: u64,
+        client: &mut WebSocketClient,
     ) {
         match self {
-            Self::Ping => Self::handle_ping(client_id, sender).await,
-            Self::Pong => Self::handle_pong(client_id).await,
+            Self::Ping => Self::handle_ping(client.client_id, sender).await,
+            Self::Pong => Self::handle_pong(client.client_id).await,
+            Self::SearchConfigurationRequest => {
+                let (mpsc_sender, mpsc_receiver) = mpsc::channel(10000);
+                let provider_list = SearchProviderList::new(mpsc_sender);
+                let config = provider_list.config();
+                client.search = Some((provider_list, mpsc_receiver));
+                if let Err(err) = sender
+                    .send(Message::Text(
+                        serde_json::to_string(&Self::SearchConfigurationResponse { config })
+                            .unwrap(),
+                    ))
+                    .await
+                {
+                    tracing::error!("Couln't send conf resp: {err}");
+                };
+            }
             Self::SearchRequest { query, request_id } => {
-                Self::handle_search(app_state, sender, client_id, query, request_id).await
+                Self::handle_search(app_state, sender, client, query, request_id).await
             }
             unsupported => {
                 tracing::error!("Unsupported request: {unsupported:?}");
@@ -87,37 +109,44 @@ impl WebSocketMessage {
 
     async fn handle_search(
         app_state: AppState,
-        sender: &mut SplitSink<WebSocket, Message>,
-        client_id: u64,
+        _sender: &mut SplitSink<WebSocket, Message>,
+        client: &mut WebSocketClient,
         query: &str,
         request_id: &str,
     ) {
+        let start = std::time::Instant::now();
         tracing::info!(
             "Processing search request from client {}: {}",
-            client_id,
+            client.client_id,
             query
         );
 
-        let (mpsc_sender, mut mpsc_receiver) = mpsc::channel(100);
-        let mut searcher_providers = SearchProviderList::new();
+        let Some((searcher_providers, mpsc_receiver)) = &mut client.search else {
+            tracing::error!("Search started without initializing.");
+            return;
+        };
 
-        searcher_providers.feed(app_state, mpsc_sender, Feeder::new(query.to_string())).await;
+        // Cancel any ongoing searches before starting a new one
+        searcher_providers.cancel();
 
-        while let Some(msg) = mpsc_receiver.blocking_recv() {
-            let response = WebSocketMessage::SearchResponse {
-                request_id: request_id.to_string(),
-                results: msg,
-            };
-            if let Err(e) = sender
-                .send(Message::Text(serde_json::to_string(&response).unwrap()))
-                .await
-            {
-                tracing::error!(
-                    "Failed to send search response to client {}: {}",
-                    client_id,
-                    e
-                );
-            }
+        // Drain any pending results from the previous search
+        while mpsc_receiver.try_recv().is_ok() {
+            // Discard old results
         }
+
+        // Store the current request_id so we can use it when sending results
+        client.current_request_id = Some(request_id.to_string());
+
+        tracing::info!("Starting search providers (took {:?})", start.elapsed());
+        
+        // Start the search (non-blocking)
+        searcher_providers
+            .feed(app_state, Feeder::new(query.to_string()))
+            .await;
+
+        tracing::info!("Search providers started (took {:?})", start.elapsed());
+
+        // Don't block here - results will be received in the main select! loop
+        // The mpsc_receiver is polled in the WebSocketClient::handle_connection method
     }
 }

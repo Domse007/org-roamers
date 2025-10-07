@@ -33,7 +33,7 @@ impl<'a> ForNode<'a> {
     fn search<F: Fn(&str) -> String>(
         &self,
         con: &mut Connection,
-        sender: SearchResultSender,
+        sender: &mut SearchResultSender,
         title_sanitizer: F,
     ) -> anyhow::Result<()> {
         let param = format_search_param(&self.node_search);
@@ -122,7 +122,7 @@ impl<'a> ForTag<'a> {
     fn search<F: Fn(&str) -> String>(
         &self,
         con: &mut Connection,
-        sender: SearchResultSender,
+        sender: &mut SearchResultSender,
         title_sanitizer: F,
     ) -> anyhow::Result<()> {
         let params = format_tag_param(&self.tag_search);
@@ -208,7 +208,7 @@ impl<'a> Search<'a> {
         }
     }
 
-    pub fn search(&self, sender: SearchResultSender, con: &mut Connection) -> Result<()> {
+    pub fn search(&self, sender: &mut SearchResultSender, con: &mut Connection) -> Result<()> {
         let title_sanitizer = |title: &str| {
             let sanitier = TitleSanitizer::new();
             sanitier.process(title)
@@ -221,27 +221,40 @@ impl<'a> Search<'a> {
     }
 }
 
-pub struct DefaultSearch;
+pub struct DefaultSearch {
+    pub(crate) sender: SearchResultSender,
+}
 
 impl DefaultSearch {
+    pub fn new(sender: SearchResultSender) -> Self {
+        Self { sender }
+    }
+
+    pub fn id(&self) -> usize {
+        self.sender.id()
+    }
+
     pub fn configuration(&self) -> super::Configuration {
         Configuration {
             returns_preview: false,
         }
     }
 
-    pub async fn feed(
-        &mut self,
-        state: AppState,
-        sender: SearchResultSender,
-        f: &super::Feeder,
-    ) -> anyhow::Result<()> {
-        let mut state = state.lock().unwrap();
-        let ref mut state = *state;
+    pub async fn feed(&mut self, state: AppState, f: &super::Feeder) -> anyhow::Result<()> {
+        let query = f.s.clone();
+        let mut sender = self.sender.clone();
+        
+        // Wrap the blocking database operation in spawn_blocking
+        tokio::task::spawn_blocking(move || {
+            let mut state_guard = state.lock().unwrap();
+            let state = &mut *state_guard;
+            let mut sqlite_guard = state.sqlite.lock().unwrap();
+            let connection = sqlite_guard.connection();
 
-        let search = Search::new(&f.s);
-        let res = search.search(sender, state.sqlite.lock().unwrap().connection());
-        res
+            let search = Search::new(&query);
+            search.search(&mut sender, connection)
+        })
+        .await?
     }
 }
 

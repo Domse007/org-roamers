@@ -79,12 +79,25 @@ export interface SearchRequestMessage extends WebSocketMessage {
   request_id: string;
 }
 
+export interface SearchResultEntry {
+  provider: number;
+  title: string;
+  id: string;
+  tags: string[];
+  preview: [string, number, number] | null;
+}
+
 export interface SearchResponseMessage extends WebSocketMessage {
   type: "search_response";
   request_id: string;
-  results: {
-    display: string;
-    id: string;
-    tags: string[];
-  }[];
+  results: SearchResultEntry;
+}
+
+export interface SearchConfigurationRequestMessage extends WebSocketMessage {
+  type: "SearchConfigurationRequest";
+}
+
+export interface SearchConfigurationResponseMessage extends WebSocketMessage {
+  type: "SearchConfigurationResponse";
+  config: [number, string][];
 }

@@ -1,9 +1,7 @@
 use std::{
     collections::HashSet,
     path::PathBuf,
-    sync::{
-        mpsc::{self, Receiver},
-    },
+    sync::mpsc::{self, Receiver},
     thread::{self, JoinHandle},
     time::Duration,
 };

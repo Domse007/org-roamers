@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import hljs from "highlight.js";
+    import hljs from "highlight.js";
 import {
-  nextTick,
-  ref,
-  useTemplateRef,
-  watch,
-  onUnmounted,
-  type Ref,
+    nextTick,
+    ref,
+    useTemplateRef,
+    watch,
+    onUnmounted,
+    type Ref,
 } from "vue";
 import { getScope } from "../settings.ts";
 import { type OrgAsHTMLResponse } from "../types.ts";
@@ -32,129 +32,188 @@ const frameWidth = ref(50); // Default width as percentage
 const isResizing = ref(false);
 
 const startResize = (event: MouseEvent) => {
-  isResizing.value = true;
-  document.addEventListener("mousemove", doResize);
-  document.addEventListener("mouseup", stopResize);
-  document.body.style.cursor = "ew-resize";
-  document.body.style.userSelect = "none"; // Prevent text selection during resize
-  event.preventDefault();
+    isResizing.value = true;
+    document.addEventListener("mousemove", doResize);
+    document.addEventListener("mouseup", stopResize);
+    document.body.style.cursor = "ew-resize";
+    document.body.style.userSelect = "none"; // Prevent text selection during resize
+    event.preventDefault();
 };
 
 const doResize = (event: MouseEvent) => {
-  if (!isResizing.value) return;
-
-  const windowWidth = window.innerWidth;
-  const newWidth = ((windowWidth - event.clientX) / windowWidth) * 100;
-
-  // Constrain width between 20% and 80%
-  frameWidth.value = Math.max(20, Math.min(80, newWidth));
+    if (!isResizing.value) return;
+    
+    const windowWidth = window.innerWidth;
+    const newWidth = ((windowWidth - event.clientX) / windowWidth) * 100;
+    
+    // Constrain width between 20% and 80%
+    frameWidth.value = Math.max(20, Math.min(80, newWidth));
 };
 
 const stopResize = () => {
-  isResizing.value = false;
-  document.removeEventListener("mousemove", doResize);
-  document.removeEventListener("mouseup", stopResize);
-  document.body.style.cursor = "";
-  document.body.style.userSelect = "";
+    isResizing.value = false;
+    document.removeEventListener("mousemove", doResize);
+    document.removeEventListener("mouseup", stopResize);
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
 };
 
 const preview = (id: string) => {
-  emit("previewSwitch", id);
-  current_id = id;
-  console.log(`Previewing ${id}`);
-  const scope: "file" | "node" = getScope();
-  fetch(`/org?id=${id}&scope=${scope}`)
-    .then((response) => {
-      console.log("Org response status:", response.status);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      return response.json();
-    })
-    .then((resp: OrgAsHTMLResponse) => {
-      console.log("Org response data:", {
-        orgLength: resp.org?.length || 0,
-        linksCount: resp.outgoing_links?.length || 0,
-        latexBlocksCount: resp.latex_blocks?.length || 0,
-      });
-      history.push(id);
-      rendered.value = resp.org;
-      links.value = resp.outgoing_links;
-      incomingLinks.value = resp.incoming_links || [];
-      current_latex_blocks = resp.latex_blocks || [];
-      console.log(
-        `Loaded content with ${current_latex_blocks.length} LaTeX blocks`,
-      );
-      expand();
-    })
-    .catch((error) => {
-      console.error("Failed to load org content:", error);
-      const errorMsg =
-        error.name === "TypeError" && error.message.includes("fetch")
-          ? "Server is not responding. Please check if the server is running."
-          : `Failed to load content: ${error.message}`;
-      emit("error", errorMsg);
-      rendered.value = `<div class="error">${errorMsg}</div>`;
-      expand();
-    });
+    emit("previewSwitch", id);
+    current_id = id;
+    console.log(`Previewing ${id}`);
+    const scope: "file" | "node" = getScope();
+    fetch(`/org?id=${id}&scope=${scope}`)
+        .then((response) => {
+            console.log("Org response status:", response.status);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then((resp: OrgAsHTMLResponse) => {
+            console.log("Org response data:", {
+                orgLength: resp.org?.length || 0,
+                linksCount: resp.outgoing_links?.length || 0,
+                latexBlocksCount: resp.latex_blocks?.length || 0,
+            });
+            history.push(id);
+            rendered.value = resp.org;
+            links.value = resp.outgoing_links;
+            incomingLinks.value = resp.incoming_links || [];
+            current_latex_blocks = resp.latex_blocks || [];
+            console.log(
+                `Loaded content with ${current_latex_blocks.length} LaTeX blocks`,
+            );
+            expand();
+        })
+        .catch((error) => {
+            console.error("Failed to load org content:", error);
+            const errorMsg =
+                error.name === "TypeError" && error.message.includes("fetch")
+                ? "Server is not responding. Please check if the server is running."
+                : `Failed to load content: ${error.message}`;
+            emit("error", errorMsg);
+            rendered.value = `<div class="error">${errorMsg}</div>`;
+            expand();
+        });
 };
 
 const expand = () => {
-  shown.value = "flex";
+    shown.value = "flex";
 };
 const collapse = () => {
-  shown.value = "none";
+    shown.value = "none";
 };
 
 const resize = () => {
-  if (rendered.value.length == 0) {
-    return;
-  }
-  if (shown.value == "none") {
-    expand();
-  } else {
-    collapse();
-  }
+    if (rendered.value.length == 0) {
+        return;
+    }
+    if (shown.value == "none") {
+        expand();
+    } else {
+        collapse();
+    }
 };
 
 // Helper functions for content management
 const getCurrentContent = () => rendered.value;
 const updateContent = (newContent: string) => {
-  rendered.value = newContent;
+    rendered.value = newContent;
 };
 
 // Dynamic import for COBOL syntax highlighting to avoid build issues
 import("highlightjs-cobol")
-  .then((hljsCOBOL) => {
-    hljs.registerLanguage("cobol", hljsCOBOL.default);
-  })
-  .catch((error) => {
-    console.warn("Failed to load COBOL syntax highlighting:", error);
-  });
+    .then((hljsCOBOL) => {
+        hljs.registerLanguage("cobol", hljsCOBOL.default);
+    })
+    .catch((error) => {
+        console.warn("Failed to load COBOL syntax highlighting:", error);
+    });
 
 // Dynamic import for Lisp syntax highlighting and register elisp/emacs-lisp aliases
 import("highlight.js/lib/languages/lisp")
-  .then((lispLang) => {
-    hljs.registerLanguage("lisp", lispLang.default);
-    hljs.registerLanguage("elisp", lispLang.default);
-    hljs.registerLanguage("emacs-lisp", lispLang.default);
-    console.log("Registered lisp, elisp, and emacs-lisp highlighting");
-  })
-  .catch((error) => {
-    console.warn("Failed to load Lisp syntax highlighting:", error);
-    // Fallback: try to register aliases if lisp is already available
-    try {
-      if (hljs.getLanguage("lisp")) {
-        hljs.registerAliases("elisp", { languageName: "lisp" });
-        hljs.registerAliases("emacs-lisp", { languageName: "lisp" });
-        console.log(
-          "Registered elisp and emacs-lisp aliases for existing lisp",
-        );
-      }
-    } catch (aliasError) {
-      console.warn("Failed to register lisp aliases as fallback:", aliasError);
-    }
-  });
+    .then((lispLang) => {
+        hljs.registerLanguage("lisp", lispLang.default);
+        hljs.registerLanguage("elisp", lispLang.default);
+        hljs.registerLanguage("emacs-lisp", lispLang.default);
+        console.log("Registered lisp, elisp, and emacs-lisp highlighting");
+    })
+    .catch((error) => {
+        console.warn("Failed to load Lisp syntax highlighting:", error);
+        // Fallback: try to register aliases if lisp is already available
+        try {
+            if (hljs.getLanguage("lisp")) {
+                hljs.registerAliases("elisp", { languageName: "lisp" });
+                hljs.registerAliases("emacs-lisp", { languageName: "lisp" });
+                console.log(
+                    "Registered elisp and emacs-lisp aliases for existing lisp",
+                );
+            }
+        } catch (aliasError) {
+            console.warn("Failed to register lisp aliases as fallback:", aliasError);
+        }
+    });
+// https://amyfare.ca/files/jcl.min.js
+hljs.registerLanguage("jcl", function() {
+    "use strict";
+    
+    return function(e: any) {
+        return {
+            aliases: ["jcl"],
+            case_insensitive: false,
+            
+            contains: [
+                e.COMMENT(/^\/\/\*/, /$/),
+                {
+                    begin: /^(?=\/\/)/,
+                    end: /$/,
+                    
+                    keywords: {
+                        $pattern: /(?<= )\w+(?= )/,
+                        keyword: 'COMMAND CNTL DD ENDCNTL EXEC IF THEN ELSE ENDIF INCLUDE JCLLIB ' +
+                                 'JOB OUTPUT PEND PROC SET XMIT',
+                    },
+                    
+                    contains: [
+                        {
+                            scope: "symbol",
+                            match: /\/\/(\w+\.?)*/
+                        },
+                        {
+                            scope: "parameter",
+                            match: /(?<=[ ,])\w+(?=\=)/
+                        },
+                        {
+                            scope: "operator",
+                            match: "[=|<>]"
+                        },
+                        {
+                            scope: "punctuation",
+                            match: "[()]"
+                        },
+                        {
+                            scope: "variable",
+                            match: /(?<!&)&\w+/
+                        },
+                        
+                        e.APOS_STRING_MODE,
+                        e.NUMBER_MODE
+                    ]
+                },
+                {
+                    scope: "meta",
+                    begin: /^\/\*/,
+                    end: /$/
+                },
+                {
+                    scope: "literal"
+                }
+            ]
+        };
+    };
+}());
 
 // Update the selector from 'pre code' to 'code' to autodetect inline src
 // like src_java[:exports code]{ void main() } which has no <pre></pre>.

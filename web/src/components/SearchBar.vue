@@ -1,113 +1,266 @@
 <script setup lang="ts">
-import { ref, type Ref, inject, onMounted } from "vue";
-import {
-  type SearchRequestMessage,
-  type SearchResponseMessage,
-} from "../types.ts";
-import SearchSuggestion from "./SearchSuggestion.vue";
+import { ref, computed, inject, type Ref } from "vue";
+import type {
+  SearchRequestMessage,
+  SearchResponseMessage,
+  SearchConfigurationRequestMessage,
+  SearchConfigurationResponseMessage,
+  SearchResultEntry,
+} from "../types";
+import ProviderGroup from "./ProviderGroup.vue";
 
-const searchSuggestions: Ref<
-  { display: string; id: string; tags: string[] }[]
-> = ref([]);
-const searchterm: Ref<string> = ref("");
-const showSuggestions: Ref<boolean> = ref(false);
-const selectedIndex: Ref<number> = ref(-1);
+/** Search term entered by the user */
+const searchterm = ref<string>("");
 
-// Get WebSocket from parent component
+/** Whether to show the suggestions dropdown */
+const showSuggestions = ref<boolean>(false);
+
+/** Currently selected index across all visible results */
+const selectedIndex = ref<number>(-1);
+
+/** Mapping of provider IDs to provider names */
+const providerConfig = ref<Map<number, string>>(new Map());
+
+/** Mapping of provider IDs to their search results */
+const providerResults = ref<Map<number, SearchResultEntry[]>>(new Map());
+
+/** Current search request ID to track responses */
+const currentRequestId = ref<string>("");
+
+/** WebSocket connection injected from parent */
 const websocket = inject<Ref<WebSocket | null>>("websocket", ref(null));
-const pendingSearchRequests = new Map<
-  string,
-  (results: { display: string; id: string; tags: string[] }[]) => void
->();
 
-// Generate unique request IDs
-const generateRequestId = () =>
+/** Reference to the search input element */
+const searchInput = ref<HTMLInputElement | null>(null);
+
+/** Flag to track if mouse is down on a search element */
+const isMouseDownOnSearch = ref<boolean>(false);
+
+/**
+ * Generate a unique request ID for tracking search requests.
+ * @returns Unique request ID string
+ */
+const generateRequestId = (): string =>
   `search_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-const search = async (
-  query: string,
-): Promise<{ display: string; id: string; tags: string[] }[]> => {
-  return new Promise((resolve, reject) => {
-    if (!websocket.value || websocket.value.readyState !== WebSocket.OPEN) {
-      console.error("WebSocket is not connected");
-      resolve([]); // Return empty results if WebSocket is not available
-      return;
-    }
+/**
+ * Initialize search configuration by requesting provider metadata from server.
+ * This must be called before performing any searches.
+ */
+const initializeSearchConfig = () => {
+  if (!websocket.value || websocket.value.readyState !== WebSocket.OPEN) {
+    console.error("WebSocket is not connected");
+    return;
+  }
 
-    if (!query.trim()) {
-      resolve([]);
-      return;
-    }
+  const configRequest: SearchConfigurationRequestMessage = {
+    type: "SearchConfigurationRequest",
+  };
 
-    const requestId = generateRequestId();
-    const searchMessage: SearchRequestMessage = {
-      type: "search_request",
-      query: query.trim(),
-      request_id: requestId,
-    };
-
-    // Store the promise resolver
-    pendingSearchRequests.set(requestId, resolve);
-
-    // Set a timeout to clean up if no response is received
-    setTimeout(() => {
-      if (pendingSearchRequests.has(requestId)) {
-        pendingSearchRequests.delete(requestId);
-        console.warn(`Search request ${requestId} timed out`);
-        resolve([]); // Return empty results on timeout
-      }
-    }, 5000); // 5 second timeout
-
-    try {
-      websocket.value.send(JSON.stringify(searchMessage));
-    } catch (error) {
-      console.error("Failed to send search request:", error);
-      pendingSearchRequests.delete(requestId);
-      resolve([]);
-    }
-  });
-};
-
-// Handle search responses from WebSocket
-const handleSearchResponse = (message: SearchResponseMessage) => {
-  const resolver = pendingSearchRequests.get(message.request_id);
-  if (resolver) {
-    resolver(message.results);
-    pendingSearchRequests.delete(message.request_id);
-  } else {
-    console.warn(
-      `Received search response for unknown request: ${message.request_id}`,
-    );
+  try {
+    websocket.value.send(JSON.stringify(configRequest));
+  } catch (error) {
+    console.error("Failed to request search configuration:", error);
   }
 };
 
-const InputHandler = () => {
-  showSuggestions.value = true;
-  selectedIndex.value = -1; // Reset selection on new input
-  search(searchterm.value).then(
-    (results: { display: string; id: string; tags: string[] }[]) => {
-      searchSuggestions.value = results;
-      console.log("Search results:", searchSuggestions.value);
-    },
+/**
+ * Handle search configuration response from server.
+ * Populates the provider config map with provider IDs and names.
+ * @param message - Configuration response containing provider metadata
+ */
+const handleSearchConfigResponse = (
+  message: SearchConfigurationResponseMessage,
+) => {
+  providerConfig.value.clear();
+  for (const [id, name] of message.config) {
+    providerConfig.value.set(id, name);
+    // Initialize empty results array for each provider
+    if (!providerResults.value.has(id)) {
+      providerResults.value.set(id, []);
+    }
+  }
+  console.log("Search configuration loaded:", providerConfig.value);
+};
+
+/**
+ * Perform a search query by sending request to server via WebSocket.
+ * Results will be streamed back asynchronously.
+ * @param query - Search query string
+ */
+const search = (query: string) => {
+  if (!websocket.value || websocket.value.readyState !== WebSocket.OPEN) {
+    console.error("WebSocket is not connected");
+    return;
+  }
+
+  if (!query.trim()) {
+    clearResults();
+    return;
+  }
+
+  // Clear previous results
+  clearResults();
+
+  const requestId = generateRequestId();
+  currentRequestId.value = requestId;
+
+  const searchMessage: SearchRequestMessage = {
+    type: "search_request",
+    query: query.trim(),
+    request_id: requestId,
+  };
+
+  try {
+    websocket.value.send(JSON.stringify(searchMessage));
+  } catch (error) {
+    console.error("Failed to send search request:", error);
+  }
+};
+
+/**
+ * Handle incoming search result from server.
+ * Results are streamed one at a time and grouped by provider.
+ * @param message - Search response containing a single result entry
+ */
+const handleSearchResponse = (message: SearchResponseMessage) => {
+  // Ignore results from outdated requests
+  if (message.request_id !== currentRequestId.value) {
+    return;
+  }
+
+  const result = message.results;
+  const providerId = result.provider;
+
+  // Get or create results array for this provider
+  const results = providerResults.value.get(providerId) || [];
+  results.push(result);
+  providerResults.value.set(providerId, results);
+
+  // Force reactivity update
+  providerResults.value = new Map(providerResults.value);
+};
+
+/**
+ * Clear all search results and reset state.
+ */
+const clearResults = () => {
+  for (const key of providerResults.value.keys()) {
+    providerResults.value.set(key, []);
+  }
+  providerResults.value = new Map(providerResults.value);
+  selectedIndex.value = -1;
+};
+
+/**
+ * Compute sorted list of provider groups for display.
+ * Groups are sorted by provider ID and only include providers with results.
+ * @returns Array of provider group data with metadata
+ */
+const sortedProviderGroups = computed(() => {
+  const groups: {
+    providerId: number;
+    providerName: string;
+    results: SearchResultEntry[];
+    startIndex: number;
+  }[] = [];
+
+  let currentIndex = 0;
+
+  // Sort by provider ID to ensure consistent ordering
+  const sortedProviderIds = Array.from(providerResults.value.keys()).sort(
+    (a, b) => a - b,
   );
+
+  for (const providerId of sortedProviderIds) {
+    const results = providerResults.value.get(providerId) || [];
+    if (results.length > 0) {
+      groups.push({
+        providerId,
+        providerName: providerConfig.value.get(providerId) || `Provider ${providerId}`,
+        results,
+        startIndex: currentIndex,
+      });
+      // Count only top 10 or all depending on display mode
+      // For now we count all for navigation
+      currentIndex += results.length;
+    }
+  }
+
+  return groups;
+});
+
+/**
+ * Get total count of all visible results across all providers.
+ * @returns Total number of results
+ */
+const totalResultsCount = computed(() => {
+  return sortedProviderGroups.value.reduce(
+    (sum, group) => sum + group.results.length,
+    0,
+  );
+});
+
+/**
+ * Handle input changes in the search field.
+ * Triggers a new search query.
+ */
+const handleInput = () => {
+  showSuggestions.value = true;
+  selectedIndex.value = -1;
+  search(searchterm.value);
 };
 
-const searchOnLeave = () => {
-  setTimeout(() => {
-    showSuggestions.value = false;
-    selectedIndex.value = -1;
-  }, 150);
-};
-
-const searchOnFocus = () => {
+/**
+ * Handle focus event on search input.
+ * Requests search configuration and shows suggestions if there's a search term.
+ */
+const handleFocus = () => {
+  // Request configuration on every focus to ensure we have latest providers
+  initializeSearchConfig();
+  
   if (searchterm.value.trim()) {
     showSuggestions.value = true;
   }
 };
 
-// Handle keyboard navigation
+/**
+ * Handle blur event on search input.
+ * Hides suggestions after a short delay to allow clicking on items.
+ */
+const handleBlur = () => {
+  setTimeout(() => {
+    // Don't close if we're clicking within the search component
+    if (!isMouseDownOnSearch.value) {
+      showSuggestions.value = false;
+      selectedIndex.value = -1;
+    }
+  }, 150);
+};
+
+/**
+ * Handle mousedown on search wrapper to prevent blur from closing.
+ */
+const handleSearchMouseDown = () => {
+  isMouseDownOnSearch.value = true;
+};
+
+/**
+ * Handle mouseup to reset the flag.
+ */
+const handleSearchMouseUp = () => {
+  isMouseDownOnSearch.value = false;
+  // Refocus the input to keep it active
+  searchInput.value?.focus();
+};
+
+/**
+ * Handle keyboard navigation in the search results.
+ * Supports arrow keys for navigation, Enter for selection, and Escape to close.
+ * @param event - Keyboard event
+ */
 const handleKeyDown = (event: KeyboardEvent) => {
-  if (!showSuggestions.value || searchSuggestions.value.length === 0) {
+  if (!showSuggestions.value || totalResultsCount.value === 0) {
     return;
   }
 
@@ -116,7 +269,7 @@ const handleKeyDown = (event: KeyboardEvent) => {
       event.preventDefault();
       selectedIndex.value = Math.min(
         selectedIndex.value + 1,
-        searchSuggestions.value.length - 1,
+        totalResultsCount.value - 1,
       );
       break;
     case "ArrowUp":
@@ -125,15 +278,12 @@ const handleKeyDown = (event: KeyboardEvent) => {
       break;
     case "Enter":
       event.preventDefault();
-      if (
-        selectedIndex.value >= 0 &&
-        selectedIndex.value < searchSuggestions.value.length
-      ) {
-        const selectedItem = searchSuggestions.value[selectedIndex.value];
-        emit("openNode", selectedItem.id);
-        showSuggestions.value = false;
-        selectedIndex.value = -1;
-        searchterm.value = "";
+      if (selectedIndex.value >= 0) {
+        const selectedResult = getResultAtIndex(selectedIndex.value);
+        if (selectedResult) {
+          emit("openNode", selectedResult.id);
+          clearSearch();
+        }
       }
       break;
     case "Escape":
@@ -144,34 +294,73 @@ const handleKeyDown = (event: KeyboardEvent) => {
   }
 };
 
-// Handle suggestion click
-const onSuggestionClick = (id: string) => {
-  emit("openNode", id);
-  showSuggestions.value = false;
-  selectedIndex.value = -1;
-  searchterm.value = "";
+/**
+ * Get the result entry at a specific global index.
+ * @param index - Global index across all provider groups
+ * @returns Search result entry or null if not found
+ */
+const getResultAtIndex = (index: number): SearchResultEntry | null => {
+  let currentIndex = 0;
+  for (const group of sortedProviderGroups.value) {
+    if (index < currentIndex + group.results.length) {
+      return group.results[index - currentIndex];
+    }
+    currentIndex += group.results.length;
+  }
+  return null;
 };
 
-// Handle suggestion hover
-const onSuggestionHover = (index: number) => {
+/**
+ * Handle click on a search suggestion.
+ * Opens the selected node and clears the search.
+ * @param id - Node ID to open
+ */
+const handleSuggestionClick = (id: string) => {
+  emit("openNode", id);
+  clearSearch();
+};
+
+/**
+ * Handle hover over a search suggestion.
+ * Updates the selected index.
+ * @param index - Global index of the hovered item
+ */
+const handleSuggestionHover = (index: number) => {
   selectedIndex.value = index;
 };
 
-// Export types for parent components
+/**
+ * Clear the search field and hide suggestions.
+ */
+const clearSearch = () => {
+  searchterm.value = "";
+  showSuggestions.value = false;
+  selectedIndex.value = -1;
+  clearResults();
+};
+
+/** Emitted events */
+const emit = defineEmits<{
+  openNode: [id: string];
+}>();
+
+/** Methods exposed to parent components */
 export interface SearchBarMethods {
   handleSearchResponse: (message: SearchResponseMessage) => void;
+  handleSearchConfigResponse: (
+    message: SearchConfigurationResponseMessage,
+  ) => void;
 }
 
-// Expose the search response handler to the parent component
+/** Expose methods to parent component */
 defineExpose<SearchBarMethods>({
   handleSearchResponse,
+  handleSearchConfigResponse,
 });
-
-const emit = defineEmits(["openNode"]);
 </script>
 
 <template>
-  <div class="search-wrapper">
+  <div class="search-wrapper" @mousedown="handleSearchMouseDown" @mouseup="handleSearchMouseUp">
     <div class="search-input-container">
       <svg
         class="search-icon"
@@ -197,9 +386,9 @@ const emit = defineEmits(["openNode"]);
         class="search-input"
         placeholder="Search nodes..."
         type="search"
-        @input="InputHandler"
-        @focus="searchOnFocus"
-        @blur="searchOnLeave"
+        @input="handleInput"
+        @focus="handleFocus"
+        @blur="handleBlur"
         @keydown="handleKeyDown"
         v-model="searchterm"
         autocomplete="off"
@@ -208,11 +397,7 @@ const emit = defineEmits(["openNode"]);
       <button
         v-if="searchterm.length > 0"
         class="search-clear"
-        @click="
-          searchterm = '';
-          showSuggestions = false;
-          selectedIndex = -1;
-        "
+        @click="clearSearch"
         tabindex="-1"
       >
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -227,13 +412,11 @@ const emit = defineEmits(["openNode"]);
     </div>
 
     <div
-      v-if="
-        showSuggestions && (searchSuggestions.length > 0 || searchterm.trim())
-      "
+      v-if="showSuggestions && searchterm.trim()"
       class="search-suggestions"
     >
       <div
-        v-if="searchSuggestions.length === 0 && searchterm.trim()"
+        v-if="totalResultsCount === 0"
         class="search-no-results"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -251,15 +434,17 @@ const emit = defineEmits(["openNode"]);
         </svg>
         <span>No results found for "{{ searchterm }}"</span>
       </div>
-      <SearchSuggestion
-        v-for="(item, index) in searchSuggestions"
-        :key="item.id"
-        :display="item.display"
-        :id="item.id"
-        :tags="item.tags"
-        :isSelected="index === selectedIndex"
-        @click="onSuggestionClick(item.id)"
-        @mouseenter="onSuggestionHover(index)"
+
+      <ProviderGroup
+        v-for="group in sortedProviderGroups"
+        :key="group.providerId"
+        :provider-name="group.providerName"
+        :provider-id="group.providerId"
+        :results="group.results"
+        :selected-index="selectedIndex"
+        :start-index="group.startIndex"
+        @click="handleSuggestionClick"
+        @hover="handleSuggestionHover"
       />
     </div>
   </div>
@@ -342,7 +527,7 @@ const emit = defineEmits(["openNode"]);
 }
 
 .search-suggestions {
-  max-height: 300px;
+  max-height: 400px;
   overflow-y: auto;
   border-top: 1px solid color-mix(in srgb, var(--highlight) 20%, transparent);
   background: var(--surface);

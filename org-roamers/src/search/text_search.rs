@@ -4,25 +4,32 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     search::{Configuration, SearchResultSender},
-    server::{types::{RoamID, RoamTitle}, AppState},
+    server::{
+        types::{RoamID, RoamTitle},
+        AppState,
+    },
 };
 
 // TODO: make this configurable.
 const THRESHOLD: i64 = 80;
 
 pub struct FullTextSeach {
-    cancel_token: CancellationToken,
+    pub(crate) cancel_token: CancellationToken,
+    pub(crate) sender: SearchResultSender,
 }
 
 impl FullTextSeach {
-    pub fn new() -> Self {
+    pub fn new(sender: SearchResultSender) -> Self {
         Self {
+            sender,
             cancel_token: CancellationToken::new(),
         }
     }
-}
 
-impl FullTextSeach {
+    pub fn id(&self) -> usize {
+        self.sender.id()
+    }
+
     pub fn configuration(&self) -> super::Configuration {
         Configuration {
             returns_preview: true,
@@ -31,14 +38,11 @@ impl FullTextSeach {
 
     pub fn cancel(&mut self) {
         self.cancel_token.cancel();
+        // Create a new token for the next search
+        self.cancel_token = CancellationToken::new();
     }
 
-    pub async fn feed(
-        &mut self,
-        state: AppState,
-        sender: SearchResultSender,
-        f: &super::Feeder,
-    ) -> anyhow::Result<()> {
+    pub async fn feed(&mut self, state: AppState, f: &super::Feeder) -> anyhow::Result<()> {
         let matcher = SkimMatcherV2::default();
         let query = f.s.to_string();
         let cancel_token = self.cancel_token.clone();
@@ -52,10 +56,12 @@ impl FullTextSeach {
         SELECT tag FROM tags
         WHERE node_id = ?1;"#;
 
+        let sender = self.sender.clone();
+
         tokio::task::spawn_blocking(move || {
             let mut state = state.lock().unwrap();
             let ref mut state = *state;
-            
+
             let mut sqlite = state.sqlite.lock().unwrap();
             let conn = sqlite.connection();
             let mut node_stmnt = conn.prepare(NODE_STMNT).unwrap();

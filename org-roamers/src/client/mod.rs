@@ -17,24 +17,36 @@ use tokio::sync::mpsc;
 use tokio::time::Duration;
 use tracing::{error, info, warn};
 
-use crate::{client::message::WebSocketMessage, server::AppState};
+use crate::{
+    client::message::WebSocketMessage,
+    search::{SearchProviderList, SearchResultEntry},
+    server::AppState,
+};
 
 pub mod message;
 
 /// Simple WebSocket client that handles a single connection
 pub struct WebSocketClient {
-    socket: WebSocket,
-    client_id: u64,
+    pub(crate) search: Option<(SearchProviderList, mpsc::Receiver<SearchResultEntry>)>,
+    pub(crate) current_request_id: Option<String>,
+    socket: Option<WebSocket>,
+    pub(crate) client_id: u64,
 }
 
 impl WebSocketClient {
     pub fn new(socket: WebSocket, client_id: u64) -> Self {
-        Self { socket, client_id }
+        Self {
+            search: None,
+            current_request_id: None,
+            socket: Some(socket),
+            client_id,
+        }
     }
 
     /// Handle the WebSocket connection lifecycle
-    pub async fn handle_connection(self, app_state: AppState) {
-        let (mut sender, mut receiver) = self.socket.split();
+    pub async fn handle_connection(mut self, app_state: AppState) {
+        let (mut sender, mut receiver) = self.socket.unwrap().split();
+        self.socket = None;
         let client_id = self.client_id;
 
         info!("WebSocket client {} connected", client_id);
@@ -70,7 +82,7 @@ impl WebSocketClient {
                     match msg {
                         Some(Ok(Message::Text(text))) => {
                             match serde_json::from_str::<WebSocketMessage>(&text) {
-                                Ok(msg) => msg.handle(app_state.clone(), &mut sender, client_id).await,
+                                Ok(msg) => msg.handle(app_state.clone(), &mut sender, &mut self).await,
                                 Err(e) => {
                                     warn!("Failed to parse message from client {}: {} - Raw: {}",
                                           client_id, e, text.chars().take(100).collect::<String>());
@@ -122,6 +134,32 @@ impl WebSocketClient {
                     )).await {
                         error!("Failed to send ping to client {}: {}", client_id, e);
                         break;
+                    }
+                }
+
+                // Handle search results
+                search_result = async {
+                    if let Some((_, receiver)) = &mut self.search {
+                        receiver.recv().await
+                    } else {
+                        // If no search is active, wait forever (this branch won't be selected)
+                        std::future::pending::<Option<crate::search::SearchResultEntry>>().await
+                    }
+                } => {
+                    if let Some(result) = search_result {
+                        info!("Received search result: {}", result.title.title());
+                        let request_id = self.current_request_id.clone().unwrap_or_default();
+                        let response = message::WebSocketMessage::SearchResponse {
+                            request_id,
+                            results: result,
+                        };
+                        if let Err(e) = sender.send(Message::Text(
+                            serde_json::to_string(&response).unwrap()
+                        )).await {
+                            error!("Failed to send search result to client {}: {}", client_id, e);
+                            break;
+                        }
+                        info!("Sent search result to client");
                     }
                 }
             }
