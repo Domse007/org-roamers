@@ -14,12 +14,6 @@ pub fn config_path() -> PathBuf {
     std::env::var("APPDATA").map(PathBuf::from).unwrap()
 }
 
-fn html_path() -> PathBuf {
-    let mut path = config_path();
-    path.push("html_settings.json");
-    path
-}
-
 fn server_conf_path() -> PathBuf {
     let mut path = config_path();
     path.push("server_conf.json");
@@ -43,7 +37,7 @@ pub fn start_server(ctx: &OrgRoamersGUI) -> anyhow::Result<ServerRuntime> {
 
     server_configuration.fs_watcher = ctx.settings.fs_watcher;
 
-    let mut state = ServerState::new(server_configuration)?;
+    let state = ServerState::new(server_configuration)?;
 
     Ok(org_roamers::server::start_server(url, state).unwrap())
 }

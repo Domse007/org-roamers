@@ -256,6 +256,7 @@ mod tests {
     use crate::config::Config;
     use crate::{cache::OrgCache, sqlite::SqliteConnection, DynamicServerState};
     use std::collections::HashMap;
+    use std::sync::Mutex;
     use std::{fs, path::Path};
     use tempfile::TempDir;
 
@@ -315,7 +316,7 @@ mod tests {
         // Insert some test data
         let file_str = test_file.to_string_lossy();
         {
-            let mut sqlite = state.sqlite.lock().unwrap();
+            let sqlite = state.sqlite.lock().unwrap();
             sqlite
                 .execute(
                     "INSERT OR REPLACE INTO files (file, hash) VALUES (?1, 123)",
@@ -329,7 +330,7 @@ mod tests {
         watcher.remove_file_data(&mut state, &test_file).unwrap();
 
         // Verify data was removed
-        let sqlite = state.sqlite.lock().unwrap();
+        let mut sqlite = state.sqlite.lock().unwrap();
         let file_count: i32 = sqlite
             .connection()
             .query_row(
@@ -395,7 +396,7 @@ This is test content.
         watcher.process_file_change(&mut state, &org_file).unwrap();
 
         // Verify file was processed (check if nodes were inserted)
-        let sqlite = state.sqlite.lock().unwrap();
+        let mut sqlite = state.sqlite.lock().unwrap();
         let node_count: i32 = sqlite
             .connection()
             .query_row(
@@ -443,7 +444,7 @@ This is test content.
         assert!(result.is_ok());
 
         // Verify the file path is handled correctly in database
-        let sqlite = state.sqlite.lock().unwrap();
+        let mut sqlite = state.sqlite.lock().unwrap();
         let count: i32 = sqlite
             .connection()
             .query_row(
@@ -474,7 +475,7 @@ This is test content.
 
         // Verify initial data exists
         {
-            let sqlite = state.sqlite.lock().unwrap();
+            let mut sqlite = state.sqlite.lock().unwrap();
             let initial_count: i32 = sqlite
                 .connection()
                 .query_row(
@@ -524,7 +525,7 @@ This is test content.
             .unwrap();
 
         // Verify node was removed
-        let sqlite = state.sqlite.lock().unwrap();
+        let mut sqlite = state.sqlite.lock().unwrap();
         let after_remove_count: i32 = sqlite
             .connection()
             .query_row(

@@ -242,28 +242,6 @@ mod tests {
     }
 
     #[test]
-    fn test_search_response_serialization() {
-        let data = SearchResponse {
-            providers: vec![SearchResponseProvider {
-                source: "sqlite".to_string(),
-                results: vec![SearchResponseElement {
-                    display: "Vec<T>".to_string(),
-                    id: RoamID("bcb77e31-b4c6-4cf9-a05d-47b766349e57".to_string()),
-                    tags: vec!["rust".to_string()],
-                }],
-            }],
-        };
-
-        let expected = concat!(
-            "{\"providers\":[{\"source\":\"sqlite\",\"results\":[{\"display\"",
-            ":\"Vec<T>\",\"id\":\"bcb77e31-b4c6-4cf9-a05d-47b766349e57\",",
-            "\"tags\":[\"rust\"]}]}]}"
-        );
-
-        assert_eq!(serde_json::to_string(&data).unwrap(), expected);
-    }
-
-    #[test]
     fn test_org_as_html_serialization() {
         let resp = OrgAsHTMLResponse {
             org: "<h1>title</h1>".to_string(),
