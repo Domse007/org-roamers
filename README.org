@@ -8,22 +8,43 @@
 #+html: </div>
 -----
 
-org-roamers is an addition to [[https://github.com/org-roam/org-roam][org-roam]] and a replacement for [[https://github.com/org-roam/org-roam-ui][org-roam-ui]]. org-roamers is a standalone server and does not need emacs to build the database or retrieve any content. But with =org-roamers.el= there is still interoperability between emacs and org-roamers. The server can either be installed locally, or containerized using docker. For local usage, the server can either be compiled to be used as a cli, or as a basic gui.
+org-roamers is an addition to [[https://github.com/org-roam/org-roam][org-roam]] and a replacement for
+[[https://github.com/org-roam/org-roam-ui][org-roam-ui]]. org-roamers is a standalone server and does not need
+emacs to build the database or retrieve any content. Currently it is
+not implemented, but with =org-roamers.el= interoperability between
+emacs and org-roamers is planned. The server can either be installed
+locally, or containerized using docker. For local usage, the server
+can either be compiled to be used as a cli, or as a basic gui.
 
-Note: org-roamers tries to be compatible with org-roam, but some hurdles must be expected. It tries to build the same graph, but internally the databases differ substantially.
+Note: org-roamers tries to be compatible with org-roam from a source
+file perspective, but some hurdles should be expected. It tries to
+build the same graph, and provide at minimum the same features as
+org-roam. But, other than the org files, there is no compatibility
+between the two projects. The DB and other files differ substantially
+from the org-roam implementation.
 
-The cli version can be started with:
+If you are using org-roamers for the first time, you must first
+generate the config. org-roamers searches for the config in the
+following sequence: if =ROAMERS_DIR= is set, the file it's pointing at,
+then =./conf.json=, =~/.config/org-roamers/conf.json= and finally
+=/etc/org-roamers/conf.json=. The config is shipped with the binary:
 
 #+begin_src sh
-org-roamers-cli --server <Path>
+org-roamers-cli --get-config > ~/.config/org-roamers/conf.json
+# or replace with another path
 #+end_src
 
-The cli can be invoked with the =--fs-watcher= argument to enable the fs
-watcher. This is mostly useful for deployments, where emacs is not
-actively talking to org-roamers about changes.
+Then edit =org_roamers_root= to point to the root directory where all
+your org files are stored. Then the server can be started with:
+
+#+begin_src sh
+org-roamers-cli --server
+#+end_src
 
 * Compilation
-Note: for release builds, use the =static_assets= feature, to include all web components in the binary. With that, the binaries are portable.
+Note: for release builds, use the =static_assets= feature, to include
+all web components in the binary. With that, the binaries are
+portable.
 
 To compile the cli, use the following command:
 
@@ -32,15 +53,17 @@ make website
 cargo build --release --bin org-roamers-cli --features static_assets
 #+end_src
 
-To compile the gui, only the bin must be changed:
+To compile the gui, use the org-roamers-gui crate:
 
 #+begin_src sh
 make website
 cargo build --release --bin org-roamers-gui --features static_assets
 #+end_src
 
-* Docker
-The server can also be run inside a docker container. A Dockerfile is provided in the root of the project. With a working installation of docker, use the following commands to create a working image.
+* Docker (WIP)
+The server can also be run inside a docker container. A Dockerfile is
+provided in the root of the project. With a working installation of
+docker, use the following commands to create a working image.
 
 #+begin_src sh
 # build the image
@@ -51,7 +74,8 @@ docker run -p 5000:5000 -v <ROAM_DIR>:/data -v /etc/org-roamers/:/etc/org-roamer
 
 * Configuration
 ** HTML display
-Custom environments (e.g. =#+begin_CUSTOM=) can be styled by adding an entry to the =html_settings.json= configuration (on unix found in =/etc/org-roamers=). Example:
+Custom environments (e.g. =#+begin_CUSTOM=) can be styled by adding an
+entry to the =env_advices= configuration. Example:
 
 #+begin_src json
 {
@@ -77,5 +101,3 @@ All rust based tests can be run with the standard rust command:
 #+begin_src sh
 cargo test
 #+end_src
-
-If any tests fail that are using the =test-data/=, refer to =doc/rebuilding-db.org=.
