@@ -5,6 +5,21 @@ use serde::{Deserialize, Serialize};
 pub const DEFAULT_CONFIG: &str = include_str!("../../conf.json");
 pub const ENV_VAR_NAME: &str = "ROAMERS_DIR";
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct HttpServerConfig {
+    pub host: String,
+    pub port: u16,
+}
+
+impl Default for HttpServerConfig {
+    fn default() -> Self {
+        Self {
+            host: "localhost".to_string(),
+            port: 5000,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct EnvAdvice {
     pub on: String,
@@ -49,6 +64,8 @@ impl Default for LatexConfig {
 pub struct Config {
     /// Path to the root of the org-roamers / org-roam directory.
     pub org_roamers_root: PathBuf,
+    /// Settings that configure the webserver.
+    pub http_server_config: HttpServerConfig,
     /// HTML settings when exporting org environments to HTML.
     pub org_to_html: HtmlExportSettings,
     /// Root path to the website files. e.g. .js / .html / .css
@@ -65,6 +82,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             org_roamers_root: "~/notes/".into(),
+            http_server_config: HttpServerConfig::default(),
             org_to_html: HtmlExportSettings::default(),
             root: "./web/dist/".into(),
             strict: true,

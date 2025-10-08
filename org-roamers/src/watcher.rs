@@ -2,7 +2,7 @@ use std::{
     collections::HashSet,
     path::PathBuf,
     sync::mpsc::{self, Receiver},
-    thread::{self, JoinHandle},
+    thread,
     time::Duration,
 };
 
@@ -197,16 +197,12 @@ pub fn watcher(path: PathBuf) -> anyhow::Result<OrgWatcher> {
 }
 
 /// Starts a background thread that processes file changes and notifies WebSocket clients
-pub fn start_watcher_runtime(
-    app_state: AppState,
-    watch_path: PathBuf,
-    _runtime_handle: Option<tokio::runtime::Handle>,
-) -> anyhow::Result<JoinHandle<()>> {
+pub async fn start_watcher_runtime(app_state: AppState, watch_path: PathBuf) -> anyhow::Result<()> {
     let mut watcher = watcher(watch_path.clone())?;
 
-    let handle = thread::spawn(move || {
-        tracing::info!("File watcher started for: {:?}", watch_path);
+    tracing::info!("File watcher started for: {:?}", watch_path);
 
+    tokio::task::spawn_blocking(move || {
         loop {
             thread::sleep(Duration::from_millis(500)); // Debounce
 
@@ -247,7 +243,7 @@ pub fn start_watcher_runtime(
         }
     });
 
-    Ok(handle)
+    Ok(())
 }
 
 #[cfg(test)]

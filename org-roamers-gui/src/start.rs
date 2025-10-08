@@ -1,6 +1,6 @@
 use std::{fs, path::PathBuf};
 
-use org_roamers::{ServerState, config::Config, server::ServerRuntime};
+use org_roamers::{ServerState, config::Config};
 
 use crate::OrgRoamersGUI;
 
@@ -24,9 +24,7 @@ fn server_conf_path() -> PathBuf {
     }
 }
 
-pub fn start_server(ctx: &OrgRoamersGUI) -> anyhow::Result<ServerRuntime> {
-    let url = ctx.url()?;
-
+pub async fn start_server(ctx: &OrgRoamersGUI) -> anyhow::Result<()> {
     let mut server_configuration = match fs::read_to_string(server_conf_path()) {
         Ok(content) => serde_json::from_str(content.as_str()).unwrap(),
         Err(err) => {
@@ -36,8 +34,12 @@ pub fn start_server(ctx: &OrgRoamersGUI) -> anyhow::Result<ServerRuntime> {
     };
 
     server_configuration.fs_watcher = ctx.settings.fs_watcher;
+    server_configuration.http_server_config.host = ctx.host().to_string();
+    server_configuration.http_server_config.port = ctx.port()?;
 
     let state = ServerState::new(server_configuration)?;
 
-    Ok(org_roamers::server::start_server(url, state).unwrap())
+    org_roamers::start(state).await.unwrap();
+
+    Ok(())
 }

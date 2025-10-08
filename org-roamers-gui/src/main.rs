@@ -5,7 +5,6 @@ use std::{env, path::PathBuf, process::Command};
 use eframe;
 use egui::{Button, IconData};
 use logger::LogBuffer;
-use org_roamers::server::ServerRuntime;
 use rfd::FileDialog;
 use settings::Settings;
 
@@ -73,7 +72,6 @@ fn settings_file() -> PathBuf {
 
 struct OrgRoamersGUI {
     settings: Settings,
-    runtime: Option<ServerRuntime>,
     logs: LogBuffer<LOG_ENTRIES>,
 }
 
@@ -87,7 +85,6 @@ impl OrgRoamersGUI {
                     Settings::default()
                 }
             },
-            runtime: None,
             logs,
         }
     }
@@ -103,9 +100,13 @@ impl OrgRoamersGUI {
         }
     }
 
-    pub fn url(&self) -> anyhow::Result<String> {
-        let port: usize = self.settings.port.parse()?;
-        Ok(format!("{}:{}", self.settings.ip_addr, port))
+    pub fn port(&self) -> anyhow::Result<u16> {
+        self.settings.port.parse().map_err(Into::into)
+    }
+
+    pub fn host(&self) -> &str {
+        self.settings.ip_addr.as_str()
+
     }
 
     pub fn url_with_protocol(&self) -> anyhow::Result<String> {
@@ -145,28 +146,19 @@ impl eframe::App for OrgRoamersGUI {
 
             ui.separator();
 
-            let button_label = if self.runtime.is_some() {
-                "Stop Server"
-            } else {
-                "Start Server"
-            };
+            // let button_label = if self.runtime.is_some() {
+            //     "Stop Server"
+            // } else {
+            //     "Start Server"
+            // };
+            let button_label = "TODO: async stuff";
 
             let button_width = ui.available_width();
             if ui
                 .add_sized([button_width, 1.], Button::new(button_label))
                 .clicked()
             {
-                if self.runtime.is_some() {
-                    let rt = self.runtime.take();
-                    rt.unwrap().graceful_shutdown().unwrap();
-                } else {
-                    match start::start_server(&self) {
-                        Ok(rt) => self.runtime = Some(rt),
-                        Err(err) => {
-                            print_gui_error(format!("Error starting server: {err:?}"));
-                        }
-                    }
-                }
+                todo!("Unimplemented because of switch to async.");
             }
             if ui
                 .add_sized([button_width, 1.], Button::new("Open Website"))
@@ -200,9 +192,5 @@ impl eframe::App for OrgRoamersGUI {
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         let _ = self.settings.write(settings_file());
-        let runtime = self.runtime.take();
-        if let Some(rt) = runtime {
-            rt.graceful_shutdown().unwrap();
-        }
     }
 }

@@ -17,11 +17,11 @@ mod latex;
 
 mod client;
 pub mod config;
-pub mod search;
-pub mod server;
-pub mod sqlite;
-pub mod transform;
-pub mod watcher;
+mod search;
+mod server;
+mod sqlite;
+mod transform;
+mod watcher;
 
 use server::types::RoamID;
 use server::types::RoamLink;
@@ -155,6 +155,41 @@ impl ServerState {
         }
     }
 }
+
+pub async fn start(state: ServerState) -> anyhow::Result<()> {
+    tracing::info!(
+        "Using server configuration: {:?}",
+        serde_json::to_string(&state.config)
+    );
+
+    let org_roam_db_path = state.cache.path().to_path_buf();
+    let use_fs_watcher = state.config.fs_watcher;
+
+    let host = &state.config.http_server_config.host;
+    let port = &state.config.http_server_config.port;
+    let url = format!("{}:{}", host, port);
+
+    let app_state = Arc::new(Mutex::new(state));
+
+    if use_fs_watcher {
+        let app_state_clone = app_state.clone();
+        let watch_path = org_roam_db_path.clone();
+
+        watcher::start_watcher_runtime(app_state_clone, watch_path).await.unwrap();
+
+        tracing::info!("File watcher enabled with concurrency conflict resolution");
+    }
+
+    let app = server::build_server(app_state.clone()).await;
+    
+    tracing::info!("Server listening on {}", url);
+    let listener = tokio::net::TcpListener::bind(&url).await.unwrap();
+
+    axum::serve(listener, app).tcp_nodelay(true).await.unwrap();
+
+    Ok(())
+}
+
 
 #[cfg(test)]
 mod tests {

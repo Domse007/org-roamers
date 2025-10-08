@@ -1,7 +1,3 @@
-use std::path::PathBuf;
-
-use serde::{Deserialize, Serialize};
-
 #[cfg(not(target_os = "windows"))]
 pub mod config_path {
     use org_roamers::config::ENV_VAR_NAME;
@@ -34,22 +30,5 @@ pub mod config_path {
     }
     pub fn config_path() -> Option<PathBuf> {
         paths()
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct Configuration {
-    pub roam_path: PathBuf,
-    pub ip_addr: String,
-    pub port: u16,
-}
-
-impl Configuration {
-    pub fn get_url(&self, protocol: bool) -> String {
-        if protocol {
-            format!("http://{}:{}", self.ip_addr, self.port)
-        } else {
-            format!("{}:{}", self.ip_addr, self.port)
-        }
     }
 }

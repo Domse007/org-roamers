@@ -12,11 +12,6 @@ use crate::{
 pub mod default;
 mod text_search;
 
-#[derive(Serialize)]
-pub struct Configuration {
-    pub returns_preview: bool,
-}
-
 pub struct Feeder {
     s: String,
 }
@@ -83,13 +78,6 @@ pub enum SearchProvider {
 }
 
 impl SearchProvider {
-    pub async fn feed(&mut self, state: AppState, f: &Feeder) -> anyhow::Result<()> {
-        match self {
-            Self::FullTextSearch(fts) => fts.feed(state, f).await,
-            Self::DefaultSearch(ds) => ds.feed(state, f).await,
-        }
-    }
-
     pub fn name(&self) -> &'static str {
         match self {
             Self::FullTextSearch(_) => "Full text search",
@@ -147,6 +135,7 @@ impl SearchProviderList {
                 SearchProvider::DefaultSearch(ds) => {
                     let sender = ds.sender.clone();
                     tokio::spawn(async move {
+                        // TODO: there appears to be no use for the Self::providers...
                         let mut ds = DefaultSearch::new(sender);
                         ds.feed(state_clone, &Feeder::new(query)).await
                     })

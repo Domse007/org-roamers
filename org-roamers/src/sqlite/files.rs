@@ -37,12 +37,3 @@ pub fn insert_file_tx<P: AsRef<Path>>(
     tx.execute(STMNT, params![filename, hash])
         .map_err(Into::into)
 }
-
-pub fn get_hash<P: AsRef<Path>>(con: &mut Connection, filename: P) -> anyhow::Result<u32> {
-    let filename = filename.as_ref().to_string_lossy();
-    const STMNT: &str = r#"SELECT hash FROM files WHERE file = ?1"#;
-    con.query_row(STMNT, params![filename], |row| {
-        Ok(row.get_unwrap::<usize, u32>(0))
-    })
-    .map_err(Into::into)
-}

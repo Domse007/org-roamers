@@ -1,5 +1,9 @@
 {
    "org_roamers_root": "~/notes/",
+   "http_server_config": {
+      "host": "localhost",
+      "port": 5000
+   },
    "org_to_html": {
       "env_advices": [
 	  {

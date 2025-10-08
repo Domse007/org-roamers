@@ -8,17 +8,6 @@ use orgize::{
 
 use crate::server::types::RoamID;
 
-/// Get the subtree of a given node.
-/// ```rust
-/// use org_roamers::transform::subtree::Subtree;
-///
-/// let org = concat!(
-///     "* Hello World\n:PROPERTIES:\n:ID:       ",
-///     "aa\n:END:\n aa"
-/// );
-/// let sub = Subtree::get("aa".into(), org);
-/// assert_eq!(sub.unwrap(), org);
-/// ```
 pub struct Subtree {
     on: RoamID,
     subtree: Option<String>,

@@ -1,11 +1,7 @@
 use anyhow::Result;
 use rusqlite::Connection;
 
-use crate::{
-    search::{Configuration, SearchResultSender},
-    server::AppState,
-    transform::title::TitleSanitizer,
-};
+use crate::{search::SearchResultSender, server::AppState, transform::title::TitleSanitizer};
 
 #[derive(PartialEq, Debug)]
 pub struct ForNode<'a> {
@@ -234,16 +230,10 @@ impl DefaultSearch {
         self.sender.id()
     }
 
-    pub fn configuration(&self) -> super::Configuration {
-        Configuration {
-            returns_preview: false,
-        }
-    }
-
     pub async fn feed(&mut self, state: AppState, f: &super::Feeder) -> anyhow::Result<()> {
         let query = f.s.clone();
         let mut sender = self.sender.clone();
-        
+
         // Wrap the blocking database operation in spawn_blocking
         tokio::task::spawn_blocking(move || {
             let mut state_guard = state.lock().unwrap();

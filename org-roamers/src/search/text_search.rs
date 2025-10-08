@@ -3,7 +3,7 @@ use rusqlite::params;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    search::{Configuration, SearchResultSender},
+    search::SearchResultSender,
     server::{
         types::{RoamID, RoamTitle},
         AppState,
@@ -28,12 +28,6 @@ impl FullTextSeach {
 
     pub fn id(&self) -> usize {
         self.sender.id()
-    }
-
-    pub fn configuration(&self) -> super::Configuration {
-        Configuration {
-            returns_preview: true,
-        }
     }
 
     pub fn cancel(&mut self) {

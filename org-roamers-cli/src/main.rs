@@ -1,29 +1,66 @@
-use std::{env, process::ExitCode};
+use std::{env, panic, process::ExitCode};
 
-mod cli;
-mod server;
+use org_roamers::start;
 
-fn main() -> ExitCode {
+mod conf;
+mod entry;
+
+#[tokio::main]
+async fn main() -> ExitCode {
+    tracing_subscriber::fmt()
+        .with_file(true)
+        .with_ansi(true)
+        .with_thread_ids(true)
+        .with_thread_names(true)
+        .pretty()
+        .with_line_number(true)
+        .init();
+
+    panic::set_hook(Box::new(|info| {
+        tracing::error!("Server paniced with {info}")
+    }));
+
     let mut args = env::args().skip(1);
 
     if let Some(cmd) = args.next() {
         match cmd.as_str() {
-            "--server" => server::entry(args.collect()).unwrap(),
-            "--get-config" => {
-                server::print_config();
-                ExitCode::SUCCESS
+            "--server" => {
+                let state = match entry::init_state() {
+                    Ok(state) => state,
+                    Err(err) => {
+                        tracing::error!("{err}");
+                        return ExitCode::FAILURE;
+                    }
+                };
+                start(state).await.unwrap();
+                tracing::info!("Starting CLI...");
+                tracing::info!("Successfully shut down runtime.");
             }
-            "--cli" => {
-                cli::entry();
-                ExitCode::SUCCESS
+            "--dump-db" => {
+                let state = match entry::init_state() {
+                    Ok(state) => state,
+                    Err(err) => {
+                        tracing::error!("{err}");
+                        return ExitCode::FAILURE;
+                    }
+                };
+                if let Err(err) = entry::dump_db(state) {
+                    tracing::error!("{err}");
+                    return ExitCode::FAILURE;
+                }
+            }
+            "--get-config" => {
+                entry::print_config();
             }
             _ => {
                 eprintln!("Unsupported command: {cmd}");
-                ExitCode::FAILURE
+                return ExitCode::FAILURE;
             }
         }
     } else {
-        eprintln!("No command provided. Use --server, --cli or --get-config");
-        ExitCode::FAILURE
+        eprintln!("No command provided. Use --server, --get-config or --dump-db");
+        return ExitCode::FAILURE;
     }
+
+    ExitCode::SUCCESS
 }

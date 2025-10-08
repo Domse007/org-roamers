@@ -6,21 +6,8 @@ use orgize::{
     Org, SyntaxElement,
 };
 use rusqlite::Connection;
-use serde::{Deserialize, Serialize};
 
 use crate::sqlite::rebuild;
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub struct Timestamps {
-    ctime: String,
-    mtime: Vec<String>,
-}
-
-impl Timestamps {
-    pub fn new(ctime: String, mtime: Vec<String>) -> Self {
-        Self { ctime, mtime }
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct NodeFromOrg {
@@ -33,7 +20,6 @@ pub struct NodeFromOrg {
     pub(crate) actual_olp: Vec<String>,
     pub(crate) tags: Vec<String>,
     pub(crate) aliases: Vec<String>,
-    pub(crate) timestamps: Option<Timestamps>,
     pub(crate) links: Vec<(String, String)>,
     pub(crate) refs: Vec<String>,
     pub(crate) cites: Vec<String>,

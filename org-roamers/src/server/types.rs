@@ -11,12 +11,6 @@ impl RoamID {
         &self.0
     }
 
-    /// ```rust
-    /// use org_roamers::server::types::RoamID;
-    ///
-    /// let id: RoamID = "t t".into();
-    /// assert_eq!(id.with_quotes(3), "\"\"\"t t\"\"\"");
-    /// ```
     pub fn with_quotes(&self, num: usize) -> String {
         let quotes = "\"".repeat(num);
         format!("{}{}{}", quotes, self.0, quotes)
@@ -151,27 +145,6 @@ pub struct OrgAsHTMLResponse {
     pub outgoing_links: Vec<OutgoingLink>,
     pub incoming_links: Vec<IncomingLink>,
     pub latex_blocks: Vec<String>,
-}
-
-/// # Example
-/// ```json
-/// {
-///     "org": "<h1>title</h1>",
-///     "links": [{
-///         "display": "t",
-///         "id": "id"
-///     }]
-/// }
-/// ```
-impl OrgAsHTMLResponse {
-    pub fn simple(text: impl ToString) -> Self {
-        Self {
-            org: text.to_string(),
-            outgoing_links: vec![],
-            incoming_links: vec![],
-            latex_blocks: vec![],
-        }
-    }
 }
 
 impl IntoResponse for OrgAsHTMLResponse {
