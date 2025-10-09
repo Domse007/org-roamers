@@ -1,8 +1,9 @@
 use std::{fs, path::PathBuf};
 
 use org_roamers::{ServerState, config::Config};
+use tokio::{runtime::Runtime, task::JoinHandle};
 
-use crate::OrgRoamersGUI;
+use crate::{settings::Settings, OrgRoamersGUI};
 
 #[cfg(not(target_os = "windows"))]
 pub fn config_path() -> PathBuf {
@@ -24,7 +25,17 @@ fn server_conf_path() -> PathBuf {
     }
 }
 
-pub async fn start_server(ctx: &OrgRoamersGUI) -> anyhow::Result<()> {
+pub fn start(ctx: &OrgRoamersGUI) -> JoinHandle<anyhow::Result<()>> {
+    let rt = Runtime::new().unwrap();
+
+    let settings = ctx.settings.clone();
+
+    rt.spawn(async move {
+        start_server(settings).await
+    })
+}
+
+pub async fn start_server(ctx: Settings) -> anyhow::Result<()> {
     let mut server_configuration = match fs::read_to_string(server_conf_path()) {
         Ok(content) => serde_json::from_str(content.as_str()).unwrap(),
         Err(err) => {
@@ -33,9 +44,9 @@ pub async fn start_server(ctx: &OrgRoamersGUI) -> anyhow::Result<()> {
         }
     };
 
-    server_configuration.fs_watcher = ctx.settings.fs_watcher;
-    server_configuration.http_server_config.host = ctx.host().to_string();
-    server_configuration.http_server_config.port = ctx.port()?;
+    server_configuration.fs_watcher = ctx.fs_watcher;
+    server_configuration.http_server_config.host = ctx.ip_addr;
+    server_configuration.http_server_config.port = ctx.port.parse()?;
 
     let state = ServerState::new(server_configuration).await?;
 

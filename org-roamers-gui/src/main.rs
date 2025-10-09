@@ -7,6 +7,7 @@ use egui::{Button, IconData};
 use logger::LogBuffer;
 use rfd::FileDialog;
 use settings::Settings;
+use tokio::task::JoinHandle;
 
 mod logger;
 mod settings;
@@ -73,6 +74,7 @@ fn settings_file() -> PathBuf {
 struct OrgRoamersGUI {
     settings: Settings,
     logs: LogBuffer<LOG_ENTRIES>,
+    handle: Option<JoinHandle<anyhow::Result<()>>>,
 }
 
 impl OrgRoamersGUI {
@@ -85,6 +87,7 @@ impl OrgRoamersGUI {
                     Settings::default()
                 }
             },
+            handle: None,
             logs,
         }
     }
@@ -98,14 +101,6 @@ impl OrgRoamersGUI {
             width,
             height,
         }
-    }
-
-    pub fn port(&self) -> anyhow::Result<u16> {
-        self.settings.port.parse().map_err(Into::into)
-    }
-
-    pub fn host(&self) -> &str {
-        self.settings.ip_addr.as_str()
     }
 
     pub fn url_with_protocol(&self) -> anyhow::Result<String> {
@@ -145,19 +140,24 @@ impl eframe::App for OrgRoamersGUI {
 
             ui.separator();
 
-            // let button_label = if self.runtime.is_some() {
-            //     "Stop Server"
-            // } else {
-            //     "Start Server"
-            // };
-            let button_label = "TODO: async stuff";
+            let button_label = if self.handle.is_some() {
+                "Stop Server"
+            } else {
+                "Start Server"
+            };
 
             let button_width = ui.available_width();
             if ui
                 .add_sized([button_width, 1.], Button::new(button_label))
                 .clicked()
             {
-                todo!("Unimplemented because of switch to async.");
+                match &self.handle {
+                    Some(handle) => {
+                        handle.abort();
+                        self.handle = None;
+                    }
+                    None => self.handle = Some(start::start(&self)),
+                }
             }
             if ui
                 .add_sized([button_width, 1.], Button::new("Open Website"))
