@@ -1,5 +1,4 @@
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
-use rusqlite::params;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
@@ -11,7 +10,7 @@ use crate::{
 };
 
 // TODO: make this configurable.
-const THRESHOLD: i64 = 80;
+const THRESHOLD: i64 = 90;
 
 pub struct FullTextSeach {
     pub(crate) cancel_token: CancellationToken,
@@ -43,56 +42,53 @@ impl FullTextSeach {
 
         const NODE_STMNT: &str = r#"
         SELECT title, id FROM nodes
-        WHERE id = ?1;
+        WHERE id = ?;
         "#;
 
         const TAGS_STMNT: &str = r#"
         SELECT tag FROM tags
-        WHERE node_id = ?1;"#;
+        WHERE node_id = ?"#;
 
         let sender = self.sender.clone();
 
-        tokio::task::spawn_blocking(move || {
-            let mut state = state.lock().unwrap();
-            let ref mut state = *state;
+        tokio::spawn(async move {
+            // Collect cache entries and clone sqlite pool before any async operations
+            let (cache_entries, sqlite) = {
+                let state = state.lock().unwrap();
+                let cache_entries: Vec<_> = state.cache.iter()
+                    .map(|(k, v)| (k.clone(), v.content().to_string()))
+                    .collect();
+                (cache_entries, state.sqlite.clone())
+            };
 
-            let mut sqlite = state.sqlite.lock().unwrap();
-            let conn = sqlite.connection();
-            let mut node_stmnt = conn.prepare(NODE_STMNT).unwrap();
-            let mut tags_stmnt = conn.prepare(TAGS_STMNT).unwrap();
-
-            for (key, value) in state.cache.iter() {
+            for (key, content) in cache_entries {
                 if cancel_token.is_cancelled() {
                     return;
                 }
 
-                if let Some((score, _index_types)) = matcher.fuzzy_indices(value.content(), &query)
+                if let Some((score, _index_types)) = matcher.fuzzy_indices(&content, &query)
                 {
                     if score >= THRESHOLD {
-                        let (title, id): (RoamTitle, RoamID) =
-                            match node_stmnt.query_map(params![key.id()], |row| {
-                                Ok((
-                                    RoamTitle::from(row.get_unwrap::<usize, String>(0)),
-                                    RoamID::from(row.get_unwrap::<usize, String>(1)),
-                                ))
-                            }) {
-                                Ok(pair) => match pair.map(|e| e.unwrap()).next() {
-                                    Some(pair) => pair,
-                                    None => {
-                                        tracing::error!("No entry found for {}", key.id());
-                                        continue;
-                                    }
-                                },
-                                Err(err) => {
-                                    tracing::error!("An error occured: {err}");
-                                    continue;
-                                }
-                            };
+                        let (title, id): (String, String) = match sqlx::query_as(NODE_STMNT)
+                            .bind(key.id())
+                            .fetch_one(&sqlite)
+                            .await
+                        {
+                            Ok(pair) => pair,
+                            Err(_) => {
+                                tracing::error!("No entry found for {}", key.id());
+                                continue;
+                            }
+                        };
 
-                        let tags = match tags_stmnt.query_map(params![id.id()], |row| {
-                            Ok(row.get_unwrap::<usize, String>(0))
-                        }) {
-                            Ok(tags) => tags.map(Result::unwrap).collect(),
+                        let (title, id) = (RoamTitle::from(title), RoamID::from(id));
+
+                        let tags: Vec<String> = match sqlx::query_as(TAGS_STMNT)
+                            .bind(id.id())
+                            .fetch_all(&sqlite)
+                            .await
+                        {
+                            Ok(tags) => tags.into_iter().map(|e: (String,)| e.0).collect(),
                             Err(err) => {
                                 tracing::error!("An error occured: {err}");
                                 vec![]
@@ -110,8 +106,7 @@ impl FullTextSeach {
                     }
                 }
             }
-        })
-        .await?;
+        });
 
         Ok(())
     }

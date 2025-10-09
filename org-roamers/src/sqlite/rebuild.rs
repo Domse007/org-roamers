@@ -1,11 +1,11 @@
-use rusqlite::{params, Connection};
+use sqlx::SqlitePool;
 
 use crate::sqlite::olp;
 
 // TODO: remove file. This also requires updating the table def.
 #[allow(clippy::too_many_arguments)]
-pub fn insert_node(
-    con: &mut Connection,
+pub async fn insert_node(
+    con: &SqlitePool,
     id: &str,
     file: &str,
     level: u64,
@@ -17,36 +17,61 @@ pub fn insert_node(
     olp: &[String],
 ) -> anyhow::Result<()> {
     const STMNT: &str = concat!(
-        "INSERT OR REPLACE INTO nodes (id, file, level, todo, priority, scheduled, deadline, title)\n",
-        "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8);"
+        "INSERT OR REPLACE INTO nodes (id, file, level, todo, priority, scheduled, deadline, title, properties)\n",
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);"
     );
-    con.execute(
-        STMNT,
-        params![id, file, level, todo, priority, scheduled, deadline, title],
-    )?;
 
-    olp::insert_olp(con, id, olp)?;
+    sqlx::query(STMNT)
+        .bind(id)
+        .bind(file)
+        .bind(level as u32)
+        .bind(todo)
+        .bind(priority as u32)
+        .bind(scheduled)
+        .bind(deadline)
+        .bind(title)
+        .bind(Option::<String>::None)  // properties - not currently used
+        .execute(con)
+        .await?;
+
+    olp::insert_olp(con, id, olp).await?;
 
     Ok(())
 }
 
-pub fn insert_tag(con: &mut Connection, id: &str, tag: &str) -> anyhow::Result<()> {
+pub async fn insert_tag(con: &SqlitePool, id: &str, tag: &str) -> anyhow::Result<()> {
     const STMNT: &str = concat!(
         "INSERT OR REPLACE INTO tags (node_id, tag)\n",
-        "VALUES (?1, ?2);"
+        "VALUES (?, ?);"
     );
-    con.execute(STMNT, params![id, tag])?;
+    sqlx::query(STMNT).bind(id).bind(tag).execute(con).await?;
     Ok(())
 }
 
-pub fn insert_link(con: &mut Connection, source: &str, dest: &str) -> anyhow::Result<()> {
+pub async fn insert_alias(con: &SqlitePool, id: &str, alias: &str) -> anyhow::Result<()> {
+    const STMNT: &str = concat!(
+        "INSERT OR REPLACE INTO aliases (node_id, alias)\n",
+        "VALUES (?, ?);"
+    );
+    sqlx::query(STMNT).bind(id).bind(alias).execute(con).await?;
+    Ok(())
+}
+
+pub async fn insert_link(con: &SqlitePool, source: &str, dest: &str) -> anyhow::Result<()> {
     const TYPE: &str = "id";
     const PROPERTIES: &str = "";
-    const POS: usize = 0;
+    const POS: u32 = 0;
     const STMNT: &str = concat!(
         "INSERT OR REPLACE INTO links (pos, source, dest, type, properties)\n",
-        "VALUES (?1, ?2, ?3, ?4, ?5);"
+        "VALUES (?, ?, ?, ?, ?);"
     );
-    con.execute(STMNT, params![POS, source, dest, TYPE, PROPERTIES])?;
+    sqlx::query(STMNT)
+        .bind(POS)
+        .bind(source)
+        .bind(dest)
+        .bind(TYPE)
+        .bind(PROPERTIES)
+        .execute(con)
+        .await?;
     Ok(())
 }

@@ -9,7 +9,7 @@ use crate::{
     },
 };
 
-pub mod default;
+mod default;
 mod text_search;
 
 pub struct Feeder {

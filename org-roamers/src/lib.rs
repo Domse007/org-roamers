@@ -12,7 +12,6 @@
 //! See: the provided server implementation `org_roamers::bin::server::main.rs`.
 
 mod cache;
-pub mod error;
 mod latex;
 
 mod client;
@@ -26,7 +25,7 @@ mod watcher;
 use server::types::RoamID;
 use server::types::RoamLink;
 use server::types::RoamNode;
-use sqlite::SqliteConnection;
+use sqlx::SqlitePool;
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -93,7 +92,7 @@ impl DynamicServerState {
 
 pub struct ServerState {
     pub config: Config,
-    pub sqlite: Mutex<SqliteConnection>,
+    pub sqlite: SqlitePool,
     pub cache: OrgCache,
     pub dynamic_state: DynamicServerState,
     pub websocket_connections: HashMap<u64, mpsc::UnboundedSender<WebSocketMessage>>,
@@ -101,20 +100,15 @@ pub struct ServerState {
 }
 
 impl ServerState {
-    pub fn new(conf: Config) -> anyhow::Result<ServerState> {
-        let mut sqlite_con = match SqliteConnection::init(conf.strict) {
-            Ok(con) => con,
-            Err(e) => {
-                anyhow::bail!("ERROR: could not initialize the sqlite connection: {e}");
-            }
-        };
+    pub async fn new(conf: Config) -> anyhow::Result<ServerState> {
+        let sqlite_con = sqlite::init_db(conf.strict).await?;
 
         let mut org_cache = OrgCache::new(conf.org_roamers_root.to_path_buf());
 
-        org_cache.rebuild(sqlite_con.connection())?;
+        org_cache.rebuild(&sqlite_con).await?;
 
         Ok(ServerState {
-            sqlite: Mutex::new(sqlite_con),
+            sqlite: sqlite_con,
             cache: org_cache,
             config: conf,
             dynamic_state: DynamicServerState::default(),

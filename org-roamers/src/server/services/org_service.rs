@@ -11,98 +11,117 @@ pub enum Query {
     ById(RoamID),
 }
 
-pub fn get_org_as_html(app_state: AppState, query: Query, scope: String) -> OrgAsHTMLResponse {
-    let mut state = app_state.lock().unwrap();
-    let ref mut server_state = *state;
-
-    // TODO: remove unwraps
-    let (id, cache_entry) = match query {
-        Query::ByTitle(ref title) => {
-            let mut sqlite = server_state.sqlite.lock().unwrap();
-            server_state
-                .cache
-                .get_by_name(sqlite.connection(), title.title())
-                .unwrap()
-        }
-        Query::ById(ref id) => (id.clone(), server_state.cache.retrieve(&id).unwrap()),
+pub async fn get_org_as_html(
+    app_state: AppState,
+    query: Query,
+    scope: String,
+) -> OrgAsHTMLResponse {
+    // Get data from cache and extract needed values
+    let (id, content, path, config, sqlite) = {
+        let sqlite_pool = app_state.lock().unwrap().sqlite.clone();
+        
+        let (id, content, path) = match &query {
+            Query::ByTitle(title) => {
+                let stmnt = r#"
+                    SELECT id FROM nodes
+                    WHERE title = ?;
+                "#;
+                let (id_str,): (String,) = sqlx::query_as(stmnt)
+                    .bind(title.title())
+                    .fetch_one(&sqlite_pool)
+                    .await
+                    .unwrap();
+                
+                let state = app_state.lock().unwrap();
+                let id: RoamID = id_str.into();
+                let cache_entry = state.cache.retrieve(&id).unwrap();
+                (id, cache_entry.content().to_string(), cache_entry.path().to_path_buf())
+            },
+            Query::ById(id) => {
+                let state = app_state.lock().unwrap();
+                let cache_entry = state.cache.retrieve(&id).unwrap();
+                (id.clone(), cache_entry.content().to_string(), cache_entry.path().to_path_buf())
+            },
+        };
+        
+        let state = app_state.lock().unwrap();
+        let config = state.config.clone();
+        (id, content, path, config, sqlite_pool)
     };
 
     let contents = if scope == "file" {
-        cache_entry.content().to_string()
+        content.clone()
     } else {
-        Subtree::get(id.into(), cache_entry.content()).unwrap_or(cache_entry.content().to_string())
+        Subtree::get(id.clone().into(), &content).unwrap_or(content.clone())
     };
 
     // Convert absolute path to relative path from org-roam directory
-    let relative_file = cache_entry.path().to_string_lossy().into_owned();
+    let relative_file = path.to_string_lossy().into_owned();
 
-    let mut handler = HtmlExport::new(&server_state.config.org_to_html, relative_file);
+    let mut handler = HtmlExport::new(&config.org_to_html, relative_file);
     Org::parse(contents).traverse(&mut handler);
 
-    let (org, outgoing_links, latex_blocks) = handler.finish();
+    let (org, org_outgoing_links, latex_blocks) = handler.finish();
 
     tracing::info!(
         "Generated HTML length: {}, LaTeX blocks: {}, outgoing links: {}",
         org.len(),
         latex_blocks.len(),
-        outgoing_links.len()
+        org_outgoing_links.len()
     );
 
-    let outgoing_links = {
-        let sqlite = server_state.sqlite.lock().unwrap();
-        outgoing_links
-            .iter()
-            .map(|bare| {
-                const STMNT: &str = "SELECT id, title FROM nodes WHERE id = ?1";
-                sqlite.query_one(STMNT, [bare], |row| {
-                    Ok(OutgoingLink {
-                        display: row.get::<usize, String>(1).unwrap().into(),
-                        id: row.get::<usize, String>(0).unwrap().into(),
-                    })
-                })
-            })
-            .filter_map(|res| match res {
-                Ok(link) => Some(link),
-                Err(err) => {
-                    tracing::error!("An error occurred: {err:?}");
-                    None
-                }
-            })
-            .collect()
+    let mut outgoing_links = vec![];
+    for link_id in org_outgoing_links {
+        const STMNT: &str = "SELECT id, title FROM nodes WHERE id = ?";
+        let res = sqlx::query_as::<_, (String, String)>(STMNT)
+            .bind(&link_id)
+            .fetch_one(&sqlite)
+            .await;
+        match res {
+            Ok((id, display)) => {
+                outgoing_links.push(OutgoingLink {
+                    display: RoamTitle::from(display),
+                    id: RoamID::from(id),
+                });
+            }
+            Err(err) => {
+                tracing::error!("Failed to fetch outgoing link for id {}: {}", link_id, err);
+            }
+        }
+    }
+
+    let final_id: RoamID = match query {
+        Query::ByTitle(title) => {
+            let (id_str,): (String,) = sqlx::query_as("SELECT n.id FROM nodes n WHERE n.title = ?")
+                .bind(title.title())
+                .fetch_one(&sqlite)
+                .await
+                .unwrap();
+            RoamID::from(id_str)
+        }
+        Query::ById(id) => id,
     };
 
-    let incoming_links = {
-        let mut sqlite = server_state.sqlite.lock().unwrap();
-        let id = match query {
-            Query::ByTitle(title) => {
-                const STMNT: &str = "SELECT n.id FROM nodes n WHERE n.id = ?1";
-                sqlite
-                    .query_one(STMNT, [title.title()], |row| {
-                        Ok(RoamID::from(row.get::<usize, String>(0).unwrap()))
-                    })
-                    .unwrap()
-            }
-            Query::ById(id) => id,
-        };
-
-        const STMNT: &str = r#"
+    const STMNT: &str = r#"
             SELECT n.id, n.title
             FROM links l
             JOIN nodes n ON l.source = n.id
-            WHERE l.dest = ?1;
+            WHERE l.dest = ?
         "#;
-        let mut stmnt = sqlite.connection().prepare(STMNT).unwrap();
-        stmnt
-            .query_map([id.id()], |row| {
-                Ok(IncomingLink {
-                    display: RoamTitle::from(row.get::<usize, String>(1).unwrap()),
-                    id: RoamID::from(row.get::<usize, String>(0).unwrap()),
+
+    let incoming_links = sqlx::query_as::<_, (String, String)>(STMNT)
+        .bind(final_id.id())
+        .fetch_all(&sqlite)
+        .await
+        .map(|list| {
+            list.into_iter()
+                .map(|(id, disp): (String, String)| IncomingLink {
+                    display: RoamTitle::from(disp),
+                    id: RoamID::from(id),
                 })
-            })
-            .unwrap()
-            .map(Result::unwrap)
-            .collect()
-    };
+                .collect()
+        })
+        .unwrap();
 
     OrgAsHTMLResponse {
         org,

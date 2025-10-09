@@ -1,54 +1,60 @@
-use rusqlite::fallible_streaming_iterator::FallibleStreamingIterator;
+use futures_util::StreamExt;
+use sqlx::SqlitePool;
 
-use crate::server::types::{GraphData, RoamLink, RoamNode};
-use crate::sqlite::{helpers, olp};
+use crate::server::types::{GraphData, RoamID, RoamLink, RoamNode};
+use crate::sqlite::olp;
 use crate::transform::title::TitleSanitizer;
-use crate::ServerState;
 
-pub fn get_graph_data(db: &mut ServerState) -> GraphData {
+pub async fn get_graph_data(sqlite: &SqlitePool) -> GraphData {
     let title_sanitizer = |title: &str| {
         let sanitizer = TitleSanitizer::new();
         sanitizer.process(title)
     };
 
-    let mut sqlite = db.sqlite.lock().unwrap();
+    let string_nodes = sqlx::query_as::<_, (String, String)>("SELECT id, title FROM nodes;")
+        .fetch_all(sqlite)
+        .await
+        .unwrap();
 
-    let mut nodes = helpers::get_all_nodes(sqlite.connection(), ["id", "title"])
-        .into_iter()
-        .map(|e| {
-            let parent = olp::get_olp(sqlite.connection(), &e[0])
-                .unwrap_or_default()
-                .pop()
-                .unwrap_or_default();
-            let stmnt = "SELECT title, id FROM nodes WHERE title = ?1;";
-            let parent = sqlite
-                .query_one(stmnt, [parent], |row| {
-                    Ok(row.get::<usize, String>(1).unwrap())
-                })
-                .unwrap_or_default();
-            RoamNode {
-                title: title_sanitizer(&e[1]).into(),
-                id: e[0].to_string().into(),
-                parent: parent.into(),
-                num_links: 0,
-            }
-        })
-        .collect::<Vec<RoamNode>>();
+    let mut nodes: Vec<RoamNode> = vec![];
+
+    for node in string_nodes {
+        let parent = olp::get_olp(sqlite, &node.0)
+            .await
+            .unwrap_or_default()
+            .pop()
+            .unwrap_or_default();
+        let stmnt = "SELECT id FROM nodes WHERE title = ?";
+        let parent_id: String = sqlx::query_scalar(stmnt)
+            .bind(parent)
+            .fetch_one(sqlite)
+            .await
+            .unwrap_or_default();
+        nodes.push(RoamNode {
+            title: title_sanitizer(&node.1).into(),
+            id: node.0.to_string().into(),
+            parent: parent_id.into(),
+            num_links: 0,
+        });
+    }
 
     const STMNT: &str = concat!(
         "SELECT source, dest, type\n",
         "FROM links\n",
         "WHERE type = 'id'\n",
-        "AND (dest = ?1 OR source = ?1)"
+        "AND (dest = ? OR source = ?)"
     );
 
-    let mut stmnt = sqlite.connection().prepare(STMNT).unwrap();
     for node in &mut nodes {
-        let num = stmnt.query([node.id.id()]).unwrap().count().unwrap();
-        node.num_links = num;
+        // TODO: use count dumbass...
+        let results: Vec<(String, String, String)> = sqlx::query_as(STMNT)
+            .bind(node.id.id())
+            .bind(node.id.id())
+            .fetch_all(sqlite)
+            .await
+            .unwrap_or_default();
+        node.num_links = results.len();
     }
-
-    drop(stmnt);
 
     const ALL_LINKS: &str = concat!(
         "SELECT source, dest, type\n",
@@ -56,25 +62,26 @@ pub fn get_graph_data(db: &mut ServerState) -> GraphData {
         "WHERE type = 'id';"
     );
 
-    let mut links: Vec<RoamLink> = sqlite
-        .query_many(ALL_LINKS, [], |row| {
-            Ok(RoamLink {
-                from: row.get::<usize, String>(0).unwrap().into(),
-                to: row.get::<usize, String>(1).unwrap().into(),
-            })
+    let mut links: Vec<RoamLink> = sqlx::query_as::<_, (String, String, String)>(ALL_LINKS)
+        .fetch(sqlite)
+        .filter_map(|res| async move {
+            match res {
+                Ok((source, dest, _)) => Some(RoamLink {
+                    from: RoamID::from(source),
+                    to: RoamID::from(dest),
+                }),
+                Err(_) => None,
+            }
         })
-        .unwrap()
-        .into_iter()
-        .collect();
+        .collect()
+        .await;
 
-    const PARENT_STMNT: &str = "SELECT id, title FROM nodes WHERE id = ?1;";
-
+    // Add parent-child hierarchy links
     for node in &nodes {
-        if let Ok(parent_id) = sqlite.query_one(PARENT_STMNT, [&node.id.id()], |row| {
-            row.get::<usize, String>(0)
-        }) {
+        // Only add a link if the node has a non-empty parent
+        if !node.parent.id().is_empty() {
             links.push(RoamLink {
-                from: parent_id.into(),
+                from: node.parent.clone(),
                 to: node.id.clone(),
             });
         }

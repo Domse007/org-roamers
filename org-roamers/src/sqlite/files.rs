@@ -1,39 +1,29 @@
 use std::path::Path;
 
-use rusqlite::{params, Connection, Transaction};
+use sqlx::{Executor, SqlitePool};
 
-pub fn init_files_table(con: &mut Connection) -> anyhow::Result<()> {
+pub async fn init_files_table(con: &SqlitePool) -> anyhow::Result<()> {
     const STMNT: &str = concat!(
         "CREATE TABLE files (id INTEGER PRIMARY KEY AUTOINCREMENT, ",
-        "file TEXT NOT NULL, hash INTEGER NOT NULL);"
+        "file TEXT NOT NULL UNIQUE, hash INTEGER NOT NULL);"
     );
-    con.execute(STMNT, [])?;
+    con.execute(STMNT).await?;
     Ok(())
 }
 
-pub fn insert_file<P: AsRef<Path>>(
-    con: &mut Connection,
+pub async fn insert_file<P: AsRef<Path>>(
+    con: &SqlitePool,
     filename: P,
     hash: u64,
-) -> anyhow::Result<usize> {
+) -> anyhow::Result<()> {
     let filename = filename.as_ref().to_string_lossy();
     let hash = hash as u32;
 
-    const STMNT: &str = r#"INSERT OR REPLACE INTO files (file, hash) VALUES (?1, ?2);"#;
-    con.execute(STMNT, params![filename, hash])
-        .map_err(Into::into)
-}
-
-/// Transaction-aware version of insert_file
-pub fn insert_file_tx<P: AsRef<Path>>(
-    tx: &Transaction,
-    filename: P,
-    hash: u64,
-) -> anyhow::Result<usize> {
-    let filename = filename.as_ref().to_string_lossy();
-    let hash = hash as u32;
-
-    const STMNT: &str = r#"INSERT OR REPLACE INTO files (file, hash) VALUES (?1, ?2);"#;
-    tx.execute(STMNT, params![filename, hash])
-        .map_err(Into::into)
+    let _ = sqlx::query("INSERT OR REPLACE INTO files (file, hash) VALUES (?, ?);")
+        .bind(filename)
+        .bind(hash)
+        .execute(con)
+        .await?;
+    
+    Ok(())
 }

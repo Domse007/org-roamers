@@ -5,7 +5,7 @@ use orgize::{
     export::{Container, Event, Traverser},
     Org, SyntaxElement,
 };
-use rusqlite::Connection;
+use sqlx::SqlitePool;
 
 use crate::sqlite::rebuild;
 
@@ -23,51 +23,67 @@ pub struct NodeFromOrg {
     pub(crate) links: Vec<(String, String)>,
     pub(crate) refs: Vec<String>,
     pub(crate) cites: Vec<String>,
+    pub(crate) file: String,
 }
 
 impl NodeFromOrg {
     #[rustfmt::skip]
-    pub fn insert_node(&self, con: &mut Connection) -> anyhow::Result<()> {
+    pub async fn insert_node(&self, con: &SqlitePool) -> anyhow::Result<()> {
         // this does not insert olp, tags, etc. -- why?
         rebuild::insert_node(
-            con, &self.uuid, "", self.level,
+            con, &self.uuid, &self.file, self.level,
             false, 0, "", "", self.title.as_str(), &self.actual_olp
-        )
+        ).await
     }
 
-    pub fn insert_tags(&self, con: &mut Connection) -> anyhow::Result<()> {
+    pub async fn insert_tags(&self, con: &SqlitePool) -> anyhow::Result<()> {
         for tag in &self.tags {
-            rebuild::insert_tag(con, &self.uuid, &tag)?;
+            rebuild::insert_tag(con, &self.uuid, &tag).await?;
         }
         Ok(())
     }
 
-    pub fn insert_links(&self, con: &mut Connection) -> anyhow::Result<()> {
+    pub async fn insert_aliases(&self, con: &SqlitePool) -> anyhow::Result<()> {
+        for alias in &self.aliases {
+            rebuild::insert_alias(con, &self.uuid, &alias).await?;
+        }
+        Ok(())
+    }
+
+    pub async fn insert_links(&self, con: &SqlitePool) -> anyhow::Result<()> {
         for link in &self.links {
-            rebuild::insert_link(con, &self.uuid, &link.0)?;
+            rebuild::insert_link(con, &self.uuid, &link.0).await?;
         }
         Ok(())
     }
 }
 
-pub fn insert_nodes(con: &mut Connection, nodes: Vec<NodeFromOrg>) {
-    for node in nodes {
-        if let Err(err) = node.insert_node(con) {
-            tracing::error!("{err}");
-        }
-        if let Err(err) = node.insert_tags(con) {
-            tracing::error!("{err}");
-        }
-        if let Err(err) = node.insert_links(con) {
-            tracing::error!("{err}");
+pub async fn insert_nodes(con: &SqlitePool, nodes: Vec<NodeFromOrg>) {
+    for node in nodes.iter() {
+        // Only insert tags, aliases, and links if the node was successfully inserted
+        match node.insert_node(con).await {
+            Ok(_) => {
+                if let Err(err) = node.insert_tags(con).await {
+                    tracing::error!("Failed to insert tags for node {}: {}", node.uuid, err);
+                }
+                if let Err(err) = node.insert_aliases(con).await {
+                    tracing::error!("Failed to insert aliases for node {}: {}", node.uuid, err);
+                }
+                if let Err(err) = node.insert_links(con).await {
+                    tracing::error!("Failed to insert links for node {}: {}", node.uuid, err);
+                }
+            }
+            Err(err) => {
+                tracing::error!("Failed to insert node {}: {} - skipping tags, aliases, and links", node.uuid, err);
+            }
         }
     }
 }
 
-pub fn get_nodes(content: &str) -> Vec<NodeFromOrg> {
+pub fn get_nodes(content: &str, file: &str) -> Vec<NodeFromOrg> {
     let org = Org::parse(content);
 
-    let mut traverser = RoamersTraverser::new();
+    let mut traverser = RoamersTraverser::new(file);
     org.traverse(&mut traverser);
     traverser.nodes
 }
@@ -79,11 +95,15 @@ pub struct RoamersTraverser {
     tags_stack: Vec<Vec<String>>,
     olp: Vec<String>,
     actual_olp: Vec<String>,
+    file: String,
 }
 
 impl RoamersTraverser {
-    pub fn new() -> Self {
-        Default::default()
+    pub fn new(file: &str) -> Self {
+        Self {
+            file: file.to_string(),
+            ..Default::default()
+        }
     }
 
     pub fn current_olp(&self) -> Vec<String> {
@@ -133,6 +153,7 @@ impl Traverser for RoamersTraverser {
                             parent: None,
                             olp: vec![],
                             actual_olp: vec![],
+                            file: self.file.clone(),
                             ..Default::default()
                         };
 
@@ -203,6 +224,7 @@ impl Traverser for RoamersTraverser {
                             olp,
                             actual_olp,
                             aliases,
+                            file: self.file.clone(),
                             ..Default::default()
                         };
 
@@ -323,7 +345,7 @@ Welcome
 :END:
 some text
 ";
-        let res = get_nodes(ORG);
+        let res = get_nodes(ORG, "test.org");
         assert_eq!(
             res,
             vec![
@@ -333,6 +355,7 @@ some text
                     uuid: "e655725f-97db-4eec-925a-b80d66ad97e8".to_string(),
                     content: ORG.to_string(),
                     level: 0,
+                    file: "test.org".to_string(),
                     ..Default::default()
                 },
                 NodeFromOrg {
@@ -343,6 +366,7 @@ some text
                     level: 1,
                     olp: vec![],
                     actual_olp: vec!["Hello World".to_string()],
+                    file: "test.org".to_string(),
                     ..Default::default()
                 }
             ]
@@ -368,7 +392,7 @@ Welcome
 :END:
 some text
 ";
-        let res = get_nodes(ORG);
+        let res = get_nodes(ORG, "test.org");
         assert_eq!(
             res,
             vec![
@@ -378,6 +402,7 @@ some text
                     parent: None,
                     content: "Welcome\n** Hello\n:PROPERTIES:\n:ID:       e655725d-97db-4eec-925a-b80d66ad97e8\n:END:\nWelcome\n".to_string(),
                     level: 1,
+                    file: "test.org".to_string(),
                     ..Default::default()
                 },
                 NodeFromOrg {
@@ -388,6 +413,7 @@ some text
                     olp: vec!["Hello World".to_string()],
                                         actual_olp: vec!["Hello World".to_string()],
                     level: 2,
+                    file: "test.org".to_string(),
                     ..Default::default()
                 },
                 NodeFromOrg {
@@ -396,6 +422,7 @@ some text
                     uuid: "e6557233-97db-4eec-925a-b80d66ad97e8".to_string(),
                     content: "some text\n".to_string(),
                     level: 1,
+                    file: "test.org".to_string(),
                     ..Default::default()
                 },
             ]
@@ -421,7 +448,7 @@ Welcome
 :END:
 some text
 ";
-        let res = get_nodes(ORG);
+        let res = get_nodes(ORG, "test.org");
         assert_eq!(
             res,
             vec![
@@ -431,6 +458,7 @@ some text
                     uuid: "e655725f-97db-4eec-925a-b80d66ad97e8".to_string(),
                     content: "Welcome\n** Hello\n:PROPERTIES:\n:ID:       e655725d-97db-4eec-925a-b80d66ad97e8\n:END:\nWelcome\n*** testing\n:PROPERTIES:\n:ID:       e6557233-97db-4eec-925a-b80d66ad97e8\n:END:\nsome text\n".to_string(),
                     level: 1,
+                    file: "test.org".to_string(),
                     ..Default::default()
                 },
                 NodeFromOrg {
@@ -441,6 +469,7 @@ some text
                     olp: vec!["Hello World".to_string()],
                                         actual_olp: vec!["Hello World".to_string()],
                     level: 2,
+                    file: "test.org".to_string(),
                     ..Default::default()
                 },
                 NodeFromOrg {
@@ -451,6 +480,7 @@ some text
                     olp: vec!["Hello World".to_string(), "Hello".to_string()],
                     actual_olp: vec!["Hello World".to_string(), "Hello".to_string()],
                     level: 3,
+                    file: "test.org".to_string(),
                     ..Default::default()
                 }
             ]
@@ -473,7 +503,7 @@ test
 :END:
 some text
 ";
-        let res = get_nodes(ORG);
+        let res = get_nodes(ORG, "test.org");
         assert_eq!(
             res,
             vec![
@@ -483,6 +513,7 @@ some text
                     uuid: "e655725f-97db-4eec-925a-b80d66ad97e8".to_string(),
                     content: "Welcome\n** Hello\ntest\n*** testing\n:PROPERTIES:\n:ID:       e6557233-97db-4eec-925a-b80d66ad97e8\n:END:\nsome text\n".to_string(),
                     level: 1,
+                    file: "test.org".to_string(),
                     ..Default::default()
                 },
                 NodeFromOrg {
@@ -493,6 +524,7 @@ some text
                     olp: vec!["Hello World".to_string(), "Hello".to_string()],
                     actual_olp: vec!["Hello World".to_string(), "Hello".to_string()],
                     level: 3,
+                    file: "test.org".to_string(),
                     ..Default::default()
                 }
             ]
@@ -538,7 +570,7 @@ some text
 :PROPERTIES:
 :ID:       e655725f-97db-4eec-925a-b80d66ad97e9
 :END:";
-        let res = get_nodes(ORG);
+        let res = get_nodes(ORG, "test.org");
         assert_eq!(
             res,
             vec![
@@ -553,6 +585,7 @@ some text
                         "test2".to_string(),
                         "test3".to_string()
                     ],
+                    file: "test.org".to_string(),
                     ..Default::default()
                 },
                 NodeFromOrg {
@@ -568,6 +601,7 @@ some text
                     ],
                     olp: vec![],
                     actual_olp: vec!["Test".to_string()],
+                    file: "test.org".to_string(),
                     ..Default::default()
                 },
             ]
@@ -585,7 +619,7 @@ some text
 :ID:       e655725f-97db-4eec-925a-b80d66ad97e9
 :END:
 Linking to [[id:e655725f-97db-4eec-925a-b80d66ad97e8][Test]]";
-        let res = get_nodes(ORG);
+        let res = get_nodes(ORG, "test.org");
         assert_eq!(res[0].links, vec![]);
         assert_eq!(
             res[1].links,
@@ -604,7 +638,7 @@ Linking to [[id:e655725f-97db-4eec-925a-b80d66ad97e8][Test]]";
 #+title: Test
 * other
 Linking to [[id:e655725f-97db-4eec-925a-b80d66ad97e8][Test]]";
-        let res = get_nodes(ORG);
+        let res = get_nodes(ORG, "test.org");
         assert_eq!(
             res[0].links,
             vec![(
@@ -626,7 +660,7 @@ Linking to [[id:e655725f-97db-4eec-925a-b80d66ad97e8][Test]]";
 :ID:       e655725f-97db-4eec-925a-b80d66ad97e9
 :ROAM_ALIASES: test3 test4
 :END:";
-        let res = get_nodes(ORG);
+        let res = get_nodes(ORG, "test.org");
         assert_eq!(
             res[0].aliases,
             vec!["test1".to_string(), "test2".to_string()]

@@ -1,4 +1,4 @@
-use std::{env, fs};
+use std::fs;
 
 use anyhow::Result;
 use org_roamers::{
@@ -25,7 +25,7 @@ pub fn print_config() {
     println!("{}", DEFAULT_CONFIG);
 }
 
-pub fn init_state() -> Result<ServerState> {
+pub async fn init_state() -> Result<ServerState> {
     let Some(server_conf_path) = conf::config_path::config_path() else {
         print_config();
         anyhow::bail!("org-roamers cannot find a config file.");
@@ -41,7 +41,7 @@ pub fn init_state() -> Result<ServerState> {
         }
     };
 
-    let state = match ServerState::new(server_configuration) {
+    let state = match ServerState::new(server_configuration).await {
         Ok(g) => g,
         Err(e) => anyhow::bail!("An error occured: {e}"),
     };
@@ -49,21 +49,8 @@ pub fn init_state() -> Result<ServerState> {
     Ok(state)
 }
 
-pub fn dump_db(state: ServerState) -> anyhow::Result<()> {
-    let mut dump_path = env::current_dir().unwrap();
-    dump_path.push("dump.db");
-
-    if std::fs::exists(&dump_path).unwrap() {
-        std::fs::remove_file(&dump_path).unwrap();
-    }
-
-    state.sqlite.lock().unwrap().connection().backup(
-        rusqlite::DatabaseName::Main,
-        &dump_path,
-        None,
-    )?;
-
-    tracing::info!("Saved db dump to {}", dump_path.display());
-
-    Ok(())
+pub fn dump_db(_state: ServerState) -> anyhow::Result<()> {
+    // TODO: Implement database dump functionality for sqlx
+    // The previous implementation used rusqlite's backup feature which is not available in sqlx
+    anyhow::bail!("Database dump functionality is not yet implemented for sqlx")
 }

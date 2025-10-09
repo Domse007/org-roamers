@@ -12,7 +12,7 @@ use std::{
     sync::Arc,
 };
 
-use rusqlite::Connection;
+use sqlx::SqlitePool;
 
 use crate::{
     cache::{file::OrgFile, fileiter::FileIter},
@@ -90,7 +90,7 @@ impl OrgCache {
         }
     }
 
-    pub fn rebuild(&mut self, con: &mut Connection) -> anyhow::Result<()> {
+    pub async fn rebuild(&mut self, con: &SqlitePool) -> anyhow::Result<()> {
         let file_iter = FileIter::new(&self.path)?;
 
         for file_or_error in file_iter {
@@ -110,11 +110,12 @@ impl OrgCache {
                 }
             };
 
-            if let Err(err) = insert_file(con, cache_entry.path(), cache_entry.get_hash()) {
+            if let Err(err) = insert_file(con, cache_entry.path(), cache_entry.get_hash()).await {
                 tracing::error!("{err}");
             }
 
-            let nodes = org::get_nodes(cache_entry.content());
+            let file_path = cache_entry.path().to_string_lossy().to_string();
+            let nodes = org::get_nodes(cache_entry.content(), &file_path);
 
             let cache_entry = Arc::new(cache_entry);
             for node in &nodes {
@@ -122,33 +123,30 @@ impl OrgCache {
                     .insert(node.uuid.clone().into(), cache_entry.clone());
             }
 
-            org::insert_nodes(con, nodes);
+            org::insert_nodes(con, nodes).await;
         }
 
         Ok(())
     }
 
-    pub fn get_by_name(
+    pub async fn get_by_name(
         &self,
-        con: &mut Connection,
+        con: &SqlitePool,
         name: &str,
     ) -> Option<(RoamID, &OrgCacheEntry)> {
         let stmnt = r#"
             SELECT id FROM nodes
-            WHERE title = ?1;
+            WHERE title = ?;
         "#;
 
-        let id = con.query_row(stmnt, [name], |row| Ok(row.get_unwrap::<usize, String>(0)));
-        let id = match id {
-            Ok(id) => id,
-            Err(err) => {
-                tracing::error!("{err}");
-                return None;
-            }
-        };
+        let id: (String,) = sqlx::query_as(stmnt)
+            .bind(name)
+            .fetch_one(con)
+            .await
+            .unwrap();
 
-        match self.retrieve(&id.as_str().into()) {
-            Some(content) => Some((id.into(), content)),
+        match self.retrieve(&id.0.as_str().into()) {
+            Some(content) => Some((id.0.into(), content)),
             None => None,
         }
     }

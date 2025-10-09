@@ -1,7 +1,10 @@
 use std::{
     collections::HashSet,
     path::PathBuf,
-    sync::mpsc::{self, Receiver},
+    sync::{
+        mpsc::{self, Receiver},
+        Arc, Mutex,
+    },
     thread,
     time::Duration,
 };
@@ -10,11 +13,12 @@ use notify::{
     event::{CreateKind, ModifyKind, RemoveKind},
     Event, EventKind, RecursiveMode, Result, Watcher,
 };
+use sqlx::SqlitePool;
 
 use crate::{
     cache::OrgCacheEntry,
     server::AppState,
-    sqlite::{files::insert_file_tx, rebuild},
+    sqlite::{files::insert_file, rebuild},
     transform::org,
     ServerState,
 };
@@ -27,7 +31,10 @@ pub struct OrgWatcher {
 
 impl OrgWatcher {
     /// Processes file system events and updates the cache/database for changed org files
-    pub fn process_events(&mut self, state: &mut ServerState) -> anyhow::Result<Vec<PathBuf>> {
+    pub async fn process_events(
+        &mut self,
+        state: Arc<Mutex<ServerState>>,
+    ) -> anyhow::Result<Vec<PathBuf>> {
         // Collect all pending org file changes
         while let Ok(event_result) = self.receiver.try_recv() {
             if let Ok(event) = event_result {
@@ -35,7 +42,7 @@ impl OrgWatcher {
                     if self.is_org_file_event(&event.kind, &path) && path.exists() {
                         self.pending_files.insert(path);
                     } else if matches!(event.kind, EventKind::Remove(RemoveKind::File)) {
-                        self.handle_file_removal(state, &path)?;
+                        self.handle_file_removal(state.clone(), &path).await?;
                     }
                 }
             }
@@ -48,8 +55,13 @@ impl OrgWatcher {
         // Process all pending files
         let files_to_process: Vec<_> = self.pending_files.drain().collect();
         for file_path in &files_to_process {
-            if !state.dynamic_state.is_file_being_processed(file_path) {
-                self.process_file_change(state, file_path)?;
+            if !state
+                .lock()
+                .unwrap()
+                .dynamic_state
+                .is_file_being_processed(file_path)
+            {
+                self.process_file_change(state.clone(), file_path).await?;
             }
         }
 
@@ -65,90 +77,92 @@ impl OrgWatcher {
     }
 
     /// Rescans a file and updates the cache and database with new content
-    fn process_file_change(&self, state: &mut ServerState, path: &PathBuf) -> anyhow::Result<()> {
+    async fn process_file_change(
+        &self,
+        state: Arc<Mutex<ServerState>>,
+        path: &PathBuf,
+    ) -> anyhow::Result<()> {
         tracing::info!("Processing file change: {:?}", path);
 
-        // Clear dynamic state before processing
-        state.dynamic_state.updated_nodes.clear();
-        state.dynamic_state.updated_links.clear();
+        // Clear dynamic state before processing and get needed values
+        let (cache_path, sqlite) = {
+            let mut guard = state.lock().unwrap();
+            guard.dynamic_state.updated_nodes.clear();
+            guard.dynamic_state.updated_links.clear();
+            (guard.cache.path().to_path_buf(), guard.sqlite.clone())
+        };
 
         // Create new cache entry
-        let cache_entry = OrgCacheEntry::new(state.cache.path(), path)?;
-        let relative_path = path.strip_prefix(state.cache.path())?;
-
-        // Start database transaction for atomic operations
-        let mut sqlite = state.sqlite.lock().unwrap();
-        let tx = sqlite.transaction()?;
+        let cache_entry = OrgCacheEntry::new(&cache_path, path)?;
+        let relative_path = path.strip_prefix(&cache_path)?;
 
         // Remove existing data for this file (clean slate)
-        self.remove_file_data_tx(&tx, path)?;
+        self.remove_file_data(state.clone(), path).await?;
 
         // Update file hash in database
-        insert_file_tx(&tx, relative_path, cache_entry.get_hash())?;
-
-        // Commit transaction - if anything above failed, changes are rolled back
-        tx.commit()?;
+        insert_file(
+            &sqlite,
+            relative_path,
+            cache_entry.get_hash(),
+        )
+        .await?;
 
         // After successful database cleanup, extract and insert nodes with correct file association
-        let nodes = org::get_nodes(cache_entry.content());
-        self.insert_nodes_with_file(sqlite.connection(), nodes, relative_path)?;
+        let file_path_str = relative_path.to_string_lossy().to_string();
+        let nodes = org::get_nodes(cache_entry.content(), &file_path_str);
+        self.insert_nodes_with_file(&sqlite, nodes, relative_path)
+            .await?;
 
         // Invalidate cache to trigger refresh
-        state.cache.invalidate(path.clone());
+        state.lock().unwrap().cache.invalidate(path.clone());
 
         tracing::info!("File change processed successfully: {:?}", path);
         Ok(())
     }
 
     /// Handles org file deletion by cleaning up associated database entries
-    fn handle_file_removal(&self, state: &mut ServerState, path: &PathBuf) -> anyhow::Result<()> {
+    async fn handle_file_removal(
+        &self,
+        state: Arc<Mutex<ServerState>>,
+        path: &PathBuf,
+    ) -> anyhow::Result<()> {
         if path.extension().map(|ext| ext == "org").unwrap_or(false) {
             tracing::info!("Processing file removal: {:?}", path);
-            self.remove_file_data(state, path)?;
-            state.cache.invalidate(path.clone());
+            self.remove_file_data(state.clone(), path).await?;
+            state.lock().unwrap().cache.invalidate(path.clone());
         }
         Ok(())
     }
 
     /// Removes all database entries (links, nodes, files) associated with a file path
-    fn remove_file_data(&self, state: &mut ServerState, path: &PathBuf) -> anyhow::Result<()> {
-        let file_str = path.to_string_lossy();
-
-        let sqlite = state.sqlite.lock().unwrap();
-        // Remove links first, then nodes, then file entry
-        sqlite.execute(
-            "DELETE FROM links WHERE source IN (SELECT id FROM nodes WHERE file = ?1) OR dest IN (SELECT id FROM nodes WHERE file = ?1)",
-            [&file_str],
-        )?;
-        sqlite.execute("DELETE FROM nodes WHERE file = ?1", [&file_str])?;
-        sqlite.execute("DELETE FROM files WHERE file = ?1", [&file_str])?;
-
-        Ok(())
-    }
-
-    /// Transaction-aware version of remove_file_data
-    fn remove_file_data_tx(
+    async fn remove_file_data(
         &self,
-        tx: &rusqlite::Transaction,
+        state: Arc<Mutex<ServerState>>,
         path: &PathBuf,
     ) -> anyhow::Result<()> {
         let file_str = path.to_string_lossy();
+        let sqlite = state.lock().unwrap().sqlite.clone();
 
-        // Remove links first, then nodes, then file entry (within transaction)
-        tx.execute(
-            "DELETE FROM links WHERE source IN (SELECT id FROM nodes WHERE file = ?1) OR dest IN (SELECT id FROM nodes WHERE file = ?1)",
-            [&file_str],
-        )?;
-        tx.execute("DELETE FROM nodes WHERE file = ?1", [&file_str])?;
-        tx.execute("DELETE FROM files WHERE file = ?1", [&file_str])?;
+        // Remove links first, then nodes, then file entry
+        sqlx::query(
+            "DELETE FROM links WHERE source IN (SELECT id FROM nodes WHERE file = ?) OR dest IN (SELECT id FROM nodes WHERE file = ?)",
+        ).bind(&file_str).bind(&file_str).execute(&sqlite).await?;
+        sqlx::query("DELETE FROM nodes WHERE file = ?")
+            .bind(&file_str)
+            .execute(&sqlite)
+            .await?;
+        sqlx::query("DELETE FROM files WHERE file = ?")
+            .bind(file_str)
+            .execute(&sqlite)
+            .await?;
 
         Ok(())
     }
 
     /// Insert nodes with proper file association for watcher context
-    fn insert_nodes_with_file(
+    async fn insert_nodes_with_file(
         &self,
-        con: &mut rusqlite::Connection,
+        con: &SqlitePool,
         nodes: Vec<org::NodeFromOrg>,
         file_path: &std::path::Path,
     ) -> anyhow::Result<()> {
@@ -167,16 +181,22 @@ impl OrgWatcher {
                 "",
                 &node.title,
                 &node.actual_olp,
-            )?;
+            )
+            .await?;
 
             // Insert tags
             for tag in &node.tags {
-                rebuild::insert_tag(con, &node.uuid, tag)?;
+                rebuild::insert_tag(con, &node.uuid, tag).await?;
+            }
+
+            // Insert aliases
+            for alias in &node.aliases {
+                rebuild::insert_alias(con, &node.uuid, alias).await?;
             }
 
             // Insert links
             for (dest_id, _description) in &node.links {
-                rebuild::insert_link(con, &node.uuid, dest_id)?;
+                rebuild::insert_link(con, &node.uuid, dest_id).await?;
             }
         }
 
@@ -202,44 +222,43 @@ pub async fn start_watcher_runtime(app_state: AppState, watch_path: PathBuf) -> 
 
     tracing::info!("File watcher started for: {:?}", watch_path);
 
+    // Use tokio::task::spawn_blocking to run the watcher in a blocking thread
     tokio::task::spawn_blocking(move || {
+        // Create a tokio runtime for async operations within the blocking context
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        
         loop {
             thread::sleep(Duration::from_millis(500)); // Debounce
 
-            let _changed_files = {
-                let mut state_guard = match app_state.lock() {
-                    Ok(guard) => guard,
-                    Err(e) => {
-                        tracing::error!("Failed to acquire app state lock: {}", e);
-                        continue;
-                    }
-                };
-
-                let changed_files = match watcher.process_events(&mut state_guard) {
+            let changed_files = rt.block_on(async {
+                match watcher.process_events(app_state.clone()).await {
                     Ok(files) => files,
                     Err(e) => {
                         tracing::error!("Error processing watcher events: {}", e);
-                        continue;
+                        return Vec::new();
                     }
+                }
+            });
+
+            // If there are changes, notify all WebSocket clients
+            if !changed_files.is_empty() {
+                // Create a simple status update message
+                let update_message = crate::client::message::WebSocketMessage::StatusUpdate {
+                    files_changed: changed_files.len(),
                 };
 
-                // If there are changes, notify all WebSocket clients
-                if !changed_files.is_empty() {
-                    // Create a simple status update message
-                    let update_message = crate::client::message::WebSocketMessage::StatusUpdate {
-                        files_changed: changed_files.len(),
-                    };
-
-                    state_guard.broadcast_to_websockets(update_message);
-                    tracing::info!(
-                        "Notified {} WebSocket clients about {} file changes",
-                        state_guard.websocket_connections.len(),
-                        changed_files.len()
-                    );
-                }
-
-                changed_files
-            };
+                let websocket_count = {
+                    let mut state = app_state.lock().unwrap();
+                    state.broadcast_to_websockets(update_message);
+                    state.websocket_connections.len()
+                };
+                
+                tracing::info!(
+                    "Notified {} WebSocket clients about {} file changes",
+                    websocket_count,
+                    changed_files.len()
+                );
+            }
         }
     });
 
@@ -250,17 +269,16 @@ pub async fn start_watcher_runtime(app_state: AppState, watch_path: PathBuf) -> 
 mod tests {
     use super::*;
     use crate::config::Config;
-    use crate::{cache::OrgCache, sqlite::SqliteConnection, DynamicServerState};
+    use crate::{cache::OrgCache, DynamicServerState};
     use std::collections::HashMap;
-    use std::sync::Mutex;
     use std::{fs, path::Path};
     use tempfile::TempDir;
 
-    fn create_test_server_state(temp_dir: &Path) -> ServerState {
-        let sqlite = SqliteConnection::init(false).unwrap();
+    async fn create_test_server_state(temp_dir: &Path) -> ServerState {
+        let sqlite = SqlitePool::connect("sqlite::connect:").await.unwrap();
         ServerState {
             config: Config::default(),
-            sqlite: Mutex::new(sqlite),
+            sqlite: sqlite,
             cache: OrgCache::new(temp_dir.to_path_buf()),
             dynamic_state: DynamicServerState::default(),
             websocket_connections: HashMap::new(),
@@ -315,11 +333,11 @@ mod tests {
             let sqlite = state.sqlite.lock().unwrap();
             sqlite
                 .execute(
-                    "INSERT OR REPLACE INTO files (file, hash) VALUES (?1, 123)",
+                    "INSERT OR REPLACE INTO files (file, hash) VALUES (?, 123)",
                     [&file_str],
                 )
                 .unwrap();
-            sqlite.execute("INSERT OR REPLACE INTO nodes (id, title, file, level) VALUES ('test-id', 'Test', ?1, 1)", [&file_str]).unwrap();
+            sqlite.execute("INSERT OR REPLACE INTO nodes (id, title, file, level) VALUES ('test-id', 'Test', ?, 1)", [&file_str]).unwrap();
         }
 
         // Test removal
@@ -330,7 +348,7 @@ mod tests {
         let file_count: i32 = sqlite
             .connection()
             .query_row(
-                "SELECT COUNT(*) FROM files WHERE file = ?1",
+                "SELECT COUNT(*) FROM files WHERE file = ?",
                 [&file_str],
                 |row| row.get(0),
             )
@@ -340,7 +358,7 @@ mod tests {
         let node_count: i32 = sqlite
             .connection()
             .query_row(
-                "SELECT COUNT(*) FROM nodes WHERE file = ?1",
+                "SELECT COUNT(*) FROM nodes WHERE file = ?",
                 [&file_str],
                 |row| row.get(0),
             )

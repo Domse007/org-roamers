@@ -1,36 +1,26 @@
-use rusqlite::{params, Connection};
+use sqlx::SqlitePool;
 
-pub fn insert_olp(con: &mut Connection, owner_id: &str, olp: &[String]) -> anyhow::Result<()> {
+pub async fn insert_olp(con: &SqlitePool, owner_id: &str, olp: &[String]) -> anyhow::Result<()> {
     const STMNT: &str = concat!(
         "INSERT OR REPLACE INTO olp (node_id, position, segment)\n",
-        "VALUES (?1, ?2, ?3);"
+        "VALUES (?, ?, ?);"
     );
 
-    let mut stmnt = con.prepare(STMNT)?;
-
     for (i, elem) in olp.iter().enumerate() {
-        stmnt.execute(params![owner_id, i, elem])?;
+        sqlx::query(STMNT).bind(owner_id).bind(i as u32).bind(elem).execute(con).await?;
     }
 
     Ok(())
 }
 
-pub fn get_olp(con: &mut Connection, owner_id: &str) -> anyhow::Result<Vec<String>> {
+pub async fn get_olp(con: &SqlitePool, owner_id: &str) -> anyhow::Result<Vec<String>> {
     const STMNT: &str = concat!(
-        "SELECT node_id, position, segment FROM olp\n",
-        "WHERE node_id = ?1\n",
+        "SELECT segment FROM olp\n",
+        "WHERE node_id = ?\n",
         "ORDER BY position ASC;"
     );
 
-    let mut stmnt = con.prepare(STMNT)?;
-
-    let res = stmnt
-        .query_map(params![owner_id], |row| {
-            Ok(row.get_unwrap::<usize, String>(2))
-        })
-        .unwrap()
-        .map(Result::unwrap)
-        .collect();
-
-    Ok(res)
+    let olp: Vec<(String,)> = sqlx::query_as(STMNT).bind(owner_id).fetch_all(con).await?;
+    
+    Ok(olp.into_iter().map(|e| e.0).collect())
 }

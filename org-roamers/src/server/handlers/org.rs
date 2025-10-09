@@ -26,5 +26,7 @@ pub async fn get_org_as_html_handler(
         },
     };
 
-    org_service::get_org_as_html(app_state, query, scope).into_response()
+    org_service::get_org_as_html(app_state, query, scope)
+        .await
+        .into_response()
 }

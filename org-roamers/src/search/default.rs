@@ -1,5 +1,6 @@
 use anyhow::Result;
-use rusqlite::Connection;
+use futures_util::StreamExt;
+use sqlx::SqlitePool;
 
 use crate::{search::SearchResultSender, server::AppState, transform::title::TitleSanitizer};
 
@@ -26,43 +27,38 @@ impl<'a> ForNode<'a> {
         }
     }
 
-    fn search<F: Fn(&str) -> String>(
+    async fn search<F: Fn(&str) -> String>(
         &self,
-        con: &mut Connection,
+        con: &SqlitePool,
         sender: &mut SearchResultSender,
         title_sanitizer: F,
     ) -> anyhow::Result<()> {
         let param = format_search_param(&self.node_search);
-        let stmnt = "SELECT id, title FROM nodes WHERE LOWER(title) LIKE ?1";
-        let mut stmnt = con.prepare(stmnt)?;
-        let elements = stmnt
-            .query_map([param], |row| {
-                Ok((
-                    row.get::<usize, String>(0).unwrap(),
-                    row.get::<usize, String>(1).unwrap(),
-                ))
-            })?
-            .map(Result::unwrap);
+        // Search both node titles and aliases, using DISTINCT to avoid duplicates
+        let stmnt = r#"
+            SELECT DISTINCT n.id, n.title 
+            FROM nodes n
+            LEFT JOIN aliases a ON n.id = a.node_id
+            WHERE LOWER(n.title) LIKE ? OR LOWER(a.alias) LIKE ?
+        "#;
+        let elements: Vec<(String, String)> =
+            sqlx::query_as(stmnt).bind(&param).bind(&param).fetch_all(con).await?;
         if !self.tag_filters.is_empty() {
             for element in elements {
                 let to_query = &element.0;
-                let stmnt = "SELECT node_id, tag FROM tags WHERE node_id = ?1";
-                let mut stmnt = con.prepare(stmnt)?;
-                let mut tags = stmnt
-                    .query_map(rusqlite::params![to_query], |row| {
-                        Ok(row.get_unwrap::<usize, String>(1))
-                    })?
-                    .map(Result::unwrap);
-                let p = tags.any(|e| {
+                let stmnt = "SELECT node_id, tag FROM tags WHERE node_id = ?";
+                let tags: Vec<(String,)> =
+                    sqlx::query_as(stmnt).bind(to_query).fetch_all(con).await?;
+                let p = tags.iter().any(|e| {
                     self.tag_filters
                         .iter()
-                        .any(|f| f.to_lowercase() == e.to_lowercase())
+                        .any(|f| f.to_lowercase() == e.0.to_lowercase())
                 });
                 if p {
                     if let Err(err) = sender.send(
                         title_sanitizer(&element.1).into(),
                         element.0.into(),
-                        tags.collect(),
+                        tags.into_iter().map(|e| e.0).collect(),
                         None,
                     ) {
                         tracing::error!("Error sending: {err}");
@@ -72,22 +68,21 @@ impl<'a> ForNode<'a> {
         } else {
             for row in elements {
                 let to_query = &row.0;
-                let stmnt = "SELECT node_id, tag FROM tags WHERE node_id = ?1";
-                let mut stmnt = con.prepare(stmnt).unwrap();
-                let tags = stmnt
-                    .query_map(rusqlite::params![to_query], |row| {
-                        Ok(row.get_unwrap::<usize, String>(1))
-                    })
-                    .unwrap()
-                    .map(Result::unwrap)
-                    .collect();
+                let stmnt = "SELECT node_id, tag FROM tags WHERE node_id = ?";
+                let tags: Vec<(String,)> =
+                    sqlx::query_as(stmnt).bind(to_query).fetch_all(con).await?;
                 let title = if row.1.is_empty() {
                     tracing::error!("Title is empty: {:?}", row);
                     String::new()
                 } else {
                     title_sanitizer(&row.1)
                 };
-                if let Err(err) = sender.send(title.into(), row.0.into(), tags, None) {
+                if let Err(err) = sender.send(
+                    title.into(),
+                    row.0.into(),
+                    tags.into_iter().map(|e| e.0).collect(),
+                    None,
+                ) {
                     tracing::error!("Error sending: {err}");
                 };
             }
@@ -115,47 +110,33 @@ impl<'a> ForTag<'a> {
         Self { tag_search: search }
     }
 
-    fn search<F: Fn(&str) -> String>(
+    async fn search<F: Fn(&str) -> String>(
         &self,
-        con: &mut Connection,
+        con: &SqlitePool,
         sender: &mut SearchResultSender,
         title_sanitizer: F,
     ) -> anyhow::Result<()> {
         let params = format_tag_param(&self.tag_search);
-        let stmnt = format!(
-            "SELECT node_id, tag FROM tags WHERE LOWER(tag) IN {}",
-            params
-        );
-        let mut stmnt = con.prepare(stmnt.as_str())?;
-        let (ids, tags): (Vec<String>, Vec<String>) = stmnt
-            .query_map([], |row| {
-                Ok((
-                    row.get_unwrap::<usize, String>(0).to_lowercase(),
-                    row.get_unwrap::<usize, String>(1).to_lowercase(),
-                ))
-            })?
-            .map(Result::unwrap)
-            .unzip();
-        const STMNT: &str = "SELECT id, title FROM nodes WHERE id = ?1";
-        let mut stmnt = con.prepare(STMNT)?;
+        let stmnt = "SELECT node_id, tag FROM tags WHERE LOWER(tag) IN ?";
+        let (ids, tags): (Vec<String>, Vec<String>) = sqlx::query_as(stmnt)
+            .bind(params)
+            .fetch(con)
+            .map(|e| e.unwrap())
+            .unzip()
+            .await;
+        const STMNT: &str = "SELECT id, title FROM nodes WHERE id = ?";
         for id in ids {
             let tags = tags.clone();
-            let elem = stmnt
-                .query_map([id], |row| {
-                    let display: String = row.get_unwrap(1);
-                    Ok((
-                        title_sanitizer(&display[1..display.len() - 1]),
-                        row.get_unwrap::<usize, String>(0).into(),
-                        tags.clone(),
-                    ))
-                })?
-                .map(Result::unwrap)
-                .next();
-            if let Some((title, id, tags)) = elem {
-                if let Err(err) = sender.send(title.into(), id, tags, None) {
-                    tracing::error!("Error sending: {err}");
-                };
-            }
+            let (id, display): (String, String) =
+                sqlx::query_as(STMNT).bind(id).fetch_one(con).await?;
+            let (title, id, tags) = (
+                title_sanitizer(&display[1..display.len() - 1]),
+                id.into(),
+                tags.clone(),
+            );
+            if let Err(err) = sender.send(title.into(), id, tags, None) {
+                tracing::error!("Error sending: {err}");
+            };
         }
 
         Ok(())
@@ -204,15 +185,23 @@ impl<'a> Search<'a> {
         }
     }
 
-    pub fn search(&self, sender: &mut SearchResultSender, con: &mut Connection) -> Result<()> {
+    pub async fn search(&self, sender: &mut SearchResultSender, con: AppState) -> Result<()> {
         let title_sanitizer = |title: &str| {
             let sanitier = TitleSanitizer::new();
             sanitier.process(title)
         };
 
+        let sqlite = con.lock().unwrap().sqlite.clone();
+
         match self {
-            Self::ForNode(node) => node.search(con, sender, title_sanitizer),
-            Self::ForTag(tag) => tag.search(con, sender, title_sanitizer),
+            Self::ForNode(node) => {
+                node.search(&sqlite, sender, title_sanitizer)
+                    .await
+            }
+            Self::ForTag(tag) => {
+                tag.search(&sqlite, sender, title_sanitizer)
+                    .await
+            }
         }
     }
 }
@@ -235,16 +224,14 @@ impl DefaultSearch {
         let mut sender = self.sender.clone();
 
         // Wrap the blocking database operation in spawn_blocking
-        tokio::task::spawn_blocking(move || {
-            let mut state_guard = state.lock().unwrap();
-            let state = &mut *state_guard;
-            let mut sqlite_guard = state.sqlite.lock().unwrap();
-            let connection = sqlite_guard.connection();
-
+        tokio::spawn(async move {
             let search = Search::new(&query);
-            search.search(&mut sender, connection)
-        })
-        .await?
+            if let Err(e) = search.search(&mut sender, state).await {
+                tracing::error!("Search error: {e}");
+            }
+        });
+
+        Ok(())
     }
 }
 

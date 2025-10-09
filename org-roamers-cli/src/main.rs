@@ -25,7 +25,7 @@ async fn main() -> ExitCode {
     if let Some(cmd) = args.next() {
         match cmd.as_str() {
             "--server" => {
-                let state = match entry::init_state() {
+                let state = match entry::init_state().await {
                     Ok(state) => state,
                     Err(err) => {
                         tracing::error!("{err}");
@@ -37,7 +37,7 @@ async fn main() -> ExitCode {
                 tracing::info!("Successfully shut down runtime.");
             }
             "--dump-db" => {
-                let state = match entry::init_state() {
+                let state = match entry::init_state().await {
                     Ok(state) => state,
                     Err(err) => {
                         tracing::error!("{err}");

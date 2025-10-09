@@ -37,7 +37,7 @@ pub async fn start_server(ctx: &OrgRoamersGUI) -> anyhow::Result<()> {
     server_configuration.http_server_config.host = ctx.host().to_string();
     server_configuration.http_server_config.port = ctx.port()?;
 
-    let state = ServerState::new(server_configuration)?;
+    let state = ServerState::new(server_configuration).await?;
 
     org_roamers::start(state).await.unwrap();
 
