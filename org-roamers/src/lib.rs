@@ -169,96 +169,19 @@ pub async fn start(state: ServerState) -> anyhow::Result<()> {
         let app_state_clone = app_state.clone();
         let watch_path = org_roam_db_path.clone();
 
-        watcher::start_watcher_runtime(app_state_clone, watch_path).await.unwrap();
+        watcher::start_watcher_runtime(app_state_clone, watch_path)
+            .await
+            .unwrap();
 
         tracing::info!("File watcher enabled with concurrency conflict resolution");
     }
 
     let app = server::build_server(app_state.clone()).await;
-    
+
     tracing::info!("Server listening on {}", url);
     let listener = tokio::net::TcpListener::bind(&url).await.unwrap();
 
     axum::serve(listener, app).tcp_nodelay(true).await.unwrap();
 
     Ok(())
-}
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn test_file_processing_guard() {
-        // Create a mock server state
-        let temp_dir = std::env::temp_dir();
-        let sqlite = SqliteConnection::init(false).unwrap();
-        let server_state = ServerState {
-            config: Config::default(),
-            sqlite: Mutex::new(sqlite),
-            cache: OrgCache::new(temp_dir.clone()),
-            dynamic_state: DynamicServerState::default(),
-            websocket_connections: HashMap::new(),
-            next_connection_id: 1,
-        };
-
-        let app_state = Arc::new(Mutex::new((server_state, Arc::new(Mutex::new(false)))));
-        let test_file = temp_dir.join("test.org");
-
-        // Test that guard properly tracks files
-        {
-            let _guard = FileProcessingGuard::new(app_state.clone(), test_file.clone()).unwrap();
-
-            // Check that file is marked as being processed
-            let state = app_state.lock().unwrap();
-            assert!(state.0.dynamic_state.is_file_being_processed(&test_file));
-            drop(state); // Release lock before guard is dropped
-        } // Guard is dropped here
-
-        // Check that file is unmarked after guard is dropped
-        let state = app_state.lock().unwrap();
-        assert!(!state.0.dynamic_state.is_file_being_processed(&test_file));
-    }
-}
-
-/// RAII guard to automatically track file processing state
-/// When dropped, it will automatically unmark the file as being processed
-pub struct FileProcessingGuard {
-    app_state: Arc<Mutex<(ServerState, Arc<Mutex<bool>>)>>,
-    file_path: PathBuf,
-}
-
-impl FileProcessingGuard {
-    /// Create a new guard and mark the file as being processed
-    pub fn new(
-        app_state: Arc<Mutex<(ServerState, Arc<Mutex<bool>>)>>,
-        file_path: PathBuf,
-    ) -> anyhow::Result<Self> {
-        // Mark the file as being processed
-        {
-            let mut state = app_state
-                .lock()
-                .map_err(|e| anyhow::anyhow!("Failed to acquire lock: {}", e))?;
-            state
-                .0
-                .dynamic_state
-                .mark_file_processing(file_path.clone());
-        } // Lock is dropped here
-
-        Ok(FileProcessingGuard {
-            app_state,
-            file_path,
-        })
-    }
-}
-
-impl Drop for FileProcessingGuard {
-    fn drop(&mut self) {
-        if let Ok(mut state) = self.app_state.lock() {
-            state
-                .0
-                .dynamic_state
-                .unmark_file_processing(&self.file_path);
-        }
-    }
 }

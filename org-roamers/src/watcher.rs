@@ -100,12 +100,7 @@ impl OrgWatcher {
         self.remove_file_data(state.clone(), path).await?;
 
         // Update file hash in database
-        insert_file(
-            &sqlite,
-            relative_path,
-            cache_entry.get_hash(),
-        )
-        .await?;
+        insert_file(&sqlite, relative_path, cache_entry.get_hash()).await?;
 
         // After successful database cleanup, extract and insert nodes with correct file association
         let file_path_str = relative_path.to_string_lossy().to_string();
@@ -226,7 +221,7 @@ pub async fn start_watcher_runtime(app_state: AppState, watch_path: PathBuf) -> 
     tokio::task::spawn_blocking(move || {
         // Create a tokio runtime for async operations within the blocking context
         let rt = tokio::runtime::Runtime::new().unwrap();
-        
+
         loop {
             thread::sleep(Duration::from_millis(500)); // Debounce
 
@@ -252,7 +247,7 @@ pub async fn start_watcher_runtime(app_state: AppState, watch_path: PathBuf) -> 
                     state.broadcast_to_websockets(update_message);
                     state.websocket_connections.len()
                 };
-                
+
                 tracing::info!(
                     "Notified {} WebSocket clients about {} file changes",
                     websocket_count,
@@ -274,16 +269,17 @@ mod tests {
     use std::{fs, path::Path};
     use tempfile::TempDir;
 
-    async fn create_test_server_state(temp_dir: &Path) -> ServerState {
-        let sqlite = SqlitePool::connect("sqlite::connect:").await.unwrap();
-        ServerState {
+    async fn create_test_server_state(temp_dir: &Path) -> Arc<Mutex<ServerState>> {
+        let sqlite = crate::sqlite::init_db(false).await.unwrap();
+        let state = ServerState {
             config: Config::default(),
             sqlite: sqlite,
             cache: OrgCache::new(temp_dir.to_path_buf()),
             dynamic_state: DynamicServerState::default(),
             websocket_connections: HashMap::new(),
             next_connection_id: 1,
-        }
+        };
+        Arc::new(Mutex::new(state))
     }
 
     fn create_test_org_file(dir: &Path, name: &str, content: &str) -> PathBuf {
@@ -315,10 +311,10 @@ mod tests {
         assert!(!watcher.is_org_file_event(&EventKind::Remove(RemoveKind::File), &org_path));
     }
 
-    #[test]
-    fn test_remove_file_data() {
+    #[tokio::test]
+    async fn test_remove_file_data() {
         let temp_dir = TempDir::new().unwrap();
-        let mut state = create_test_server_state(temp_dir.path());
+        let state = create_test_server_state(temp_dir.path()).await;
 
         let watcher = OrgWatcher {
             receiver: mpsc::channel().1,
@@ -330,46 +326,41 @@ mod tests {
         // Insert some test data
         let file_str = test_file.to_string_lossy();
         {
-            let sqlite = state.sqlite.lock().unwrap();
-            sqlite
-                .execute(
-                    "INSERT OR REPLACE INTO files (file, hash) VALUES (?, 123)",
-                    [&file_str],
-                )
+            sqlx::query("INSERT OR REPLACE INTO files (file, hash) VALUES (?, 123)")
+                .bind(&file_str)
+                .execute(&state.lock().unwrap().sqlite)
+                .await
                 .unwrap();
-            sqlite.execute("INSERT OR REPLACE INTO nodes (id, title, file, level) VALUES ('test-id', 'Test', ?, 1)", [&file_str]).unwrap();
+            sqlx::query("INSERT OR REPLACE INTO nodes (id, title, file, level) VALUES ('test-id', 'Test', ?, 1)")
+                .bind(&file_str).execute(&state.lock().unwrap().sqlite).await.unwrap();
         }
 
         // Test removal
-        watcher.remove_file_data(&mut state, &test_file).unwrap();
+        watcher
+            .remove_file_data(state.clone(), &test_file)
+            .await
+            .unwrap();
 
         // Verify data was removed
-        let mut sqlite = state.sqlite.lock().unwrap();
-        let file_count: i32 = sqlite
-            .connection()
-            .query_row(
-                "SELECT COUNT(*) FROM files WHERE file = ?",
-                [&file_str],
-                |row| row.get(0),
-            )
+        let file_count: i32 = sqlx::query_scalar("SELECT COUNT(*) FROM files WHERE file = ?")
+            .bind(&file_str)
+            .fetch_one(&state.lock().unwrap().sqlite)
+            .await
             .unwrap();
         assert_eq!(file_count, 0);
 
-        let node_count: i32 = sqlite
-            .connection()
-            .query_row(
-                "SELECT COUNT(*) FROM nodes WHERE file = ?",
-                [&file_str],
-                |row| row.get(0),
-            )
+        let node_count: i32 = sqlx::query_scalar("SELECT COUNT(*) FROM nodes WHERE file = ?")
+            .bind(file_str)
+            .fetch_one(&state.lock().unwrap().sqlite)
+            .await
             .unwrap();
         assert_eq!(node_count, 0);
     }
 
-    #[test]
-    fn test_handle_file_removal() {
+    #[tokio::test]
+    async fn test_handle_file_removal() {
         let temp_dir = TempDir::new().unwrap();
-        let mut state = create_test_server_state(temp_dir.path());
+        let state = create_test_server_state(temp_dir.path()).await;
 
         let watcher = OrgWatcher {
             receiver: mpsc::channel().1,
@@ -380,16 +371,19 @@ mod tests {
         let txt_file = temp_dir.path().join("test.txt");
 
         // Test org file removal
-        watcher.handle_file_removal(&mut state, &org_file).unwrap();
+        watcher
+            .handle_file_removal(state.clone(), &org_file)
+            .await
+            .unwrap();
 
         // Test non-org file removal (should not error)
-        watcher.handle_file_removal(&mut state, &txt_file).unwrap();
+        watcher.handle_file_removal(state, &txt_file).await.unwrap();
     }
 
-    #[test]
-    fn test_process_file_change() {
+    #[tokio::test]
+    async fn test_process_file_change() {
         let temp_dir = TempDir::new().unwrap();
-        let mut state = create_test_server_state(temp_dir.path());
+        let state = create_test_server_state(temp_dir.path()).await;
 
         let watcher = OrgWatcher {
             receiver: mpsc::channel().1,
@@ -407,18 +401,17 @@ This is test content.
         let org_file = create_test_org_file(temp_dir.path(), "test.org", org_content);
 
         // Process the file change
-        watcher.process_file_change(&mut state, &org_file).unwrap();
+        watcher
+            .process_file_change(state.clone(), &org_file)
+            .await
+            .unwrap();
 
         // Verify file was processed (check if nodes were inserted)
-        let mut sqlite = state.sqlite.lock().unwrap();
-        let node_count: i32 = sqlite
-            .connection()
-            .query_row(
-                "SELECT COUNT(*) FROM nodes WHERE id = 'test-id-123'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
+        let node_count: i32 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM nodes WHERE id = 'test-id-123'")
+                .fetch_one(&state.lock().unwrap().sqlite)
+                .await
+                .unwrap();
         assert_eq!(node_count, 1);
     }
 
@@ -436,10 +429,10 @@ This is test content.
         assert!(bad_watcher_result.is_err());
     }
 
-    #[test]
-    fn test_path_handling_cross_platform() {
+    #[tokio::test]
+    async fn test_path_handling_cross_platform() {
         let temp_dir = TempDir::new().unwrap();
-        let mut state = create_test_server_state(temp_dir.path());
+        let state = create_test_server_state(temp_dir.path()).await;
 
         let watcher = OrgWatcher {
             receiver: mpsc::channel().1,
@@ -454,26 +447,21 @@ This is test content.
         );
 
         // This should work regardless of path separator differences
-        let result = watcher.process_file_change(&mut state, &org_file);
+        let result = watcher.process_file_change(state.clone(), &org_file).await;
         assert!(result.is_ok());
 
         // Verify the file path is handled correctly in database
-        let mut sqlite = state.sqlite.lock().unwrap();
-        let count: i32 = sqlite
-            .connection()
-            .query_row(
-                "SELECT COUNT(*) FROM nodes WHERE id = 'test-123'",
-                [],
-                |row| row.get(0),
-            )
+        let count: i32 = sqlx::query_scalar("SELECT COUNT(*) FROM nodes WHERE id = 'test-123'")
+            .fetch_one(&state.lock().unwrap().sqlite)
+            .await
             .unwrap();
         assert_eq!(count, 1);
     }
 
-    #[test]
-    fn test_transaction_safety() {
+    #[tokio::test]
+    async fn test_transaction_safety() {
         let temp_dir = TempDir::new().unwrap();
-        let mut state = create_test_server_state(temp_dir.path());
+        let state = create_test_server_state(temp_dir.path()).await;
 
         let watcher = OrgWatcher {
             receiver: mpsc::channel().1,
@@ -485,46 +473,31 @@ This is test content.
         let org_file = create_test_org_file(temp_dir.path(), "test.org", org_content);
 
         // Initial insert should work
-        watcher.process_file_change(&mut state, &org_file).unwrap();
+        watcher
+            .process_file_change(state.clone(), &org_file)
+            .await
+            .unwrap();
 
         // Verify initial data exists
         {
-            let mut sqlite = state.sqlite.lock().unwrap();
-            let initial_count: i32 = sqlite
-                .connection()
-                .query_row(
-                    "SELECT COUNT(*) FROM nodes WHERE id = 'test-node'",
-                    [],
-                    |row| row.get(0),
-                )
-                .unwrap();
+            let initial_count: i32 =
+                sqlx::query_scalar("SELECT COUNT(*) FROM nodes WHERE id = 'test-node'")
+                    .fetch_one(&state.lock().unwrap().sqlite)
+                    .await
+                    .unwrap();
             assert_eq!(initial_count, 1);
 
             // Debug: check what file path is in the database
-            let files_in_db: Vec<String> = {
-                let mut stmt = sqlite
-                    .connection()
-                    .prepare("SELECT file FROM files")
-                    .unwrap();
-                stmt.query_map([], |row| row.get::<usize, String>(0))
-                    .unwrap()
-                    .collect::<std::result::Result<Vec<_>, rusqlite::Error>>()
-                    .unwrap()
-            };
+            let files_in_db: Vec<String> = sqlx::query_scalar("SELECT file FROM files")
+                .fetch_all(&state.lock().unwrap().sqlite)
+                .await
+                .unwrap();
             tracing::info!("Files in database: {:?}", files_in_db);
 
-            let nodes_in_db: Vec<(String, String)> = {
-                let mut stmt = sqlite
-                    .connection()
-                    .prepare("SELECT id, file FROM nodes")
-                    .unwrap();
-                stmt.query_map([], |row| {
-                    Ok((row.get::<usize, String>(0)?, row.get::<usize, String>(1)?))
-                })
-                .unwrap()
-                .collect::<std::result::Result<Vec<_>, rusqlite::Error>>()
-                .unwrap()
-            };
+            let nodes_in_db: Vec<(String, String)> = sqlx::query_as("SELECT id, file FROM nodes")
+                .fetch_all(&state.lock().unwrap().sqlite)
+                .await
+                .unwrap();
             tracing::info!("Nodes in database: {:?}", nodes_in_db);
         }
 
@@ -535,19 +508,16 @@ This is test content.
             .to_path_buf();
         tracing::info!("Attempting to remove file: {:?}", org_file_relative);
         watcher
-            .remove_file_data(&mut state, &org_file_relative)
+            .remove_file_data(state.clone(), &org_file_relative)
+            .await
             .unwrap();
 
         // Verify node was removed
-        let mut sqlite = state.sqlite.lock().unwrap();
-        let after_remove_count: i32 = sqlite
-            .connection()
-            .query_row(
-                "SELECT COUNT(*) FROM nodes WHERE id = 'test-node'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
+        let after_remove_count: i32 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM nodes WHERE id = 'test-node'")
+                .fetch_one(&state.lock().unwrap().sqlite)
+                .await
+                .unwrap();
         assert_eq!(after_remove_count, 0);
     }
 }
