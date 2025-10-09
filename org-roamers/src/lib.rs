@@ -22,13 +22,9 @@ mod sqlite;
 mod transform;
 mod watcher;
 
-use server::types::RoamID;
-use server::types::RoamLink;
-use server::types::RoamNode;
 use sqlx::SqlitePool;
 
-use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 
@@ -36,65 +32,10 @@ use crate::cache::OrgCache;
 use crate::client::message::WebSocketMessage;
 use crate::config::Config;
 
-#[derive(Default, Debug)]
-pub struct DynamicServerState {
-    pub working_id: Option<(RoamID, Option<RoamID>)>,
-    pub pending_reload: bool,
-    pub updated_links: Vec<RoamLink>,
-    pub updated_nodes: Vec<RoamNode>,
-    /// Track files currently being processed to avoid watcher conflicts
-    pub files_being_processed: HashSet<PathBuf>,
-}
-
-impl DynamicServerState {
-    pub fn update_working_id(&mut self, new_id: RoamID) {
-        match &mut self.working_id {
-            Some(working_id) => {
-                working_id.1 = Some(working_id.0.clone());
-                working_id.0 = new_id;
-            }
-            None => self.working_id = Some((new_id, None)),
-        }
-    }
-
-    pub fn get_working_id(&mut self) -> Option<&RoamID> {
-        match &mut self.working_id {
-            Some((ref current, ref mut last)) => match last {
-                Some(last) if *last == *current => None,
-                Some(last) => {
-                    *last = current.clone();
-                    Some(current)
-                }
-                None => {
-                    *last = Some(current.clone());
-                    Some(current)
-                }
-            },
-            None => None,
-        }
-    }
-
-    /// Mark a file as being processed to avoid watcher conflicts
-    pub fn mark_file_processing(&mut self, file_path: PathBuf) {
-        self.files_being_processed.insert(file_path);
-    }
-
-    /// Unmark a file as being processed
-    pub fn unmark_file_processing(&mut self, file_path: &PathBuf) {
-        self.files_being_processed.remove(file_path);
-    }
-
-    /// Check if a file is currently being processed
-    pub fn is_file_being_processed(&self, file_path: &PathBuf) -> bool {
-        self.files_being_processed.contains(file_path)
-    }
-}
-
 pub struct ServerState {
     pub config: Config,
     pub sqlite: SqlitePool,
     pub cache: OrgCache,
-    pub dynamic_state: DynamicServerState,
     pub websocket_connections: HashMap<u64, mpsc::UnboundedSender<WebSocketMessage>>,
     pub next_connection_id: u64,
 }
@@ -111,7 +52,6 @@ impl ServerState {
             sqlite: sqlite_con,
             cache: org_cache,
             config: conf,
-            dynamic_state: DynamicServerState::default(),
             websocket_connections: HashMap::new(),
             next_connection_id: 1,
         })
@@ -173,7 +113,7 @@ pub async fn start(state: ServerState) -> anyhow::Result<()> {
             .await
             .unwrap();
 
-        tracing::info!("File watcher enabled with concurrency conflict resolution");
+        tracing::info!("File watcher enabled");
     }
 
     let app = server::build_server(app_state.clone()).await;

@@ -24,9 +24,6 @@ pub async fn emacs_handler(
             match req {
                 EmacsRequest::BufferOpened(id) => {
                     let roam_id: RoamID = id.clone().into();
-                    server_state
-                        .dynamic_state
-                        .update_working_id(roam_id.clone());
 
                     // Notify all WebSocket clients about node visit
                     let message =

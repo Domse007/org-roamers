@@ -55,14 +55,7 @@ impl OrgWatcher {
         // Process all pending files
         let files_to_process: Vec<_> = self.pending_files.drain().collect();
         for file_path in &files_to_process {
-            if !state
-                .lock()
-                .unwrap()
-                .dynamic_state
-                .is_file_being_processed(file_path)
-            {
-                self.process_file_change(state.clone(), file_path).await?;
-            }
+            self.process_file_change(state.clone(), file_path).await?;
         }
 
         Ok(files_to_process)
@@ -86,9 +79,7 @@ impl OrgWatcher {
 
         // Clear dynamic state before processing and get needed values
         let (cache_path, sqlite) = {
-            let mut guard = state.lock().unwrap();
-            guard.dynamic_state.updated_nodes.clear();
-            guard.dynamic_state.updated_links.clear();
+            let guard = state.lock().unwrap();
             (guard.cache.path().to_path_buf(), guard.sqlite.clone())
         };
 
@@ -264,7 +255,7 @@ pub async fn start_watcher_runtime(app_state: AppState, watch_path: PathBuf) -> 
 mod tests {
     use super::*;
     use crate::config::Config;
-    use crate::{cache::OrgCache, DynamicServerState};
+    use crate::cache::OrgCache;
     use std::collections::HashMap;
     use std::{fs, path::Path};
     use tempfile::TempDir;
@@ -275,7 +266,6 @@ mod tests {
             config: Config::default(),
             sqlite: sqlite,
             cache: OrgCache::new(temp_dir.to_path_buf()),
-            dynamic_state: DynamicServerState::default(),
             websocket_connections: HashMap::new(),
             next_connection_id: 1,
         };
