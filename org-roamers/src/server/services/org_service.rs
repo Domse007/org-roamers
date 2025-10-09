@@ -19,7 +19,7 @@ pub async fn get_org_as_html(
     // Get data from cache and extract needed values
     let (id, content, path, config, sqlite) = {
         let sqlite_pool = app_state.lock().unwrap().sqlite.clone();
-        
+
         let (id, content, path) = match &query {
             Query::ByTitle(title) => {
                 let stmnt = r#"
@@ -31,19 +31,27 @@ pub async fn get_org_as_html(
                     .fetch_one(&sqlite_pool)
                     .await
                     .unwrap();
-                
+
                 let state = app_state.lock().unwrap();
                 let id: RoamID = id_str.into();
                 let cache_entry = state.cache.retrieve(&id).unwrap();
-                (id, cache_entry.content().to_string(), cache_entry.path().to_path_buf())
-            },
+                (
+                    id,
+                    cache_entry.content().to_string(),
+                    cache_entry.path().to_path_buf(),
+                )
+            }
             Query::ById(id) => {
                 let state = app_state.lock().unwrap();
                 let cache_entry = state.cache.retrieve(&id).unwrap();
-                (id.clone(), cache_entry.content().to_string(), cache_entry.path().to_path_buf())
-            },
+                (
+                    id.clone(),
+                    cache_entry.content().to_string(),
+                    cache_entry.path().to_path_buf(),
+                )
+            }
         };
-        
+
         let state = app_state.lock().unwrap();
         let config = state.config.clone();
         (id, content, path, config, sqlite_pool)

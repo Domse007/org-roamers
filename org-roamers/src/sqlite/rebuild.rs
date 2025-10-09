@@ -30,7 +30,7 @@ pub async fn insert_node(
         .bind(scheduled)
         .bind(deadline)
         .bind(title)
-        .bind(Option::<String>::None)  // properties - not currently used
+        .bind(Option::<String>::None) // properties - not currently used
         .execute(con)
         .await?;
 

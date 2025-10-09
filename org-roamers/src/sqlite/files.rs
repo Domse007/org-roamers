@@ -24,6 +24,6 @@ pub async fn insert_file<P: AsRef<Path>>(
         .bind(hash)
         .execute(con)
         .await?;
-    
+
     Ok(())
 }

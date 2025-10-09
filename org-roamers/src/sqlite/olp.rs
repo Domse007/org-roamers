@@ -7,7 +7,12 @@ pub async fn insert_olp(con: &SqlitePool, owner_id: &str, olp: &[String]) -> any
     );
 
     for (i, elem) in olp.iter().enumerate() {
-        sqlx::query(STMNT).bind(owner_id).bind(i as u32).bind(elem).execute(con).await?;
+        sqlx::query(STMNT)
+            .bind(owner_id)
+            .bind(i as u32)
+            .bind(elem)
+            .execute(con)
+            .await?;
     }
 
     Ok(())
@@ -21,6 +26,6 @@ pub async fn get_olp(con: &SqlitePool, owner_id: &str) -> anyhow::Result<Vec<Str
     );
 
     let olp: Vec<(String,)> = sqlx::query_as(STMNT).bind(owner_id).fetch_all(con).await?;
-    
+
     Ok(olp.into_iter().map(|e| e.0).collect())
 }

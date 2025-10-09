@@ -106,7 +106,6 @@ impl OrgRoamersGUI {
 
     pub fn host(&self) -> &str {
         self.settings.ip_addr.as_str()
-
     }
 
     pub fn url_with_protocol(&self) -> anyhow::Result<String> {

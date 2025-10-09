@@ -41,8 +41,11 @@ impl<'a> ForNode<'a> {
             LEFT JOIN aliases a ON n.id = a.node_id
             WHERE LOWER(n.title) LIKE ? OR LOWER(a.alias) LIKE ?
         "#;
-        let elements: Vec<(String, String)> =
-            sqlx::query_as(stmnt).bind(&param).bind(&param).fetch_all(con).await?;
+        let elements: Vec<(String, String)> = sqlx::query_as(stmnt)
+            .bind(&param)
+            .bind(&param)
+            .fetch_all(con)
+            .await?;
         if !self.tag_filters.is_empty() {
             for element in elements {
                 let to_query = &element.0;
@@ -194,14 +197,8 @@ impl<'a> Search<'a> {
         let sqlite = con.lock().unwrap().sqlite.clone();
 
         match self {
-            Self::ForNode(node) => {
-                node.search(&sqlite, sender, title_sanitizer)
-                    .await
-            }
-            Self::ForTag(tag) => {
-                tag.search(&sqlite, sender, title_sanitizer)
-                    .await
-            }
+            Self::ForNode(node) => node.search(&sqlite, sender, title_sanitizer).await,
+            Self::ForTag(tag) => tag.search(&sqlite, sender, title_sanitizer).await,
         }
     }
 }

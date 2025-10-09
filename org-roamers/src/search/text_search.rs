@@ -55,7 +55,9 @@ impl FullTextSeach {
             // Collect cache entries and clone sqlite pool before any async operations
             let (cache_entries, sqlite) = {
                 let state = state.lock().unwrap();
-                let cache_entries: Vec<_> = state.cache.iter()
+                let cache_entries: Vec<_> = state
+                    .cache
+                    .iter()
                     .map(|(k, v)| (k.clone(), v.content().to_string()))
                     .collect();
                 (cache_entries, state.sqlite.clone())
@@ -66,8 +68,7 @@ impl FullTextSeach {
                     return;
                 }
 
-                if let Some((score, _index_types)) = matcher.fuzzy_indices(&content, &query)
-                {
+                if let Some((score, _index_types)) = matcher.fuzzy_indices(&content, &query) {
                     if score >= THRESHOLD {
                         let (title, id): (String, String) = match sqlx::query_as(NODE_STMNT)
                             .bind(key.id())

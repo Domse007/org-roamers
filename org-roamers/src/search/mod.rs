@@ -123,13 +123,13 @@ impl SearchProviderList {
 
     pub async fn feed(&mut self, state: AppState, f: Feeder) {
         let mut tasks = vec![];
-        
+
         // We need to extract providers to spawn them in separate tasks
         // Since we can't easily do that with mutable references, we'll spawn tasks directly
         for provider in &mut self.providers {
             let state_clone = state.clone();
             let query = f.s.clone();
-            
+
             // Spawn each provider's feed as a separate task
             let task = match provider {
                 SearchProvider::DefaultSearch(ds) => {
@@ -144,19 +144,22 @@ impl SearchProviderList {
                     let sender = fts.sender.clone();
                     let cancel_token = fts.cancel_token.clone();
                     tokio::spawn(async move {
-                        let mut fts = FullTextSeach { sender, cancel_token };
+                        let mut fts = FullTextSeach {
+                            sender,
+                            cancel_token,
+                        };
                         fts.feed(state_clone, &Feeder::new(query)).await
                     })
                 }
             };
-            
+
             tasks.push(task);
         }
-        
+
         // Wait for all tasks to complete
         for task in tasks {
             match task.await {
-                Ok(Ok(_)) => {},
+                Ok(Ok(_)) => {}
                 Ok(Err(err)) => tracing::error!("Search provider failed: {err}"),
                 Err(err) => tracing::error!("Search provider task panicked: {err}"),
             }

@@ -74,7 +74,11 @@ pub async fn insert_nodes(con: &SqlitePool, nodes: Vec<NodeFromOrg>) {
                 }
             }
             Err(err) => {
-                tracing::error!("Failed to insert node {}: {} - skipping tags, aliases, and links", node.uuid, err);
+                tracing::error!(
+                    "Failed to insert node {}: {} - skipping tags, aliases, and links",
+                    node.uuid,
+                    err
+                );
             }
         }
     }

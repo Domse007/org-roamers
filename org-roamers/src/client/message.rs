@@ -138,7 +138,7 @@ impl WebSocketMessage {
         client.current_request_id = Some(request_id.to_string());
 
         tracing::info!("Starting search providers (took {:?})", start.elapsed());
-        
+
         // Start the search (non-blocking)
         searcher_providers
             .feed(app_state, Feeder::new(query.to_string()))
