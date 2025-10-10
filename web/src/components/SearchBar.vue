@@ -565,8 +565,10 @@ defineExpose<SearchBarMethods>({
 /* Responsive design */
 @media (max-width: 768px) {
   .search-wrapper {
-    width: min(350px, 90vw);
+    width: calc(100vw - 24px); /* Full width with 12px margin on each side */
     top: 8px;
+    right: 12px;
+    z-index: 55; /* Higher than preview frame (50) on mobile */
   }
 
   .search-input {
@@ -580,12 +582,6 @@ defineExpose<SearchBarMethods>({
 
   .search-clear {
     right: 4px;
-  }
-}
-
-@media (max-width: 480px) {
-  .search-wrapper {
-    width: min(320px, 95vw);
   }
 }
 </style>

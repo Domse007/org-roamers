@@ -283,7 +283,7 @@ const emit = defineEmits(["previewSwitch", "error"]);
   >
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
       <path
-        d="M6 3L11 8L6 13"
+        d="M10 3L5 8L10 13"
         stroke="currentColor"
         stroke-width="1.5"
         stroke-linecap="round"
@@ -309,7 +309,6 @@ const emit = defineEmits(["previewSwitch", "error"]);
         stroke-width="1.5"
         stroke-linecap="round"
         stroke-linejoin="round"
-        transform="rotate(180 8 8)"
       />
     </svg>
   </button>
@@ -422,6 +421,21 @@ const emit = defineEmits(["previewSwitch", "error"]);
               />
             </svg>
           </button>
+
+          <button
+            class="preview-control-button preview-close-button-mobile"
+            @click="resize"
+            title="Close preview"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path
+                d="M2 2L12 12M12 2L2 12"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+              />
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -453,8 +467,8 @@ const emit = defineEmits(["previewSwitch", "error"]);
 <style scoped>
 .preview-toggle-button-floating {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 12px;
+  right: 12px;
   width: 36px;
   height: 36px;
   border: none;
@@ -491,7 +505,7 @@ const emit = defineEmits(["previewSwitch", "error"]);
 
 .preview-toggle-button-attached {
   position: absolute;
-  top: 8px;
+  top: 12px;
   width: 36px;
   height: 36px;
   border: none;
@@ -527,9 +541,9 @@ const emit = defineEmits(["previewSwitch", "error"]);
 
 .org-preview-outerframe {
   position: absolute;
-  right: 8px;
-  top: 8px;
-  bottom: 8px;
+  right: 12px;
+  top: 12px;
+  bottom: 12px;
   z-index: 50;
   display: flex;
   background: linear-gradient(
@@ -665,25 +679,30 @@ const emit = defineEmits(["previewSwitch", "error"]);
   background: color-mix(in srgb, var(--text) 50%, transparent);
 }
 
+/* Hide mobile close button on desktop */
+.preview-close-button-mobile {
+  display: none;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
   .org-preview-outerframe {
-    right: 4px;
-    top: 4px;
-    bottom: 4px;
+    width: calc(100vw - 24px) !important; /* Full width with 12px margin on each side */
+    right: 12px;
+    left: 12px;
+    top: 56px; /* Below the search bar */
+    bottom: 12px;
   }
 
-  .preview-toggle-button-floating {
-    top: 4px;
-    right: 4px;
-    width: 32px;
-    height: 32px;
-  }
-
+  /* Hide the floating and attached toggle buttons on mobile */
+  .preview-toggle-button-floating,
   .preview-toggle-button-attached {
-    top: 4px;
-    width: 32px;
-    height: 32px;
+    display: none;
+  }
+
+  /* Show the close button in the header on mobile */
+  .preview-close-button-mobile {
+    display: flex;
   }
 
   .preview-header {
@@ -701,6 +720,11 @@ const emit = defineEmits(["previewSwitch", "error"]);
 
   .org-preview-content {
     padding: 12px;
+  }
+
+  /* Disable resize on mobile */
+  .resize-handle {
+    display: none;
   }
 }
 </style>
@@ -754,6 +778,7 @@ const emit = defineEmits(["previewSwitch", "error"]);
   border: none;
   border-radius: 6px;
   border-left: 4px solid var(--highlight-2);
+  border-right: 4px solid var(--highlight-2);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   color: var(--highlight);
 }

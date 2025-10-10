@@ -49,14 +49,16 @@ const props = defineProps<{
     aria-label="Open Settings"
     title="Settings"
   >
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-      <path
-        d="M10 6.5C8.067 6.5 6.5 8.067 6.5 10S8.067 13.5 10 13.5S13.5 11.933 13.5 10S11.933 6.5 10 6.5Z"
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <circle
+        cx="12"
+        cy="12"
+        r="3"
         stroke="currentColor"
         stroke-width="1.5"
       />
       <path
-        d="M8.5 1.5H11.5L12 3.5C12.5 3.7 13 3.9 13.4 4.2L15.5 3.5L17 6L15.3 7.3C15.4 7.7 15.4 8.3 15.3 8.7L17 10L15.5 12.5L13.4 11.8C13 12.1 12.5 12.3 12 12.5L11.5 14.5H8.5L8 12.5C7.5 12.3 7 12.1 6.6 11.8L4.5 12.5L3 10L4.7 8.7C4.6 8.3 4.6 7.7 4.7 7.3L3 6L4.5 3.5L6.6 4.2C7 3.9 7.5 3.7 8 3.5L8.5 1.5Z"
+        d="M10.5 4.5H13.5L14 7C14.6 7.2 15.2 7.5 15.7 7.9L18 7L19.5 9.5L17.5 11C17.6 11.7 17.6 12.3 17.5 13L19.5 14.5L18 17L15.7 16.1C15.2 16.5 14.6 16.8 14 17L13.5 19.5H10.5L10 17C9.4 16.8 8.8 16.5 8.3 16.1L6 17L4.5 14.5L6.5 13C6.4 12.3 6.4 11.7 6.5 11L4.5 9.5L6 7L8.3 7.9C8.8 7.5 9.4 7.2 10 7L10.5 4.5Z"
         stroke="currentColor"
         stroke-width="1.5"
         stroke-linejoin="round"
@@ -190,8 +192,8 @@ const props = defineProps<{
 <style scoped>
 .settings-open-button {
   position: absolute;
-  bottom: 8px;
-  left: 8px;
+  bottom: 12px;
+  left: 12px;
   width: 44px;
   height: 44px;
   border: none;
@@ -201,7 +203,7 @@ const props = defineProps<{
     var(--clickable),
     color-mix(in srgb, var(--clickable) 80%, black)
   );
-  color: var(--base);
+  color: var(--surface);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -209,15 +211,17 @@ const props = defineProps<{
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
   transition: all 0.15s ease;
   z-index: 60;
+  border: 1px solid color-mix(in srgb, var(--clickable) 120%, white);
 }
 
 .settings-open-button:hover {
   background: linear-gradient(
     135deg,
-    color-mix(in srgb, var(--clickable) 110%, white),
-    color-mix(in srgb, var(--clickable) 90%, black)
+    color-mix(in srgb, var(--clickable) 90%, white),
+    var(--clickable)
   );
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+  border-color: color-mix(in srgb, var(--clickable) 80%, white);
 }
 
 .settings-open-button:active {
@@ -226,8 +230,8 @@ const props = defineProps<{
 
 .settings-pane {
   position: absolute;
-  bottom: 8px;
-  left: 8px;
+  bottom: 12px;
+  left: 12px;
   width: min(680px, 90vw);
   height: min(500px, 75vh);
   background: linear-gradient(
@@ -243,6 +247,8 @@ const props = defineProps<{
   backdrop-filter: blur(8px);
   overflow: hidden;
   z-index: 55;
+  display: flex;
+  flex-direction: column;
 }
 
 .settings-header {
@@ -256,6 +262,7 @@ const props = defineProps<{
     color-mix(in srgb, var(--surface) 98%, var(--highlight)),
     color-mix(in srgb, var(--surface) 95%, var(--base))
   );
+  flex-shrink: 0;
 }
 
 .settings-title {
@@ -295,7 +302,9 @@ const props = defineProps<{
 
 .settings-content {
   display: flex;
-  height: calc(100% - 60px);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .settings-tabs {
@@ -310,7 +319,7 @@ const props = defineProps<{
   border-right: 1px solid color-mix(in srgb, var(--highlight) 25%, transparent);
   padding: 6px;
   gap: 2px;
-  height: 100%;
+  flex-shrink: 0;
 }
 
 .settings-tab {
@@ -386,7 +395,8 @@ const props = defineProps<{
   padding: 0;
   overflow-y: auto;
   background: var(--surface);
-  height: 100%;
+  min-height: 0;
+  min-width: 0;
 }
 
 /* Scrollbar styling for settings panel */
@@ -411,9 +421,23 @@ const props = defineProps<{
 
 /* Responsive design */
 @media (max-width: 768px) {
+  /* Bottom sheet modal on mobile */
   .settings-pane {
-    width: min(580px, 95vw);
-    height: min(450px, 80vh);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 90vh;
+    border-radius: 12px 12px 0 0;
+    border-bottom: none;
+    z-index: 40; /* Behind preview frame (50) */
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
+  }
+
+  .settings-open-button {
+    bottom: 12px;
+    left: 12px;
+    z-index: 40; /* Behind preview frame (50) */
   }
 
   .settings-header {
@@ -437,8 +461,7 @@ const props = defineProps<{
 
 @media (max-width: 600px) {
   .settings-pane {
-    width: min(500px, 98vw);
-    height: min(400px, 85vh);
+    height: 85vh;
   }
 
   .settings-content {
@@ -452,11 +475,13 @@ const props = defineProps<{
     border-bottom: 1px solid
       color-mix(in srgb, var(--highlight) 25%, transparent);
     overflow-x: auto;
+    padding: 6px 8px;
   }
 
   .settings-tab {
     white-space: nowrap;
     min-width: fit-content;
+    padding: 10px 14px;
   }
 
   .settings-tab:hover,
