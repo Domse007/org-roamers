@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use axum::{
     extract::{Query as AxumQuery, State},
@@ -6,12 +6,14 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
-use crate::server::services::org_service::{self, Query};
-use crate::server::AppState;
+use crate::{
+    server::services::org_service::{self, Query},
+    ServerState,
+};
 
 pub async fn get_org_as_html_handler(
     AxumQuery(params): AxumQuery<HashMap<String, String>>,
-    State(app_state): State<AppState>,
+    State(app_state): State<Arc<ServerState>>,
 ) -> Response {
     let scope = params
         .get("scope")

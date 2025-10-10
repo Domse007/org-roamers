@@ -3,7 +3,7 @@ use std::{
     path::PathBuf,
     sync::{
         mpsc::{self, Receiver},
-        Arc, Mutex,
+        Arc,
     },
     thread,
     time::Duration,
@@ -17,7 +17,6 @@ use sqlx::SqlitePool;
 
 use crate::{
     cache::OrgCacheEntry,
-    server::AppState,
     sqlite::{files::insert_file, rebuild},
     transform::org,
     ServerState,
@@ -33,7 +32,7 @@ impl OrgWatcher {
     /// Processes file system events and updates the cache/database for changed org files
     pub async fn process_events(
         &mut self,
-        state: Arc<Mutex<ServerState>>,
+        state: Arc<ServerState>,
     ) -> anyhow::Result<Vec<PathBuf>> {
         // Collect all pending org file changes
         while let Ok(event_result) = self.receiver.try_recv() {
@@ -72,16 +71,14 @@ impl OrgWatcher {
     /// Rescans a file and updates the cache and database with new content
     async fn process_file_change(
         &self,
-        state: Arc<Mutex<ServerState>>,
+        state: Arc<ServerState>,
         path: &PathBuf,
     ) -> anyhow::Result<()> {
         tracing::info!("Processing file change: {:?}", path);
 
-        // Clear dynamic state before processing and get needed values
-        let (cache_path, sqlite) = {
-            let guard = state.lock().unwrap();
-            (guard.cache.path().to_path_buf(), guard.sqlite.clone())
-        };
+        // Get needed values from state
+        let cache_path = state.cache.path().to_path_buf();
+        let sqlite = &state.sqlite;
 
         // Create new cache entry
         let cache_entry = OrgCacheEntry::new(&cache_path, path)?;
@@ -91,16 +88,16 @@ impl OrgWatcher {
         self.remove_file_data(state.clone(), path).await?;
 
         // Update file hash in database
-        insert_file(&sqlite, relative_path, cache_entry.get_hash()).await?;
+        insert_file(sqlite, relative_path, cache_entry.get_hash()).await?;
 
         // After successful database cleanup, extract and insert nodes with correct file association
         let file_path_str = relative_path.to_string_lossy().to_string();
         let nodes = org::get_nodes(cache_entry.content(), &file_path_str);
-        self.insert_nodes_with_file(&sqlite, nodes, relative_path)
+        self.insert_nodes_with_file(sqlite, nodes, relative_path)
             .await?;
 
         // Invalidate cache to trigger refresh
-        state.lock().unwrap().cache.invalidate(path.clone());
+        state.cache.invalidate(path.clone());
 
         tracing::info!("File change processed successfully: {:?}", path);
         Ok(())
@@ -109,13 +106,13 @@ impl OrgWatcher {
     /// Handles org file deletion by cleaning up associated database entries
     async fn handle_file_removal(
         &self,
-        state: Arc<Mutex<ServerState>>,
+        state: Arc<ServerState>,
         path: &PathBuf,
     ) -> anyhow::Result<()> {
         if path.extension().map(|ext| ext == "org").unwrap_or(false) {
             tracing::info!("Processing file removal: {:?}", path);
             self.remove_file_data(state.clone(), path).await?;
-            state.lock().unwrap().cache.invalidate(path.clone());
+            state.cache.invalidate(path.clone());
         }
         Ok(())
     }
@@ -123,11 +120,11 @@ impl OrgWatcher {
     /// Removes all database entries (links, nodes, files) associated with a file path
     async fn remove_file_data(
         &self,
-        state: Arc<Mutex<ServerState>>,
+        state: Arc<ServerState>,
         path: &PathBuf,
     ) -> anyhow::Result<()> {
         let file_str = path.to_string_lossy();
-        let sqlite = state.lock().unwrap().sqlite.clone();
+        let sqlite = state.sqlite.clone();
 
         // Remove links first, then nodes, then file entry
         sqlx::query(
@@ -203,7 +200,10 @@ pub fn watcher(path: PathBuf) -> anyhow::Result<OrgWatcher> {
 }
 
 /// Starts a background thread that processes file changes and notifies WebSocket clients
-pub async fn start_watcher_runtime(app_state: AppState, watch_path: PathBuf) -> anyhow::Result<()> {
+pub async fn start_watcher_runtime(
+    app_state: Arc<ServerState>,
+    watch_path: PathBuf,
+) -> anyhow::Result<()> {
     let mut watcher = watcher(watch_path.clone())?;
 
     tracing::info!("File watcher started for: {:?}", watch_path);
@@ -234,9 +234,8 @@ pub async fn start_watcher_runtime(app_state: AppState, watch_path: PathBuf) -> 
                 };
 
                 let websocket_count = {
-                    let mut state = app_state.lock().unwrap();
-                    state.broadcast_to_websockets(update_message);
-                    state.websocket_connections.len()
+                    app_state.broadcast_to_websockets(update_message);
+                    app_state.websocket_connections.len()
                 };
 
                 tracing::info!(
@@ -254,22 +253,23 @@ pub async fn start_watcher_runtime(app_state: AppState, watch_path: PathBuf) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::Config;
     use crate::cache::OrgCache;
-    use std::collections::HashMap;
+    use crate::config::Config;
+    use dashmap::DashMap;
+    use std::sync::atomic::AtomicU64;
     use std::{fs, path::Path};
     use tempfile::TempDir;
 
-    async fn create_test_server_state(temp_dir: &Path) -> Arc<Mutex<ServerState>> {
+    async fn create_test_server_state(temp_dir: &Path) -> Arc<ServerState> {
         let sqlite = crate::sqlite::init_db(false).await.unwrap();
         let state = ServerState {
             config: Config::default(),
             sqlite: sqlite,
             cache: OrgCache::new(temp_dir.to_path_buf()),
-            websocket_connections: HashMap::new(),
-            next_connection_id: 1,
+            websocket_connections: DashMap::new(),
+            next_connection_id: AtomicU64::new(1),
         };
-        Arc::new(Mutex::new(state))
+        Arc::new(state)
     }
 
     fn create_test_org_file(dir: &Path, name: &str, content: &str) -> PathBuf {
@@ -318,11 +318,11 @@ mod tests {
         {
             sqlx::query("INSERT OR REPLACE INTO files (file, hash) VALUES (?, 123)")
                 .bind(&file_str)
-                .execute(&state.lock().unwrap().sqlite)
+                .execute(&state.sqlite)
                 .await
                 .unwrap();
             sqlx::query("INSERT OR REPLACE INTO nodes (id, title, file, level) VALUES ('test-id', 'Test', ?, 1)")
-                .bind(&file_str).execute(&state.lock().unwrap().sqlite).await.unwrap();
+                .bind(&file_str).execute(&state.sqlite).await.unwrap();
         }
 
         // Test removal
@@ -334,14 +334,14 @@ mod tests {
         // Verify data was removed
         let file_count: i32 = sqlx::query_scalar("SELECT COUNT(*) FROM files WHERE file = ?")
             .bind(&file_str)
-            .fetch_one(&state.lock().unwrap().sqlite)
+            .fetch_one(&state.sqlite)
             .await
             .unwrap();
         assert_eq!(file_count, 0);
 
         let node_count: i32 = sqlx::query_scalar("SELECT COUNT(*) FROM nodes WHERE file = ?")
             .bind(file_str)
-            .fetch_one(&state.lock().unwrap().sqlite)
+            .fetch_one(&state.sqlite)
             .await
             .unwrap();
         assert_eq!(node_count, 0);
@@ -399,7 +399,7 @@ This is test content.
         // Verify file was processed (check if nodes were inserted)
         let node_count: i32 =
             sqlx::query_scalar("SELECT COUNT(*) FROM nodes WHERE id = 'test-id-123'")
-                .fetch_one(&state.lock().unwrap().sqlite)
+                .fetch_one(&state.sqlite)
                 .await
                 .unwrap();
         assert_eq!(node_count, 1);
@@ -442,7 +442,7 @@ This is test content.
 
         // Verify the file path is handled correctly in database
         let count: i32 = sqlx::query_scalar("SELECT COUNT(*) FROM nodes WHERE id = 'test-123'")
-            .fetch_one(&state.lock().unwrap().sqlite)
+            .fetch_one(&state.sqlite)
             .await
             .unwrap();
         assert_eq!(count, 1);
@@ -472,20 +472,20 @@ This is test content.
         {
             let initial_count: i32 =
                 sqlx::query_scalar("SELECT COUNT(*) FROM nodes WHERE id = 'test-node'")
-                    .fetch_one(&state.lock().unwrap().sqlite)
+                    .fetch_one(&state.sqlite)
                     .await
                     .unwrap();
             assert_eq!(initial_count, 1);
 
             // Debug: check what file path is in the database
             let files_in_db: Vec<String> = sqlx::query_scalar("SELECT file FROM files")
-                .fetch_all(&state.lock().unwrap().sqlite)
+                .fetch_all(&state.sqlite)
                 .await
                 .unwrap();
             tracing::info!("Files in database: {:?}", files_in_db);
 
             let nodes_in_db: Vec<(String, String)> = sqlx::query_as("SELECT id, file FROM nodes")
-                .fetch_all(&state.lock().unwrap().sqlite)
+                .fetch_all(&state.sqlite)
                 .await
                 .unwrap();
             tracing::info!("Nodes in database: {:?}", nodes_in_db);
@@ -505,7 +505,7 @@ This is test content.
         // Verify node was removed
         let after_remove_count: i32 =
             sqlx::query_scalar("SELECT COUNT(*) FROM nodes WHERE id = 'test-node'")
-                .fetch_one(&state.lock().unwrap().sqlite)
+                .fetch_one(&state.sqlite)
                 .await
                 .unwrap();
         assert_eq!(after_remove_count, 0);

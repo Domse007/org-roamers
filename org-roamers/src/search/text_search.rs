@@ -1,12 +1,12 @@
+use std::sync::Arc;
+
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
     search::SearchResultSender,
-    server::{
-        types::{RoamID, RoamTitle},
-        AppState,
-    },
+    server::types::{RoamID, RoamTitle},
+    ServerState,
 };
 
 // TODO: make this configurable.
@@ -35,7 +35,7 @@ impl FullTextSeach {
         self.cancel_token = CancellationToken::new();
     }
 
-    pub async fn feed(&mut self, state: AppState, f: &super::Feeder) -> anyhow::Result<()> {
+    pub async fn feed(&mut self, state: Arc<ServerState>, f: &super::Feeder) -> anyhow::Result<()> {
         let matcher = SkimMatcherV2::default();
         let query = f.s.to_string();
         let cancel_token = self.cancel_token.clone();
@@ -54,11 +54,13 @@ impl FullTextSeach {
         tokio::spawn(async move {
             // Collect cache entries and clone sqlite pool before any async operations
             let (cache_entries, sqlite) = {
-                let state = state.lock().unwrap();
                 let cache_entries: Vec<_> = state
                     .cache
                     .iter()
-                    .map(|(k, v)| (k.clone(), v.content().to_string()))
+                    .map(|r| {
+                        let (k, v) = r.pair();
+                        (k.clone(), v.content().to_string())
+                    })
                     .collect();
                 (cache_entries, state.sqlite.clone())
             };

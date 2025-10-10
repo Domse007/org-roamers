@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use axum::extract::ws::{Message, WebSocket};
 use futures_util::{stream::SplitSink, SinkExt};
 use serde::{Deserialize, Serialize};
@@ -6,7 +8,7 @@ use tokio::sync::mpsc;
 use crate::{
     client::WebSocketClient,
     search::{Feeder, SearchProviderList, SearchResultEntry},
-    server::AppState,
+    ServerState,
 };
 
 /// WebSocket message types for 1:1 client communication
@@ -60,7 +62,7 @@ pub enum WebSocketMessage {
 impl WebSocketMessage {
     pub async fn handle(
         &self,
-        app_state: AppState,
+        app_state: Arc<ServerState>,
         sender: &mut SplitSink<WebSocket, Message>,
         client: &mut WebSocketClient,
     ) {
@@ -108,7 +110,7 @@ impl WebSocketMessage {
     }
 
     async fn handle_search(
-        app_state: AppState,
+        app_state: Arc<ServerState>,
         _sender: &mut SplitSink<WebSocket, Message>,
         client: &mut WebSocketClient,
         query: &str,

@@ -1,9 +1,11 @@
+use std::sync::Arc;
+
 use orgize::Org;
 
 use crate::server::types::{IncomingLink, OrgAsHTMLResponse, OutgoingLink, RoamID, RoamTitle};
-use crate::server::AppState;
 use crate::transform::export::HtmlExport;
 use crate::transform::subtree::Subtree;
+use crate::ServerState;
 
 #[derive(Debug)]
 pub enum Query {
@@ -12,50 +14,44 @@ pub enum Query {
 }
 
 pub async fn get_org_as_html(
-    app_state: AppState,
+    app_state: Arc<ServerState>,
     query: Query,
     scope: String,
 ) -> OrgAsHTMLResponse {
+    let sqlite = &app_state.sqlite;
+
     // Get data from cache and extract needed values
-    let (id, content, path, config, sqlite) = {
-        let sqlite_pool = app_state.lock().unwrap().sqlite.clone();
+    let (id, content, path) = match &query {
+        Query::ByTitle(title) => {
+            let stmnt = r#"
+                SELECT id FROM nodes
+                WHERE title = ?;
+            "#;
+            let (id_str,): (String,) = sqlx::query_as(stmnt)
+                .bind(title.title())
+                .fetch_one(sqlite)
+                .await
+                .unwrap();
 
-        let (id, content, path) = match &query {
-            Query::ByTitle(title) => {
-                let stmnt = r#"
-                    SELECT id FROM nodes
-                    WHERE title = ?;
-                "#;
-                let (id_str,): (String,) = sqlx::query_as(stmnt)
-                    .bind(title.title())
-                    .fetch_one(&sqlite_pool)
-                    .await
-                    .unwrap();
-
-                let state = app_state.lock().unwrap();
-                let id: RoamID = id_str.into();
-                let cache_entry = state.cache.retrieve(&id).unwrap();
-                (
-                    id,
-                    cache_entry.content().to_string(),
-                    cache_entry.path().to_path_buf(),
-                )
-            }
-            Query::ById(id) => {
-                let state = app_state.lock().unwrap();
-                let cache_entry = state.cache.retrieve(&id).unwrap();
-                (
-                    id.clone(),
-                    cache_entry.content().to_string(),
-                    cache_entry.path().to_path_buf(),
-                )
-            }
-        };
-
-        let state = app_state.lock().unwrap();
-        let config = state.config.clone();
-        (id, content, path, config, sqlite_pool)
+            let id: RoamID = id_str.into();
+            let cache_entry = app_state.cache.retrieve(&id).unwrap();
+            (
+                id,
+                cache_entry.content().to_string(),
+                cache_entry.path().to_path_buf(),
+            )
+        }
+        Query::ById(id) => {
+            let cache_entry = app_state.cache.retrieve(&id).unwrap();
+            (
+                id.clone(),
+                cache_entry.content().to_string(),
+                cache_entry.path().to_path_buf(),
+            )
+        }
     };
+
+    let config = &app_state.config;
 
     let contents = if scope == "file" {
         content.clone()
@@ -83,7 +79,7 @@ pub async fn get_org_as_html(
         const STMNT: &str = "SELECT id, title FROM nodes WHERE id = ?";
         let res = sqlx::query_as::<_, (String, String)>(STMNT)
             .bind(&link_id)
-            .fetch_one(&sqlite)
+            .fetch_one(sqlite)
             .await;
         match res {
             Ok((id, display)) => {
@@ -102,7 +98,7 @@ pub async fn get_org_as_html(
         Query::ByTitle(title) => {
             let (id_str,): (String,) = sqlx::query_as("SELECT n.id FROM nodes n WHERE n.title = ?")
                 .bind(title.title())
-                .fetch_one(&sqlite)
+                .fetch_one(sqlite)
                 .await
                 .unwrap();
             RoamID::from(id_str)
@@ -119,7 +115,7 @@ pub async fn get_org_as_html(
 
     let incoming_links = sqlx::query_as::<_, (String, String)>(STMNT)
         .bind(final_id.id())
-        .fetch_all(&sqlite)
+        .fetch_all(sqlite)
         .await
         .map(|list| {
             list.into_iter()

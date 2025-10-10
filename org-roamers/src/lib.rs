@@ -24,20 +24,26 @@ mod watcher;
 
 use sqlx::SqlitePool;
 
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use tokio::sync::mpsc;
+use dashmap::DashMap;
+use std::sync::{atomic::AtomicU64, atomic::Ordering, Arc};
+use tokio::sync::mpsc::{self, UnboundedSender};
+use tokio::time::Instant;
 
 use crate::cache::OrgCache;
 use crate::client::message::WebSocketMessage;
 use crate::config::Config;
 
 pub struct ServerState {
+    /// Read-only configuration
     pub config: Config,
+    /// SQLite connection pool
     pub sqlite: SqlitePool,
+    /// Org cache
     pub cache: OrgCache,
-    pub websocket_connections: HashMap<u64, mpsc::UnboundedSender<WebSocketMessage>>,
-    pub next_connection_id: u64,
+    /// WebSocket connections
+    pub websocket_connections: DashMap<u64, UnboundedSender<WebSocketMessage>>,
+    /// Atomic counter for connection IDs
+    pub next_connection_id: AtomicU64,
 }
 
 impl ServerState {
@@ -52,32 +58,32 @@ impl ServerState {
             sqlite: sqlite_con,
             cache: org_cache,
             config: conf,
-            websocket_connections: HashMap::new(),
-            next_connection_id: 1,
+            websocket_connections: DashMap::new(),
+            next_connection_id: AtomicU64::new(1),
         })
     }
 
     /// Register a new WebSocket connection
     pub fn register_websocket_connection(
-        &mut self,
+        &self,
         sender: mpsc::UnboundedSender<WebSocketMessage>,
     ) -> u64 {
-        let connection_id = self.next_connection_id;
-        self.next_connection_id += 1;
+        let connection_id = self.next_connection_id.fetch_add(1, Ordering::SeqCst);
         self.websocket_connections.insert(connection_id, sender);
         connection_id
     }
 
     /// Unregister a WebSocket connection
-    pub fn unregister_websocket_connection(&mut self, connection_id: u64) {
+    pub fn unregister_websocket_connection(&self, connection_id: u64) {
         self.websocket_connections.remove(&connection_id);
     }
 
     /// Send a message to all connected WebSocket clients
-    pub fn broadcast_to_websockets(&mut self, message: WebSocketMessage) {
+    pub fn broadcast_to_websockets(&self, message: WebSocketMessage) {
         let mut failed_connections = Vec::new();
 
-        for (connection_id, sender) in &self.websocket_connections {
+        for entry in self.websocket_connections.iter() {
+            let (connection_id, sender) = entry.pair();
             if sender.send(message.clone()).is_err() {
                 failed_connections.push(*connection_id);
             }
@@ -91,6 +97,8 @@ impl ServerState {
 }
 
 pub async fn start(state: ServerState) -> anyhow::Result<()> {
+    let start = Instant::now();
+
     tracing::info!(
         "Using server configuration: {:?}",
         serde_json::to_string(&state.config)
@@ -103,7 +111,7 @@ pub async fn start(state: ServerState) -> anyhow::Result<()> {
     let port = &state.config.http_server_config.port;
     let url = format!("{}:{}", host, port);
 
-    let app_state = Arc::new(Mutex::new(state));
+    let app_state = Arc::new(state);
 
     if use_fs_watcher {
         let app_state_clone = app_state.clone();
@@ -120,6 +128,9 @@ pub async fn start(state: ServerState) -> anyhow::Result<()> {
 
     tracing::info!("Server listening on {}", url);
     let listener = tokio::net::TcpListener::bind(&url).await.unwrap();
+
+    let end = Instant::now();
+    tracing::info!("Startup took {}ms.", (end - start).as_millis());
 
     axum::serve(listener, app).tcp_nodelay(true).await.unwrap();
 

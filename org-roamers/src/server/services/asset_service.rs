@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use axum::{
     http::{HeaderMap, StatusCode},
@@ -10,7 +11,7 @@ use axum::{
 use crate::server::data::{self, DataLoader};
 use crate::ServerState;
 
-pub fn default_route_content(_db: &mut ServerState, root: String, url: Option<String>) -> Response {
+pub fn default_route_content(_db: Arc<ServerState>, root: String, url: Option<String>) -> Response {
     let root = PathBuf::from(root);
 
     let rel_path = match url {

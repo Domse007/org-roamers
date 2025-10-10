@@ -23,7 +23,8 @@ pub fn get_latex_svg_by_index(
         scope
     );
 
-    let content = state.cache.retrieve(&id.into()).unwrap().content();
+    let entry = state.cache.retrieve(&id.into()).unwrap();
+    let content = entry.content();
 
     let mut handler = HtmlExport::new(&state.config.org_to_html, String::new());
     Org::parse(content).traverse(&mut handler);

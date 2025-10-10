@@ -3,7 +3,7 @@ use std::{fs, path::PathBuf};
 use org_roamers::{ServerState, config::Config};
 use tokio::{runtime::Runtime, task::JoinHandle};
 
-use crate::{settings::Settings, OrgRoamersGUI};
+use crate::{OrgRoamersGUI, settings::Settings};
 
 #[cfg(not(target_os = "windows"))]
 pub fn config_path() -> PathBuf {
@@ -30,9 +30,7 @@ pub fn start(ctx: &OrgRoamersGUI) -> JoinHandle<anyhow::Result<()>> {
 
     let settings = ctx.settings.clone();
 
-    rt.spawn(async move {
-        start_server(settings).await
-    })
+    rt.spawn(async move { start_server(settings).await })
 }
 
 pub async fn start_server(ctx: Settings) -> anyhow::Result<()> {

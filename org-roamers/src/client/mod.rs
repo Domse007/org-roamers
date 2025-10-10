@@ -11,6 +11,8 @@
 //! - Ping/pong keep-alive mechanism
 //! - Simple message handling without broadcasting
 
+use std::sync::Arc;
+
 use axum::extract::ws::{Message, WebSocket};
 use futures_util::{SinkExt, StreamExt};
 use tokio::sync::mpsc;
@@ -20,7 +22,7 @@ use tracing::{error, info, warn};
 use crate::{
     client::message::WebSocketMessage,
     search::{SearchProviderList, SearchResultEntry},
-    server::AppState,
+    ServerState,
 };
 
 pub mod message;
@@ -44,7 +46,7 @@ impl WebSocketClient {
     }
 
     /// Handle the WebSocket connection lifecycle
-    pub async fn handle_connection(mut self, app_state: AppState) {
+    pub async fn handle_connection(mut self, app_state: Arc<ServerState>) {
         let (mut sender, mut receiver) = self.socket.unwrap().split();
         self.socket = None;
         let client_id = self.client_id;
@@ -55,10 +57,7 @@ impl WebSocketClient {
         let (server_tx, mut server_rx) = mpsc::unbounded_channel::<WebSocketMessage>();
 
         // Register this connection with the server state
-        {
-            let mut state_guard = app_state.lock().unwrap();
-            state_guard.register_websocket_connection(server_tx);
-        }
+        app_state.register_websocket_connection(server_tx);
 
         // Set up ping interval for keep-alive
         let mut ping_interval = tokio::time::interval(Duration::from_secs(30));
@@ -166,17 +165,14 @@ impl WebSocketClient {
         }
 
         // Unregister this connection when it closes
-        {
-            let mut state_guard = app_state.lock().unwrap();
-            state_guard.unregister_websocket_connection(client_id);
-        }
+        app_state.unregister_websocket_connection(client_id);
 
         info!("WebSocket client {} disconnected", client_id);
     }
 }
 
 /// Handle a new WebSocket connection with a simple 1:1 approach
-pub async fn handle_websocket(socket: WebSocket, app_state: AppState) {
+pub async fn handle_websocket(socket: WebSocket, app_state: Arc<ServerState>) {
     // Use a simple counter for client IDs - in production you might want something more robust
     static CLIENT_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
     let client_id = CLIENT_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);

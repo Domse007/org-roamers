@@ -1,8 +1,10 @@
+use std::sync::Arc;
+
 use anyhow::Result;
 use futures_util::StreamExt;
 use sqlx::SqlitePool;
 
-use crate::{search::SearchResultSender, server::AppState, transform::title::TitleSanitizer};
+use crate::{search::SearchResultSender, transform::title::TitleSanitizer, ServerState};
 
 #[derive(PartialEq, Debug)]
 pub struct ForNode<'a> {
@@ -188,13 +190,17 @@ impl<'a> Search<'a> {
         }
     }
 
-    pub async fn search(&self, sender: &mut SearchResultSender, con: AppState) -> Result<()> {
+    pub async fn search(
+        &self,
+        sender: &mut SearchResultSender,
+        con: Arc<ServerState>,
+    ) -> Result<()> {
         let title_sanitizer = |title: &str| {
             let sanitier = TitleSanitizer::new();
             sanitier.process(title)
         };
 
-        let sqlite = con.lock().unwrap().sqlite.clone();
+        let sqlite = con.sqlite.clone();
 
         match self {
             Self::ForNode(node) => node.search(&sqlite, sender, title_sanitizer).await,
@@ -216,7 +222,7 @@ impl DefaultSearch {
         self.sender.id()
     }
 
-    pub async fn feed(&mut self, state: AppState, f: &super::Feeder) -> anyhow::Result<()> {
+    pub async fn feed(&mut self, state: Arc<ServerState>, f: &super::Feeder) -> anyhow::Result<()> {
         let query = f.s.clone();
         let mut sender = self.sender.clone();
 

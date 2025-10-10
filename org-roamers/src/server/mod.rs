@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::sync::Mutex;
 
 use axum::{
     routing::{get, post},
@@ -17,9 +16,7 @@ mod handlers;
 mod services;
 pub mod types;
 
-pub type AppState = Arc<Mutex<ServerState>>;
-
-pub async fn build_server(app_state: AppState) -> Router {
+pub async fn build_server(app_state: Arc<ServerState>) -> Router {
     Router::new()
         .route("/", get(health::default_route))
         .route("/org", get(org::get_org_as_html_handler))

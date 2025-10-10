@@ -1,12 +1,12 @@
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use crate::{
     search::{default::DefaultSearch, text_search::FullTextSeach},
-    server::{
-        types::{RoamID, RoamTitle},
-        AppState,
-    },
+    server::types::{RoamID, RoamTitle},
+    ServerState,
 };
 
 mod default;
@@ -121,7 +121,7 @@ impl SearchProviderList {
         }
     }
 
-    pub async fn feed(&mut self, state: AppState, f: Feeder) {
+    pub async fn feed(&mut self, state: Arc<ServerState>, f: Feeder) {
         let mut tasks = vec![];
 
         // We need to extract providers to spawn them in separate tasks

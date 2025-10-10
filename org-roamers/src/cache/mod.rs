@@ -4,14 +4,13 @@
 //! It should reduce the file lookup to just fetching updated files.
 
 use std::{
-    collections::HashMap,
     hash::{DefaultHasher, Hash, Hasher},
     io,
-    ops::Deref,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 
+use dashmap::{mapref::multiple::RefMulti, DashMap};
 use sqlx::SqlitePool;
 
 use crate::{
@@ -76,17 +75,17 @@ impl From<RoamID> for InvalidatedBy {
 pub struct OrgCache {
     /// Path to the root of the org-roamers directory.
     path: PathBuf,
-    lookup: HashMap<RoamID, Arc<OrgCacheEntry>>,
+    lookup: DashMap<RoamID, Arc<OrgCacheEntry>>,
     // TODO: currently not processed. File changes are handled by the watcher.
-    invalidated: Vec<InvalidatedBy>,
+    invalidated: Mutex<Vec<InvalidatedBy>>,
 }
 
 impl OrgCache {
     pub fn new(root: PathBuf) -> Self {
         Self {
             path: root,
-            lookup: HashMap::new(),
-            invalidated: Vec::new(),
+            lookup: DashMap::new(),
+            invalidated: Mutex::new(Vec::new()),
         }
     }
 
@@ -133,7 +132,7 @@ impl OrgCache {
         &self,
         con: &SqlitePool,
         name: &str,
-    ) -> Option<(RoamID, &OrgCacheEntry)> {
+    ) -> Option<(RoamID, Arc<OrgCacheEntry>)> {
         let stmnt = r#"
             SELECT id FROM nodes
             WHERE title = ?;
@@ -161,7 +160,9 @@ impl OrgCache {
         let file_path = cache_entry_arc.path();
         let mut ids_to_update = Vec::new();
 
-        for (existing_id, existing_entry) in &self.lookup {
+        let mut iter = self.lookup.iter_mut();
+        while let Some(mut ref_tuple) = iter.next() {
+            let (existing_id, existing_entry) = ref_tuple.pair_mut();
             if existing_entry.path() == file_path {
                 ids_to_update.push(existing_id.clone());
             }
@@ -178,12 +179,12 @@ impl OrgCache {
         Ok(())
     }
 
-    pub fn retrieve(&self, id: &RoamID) -> Option<&OrgCacheEntry> {
-        self.lookup.get(id).map(|e| e.deref())
+    pub fn retrieve(&self, id: &RoamID) -> Option<Arc<OrgCacheEntry>> {
+        self.lookup.get(id).map(|r| r.value().clone())
     }
 
-    pub fn invalidate<T: Into<InvalidatedBy>>(&mut self, by: T) {
-        self.invalidated.push(by.into());
+    pub fn invalidate<T: Into<InvalidatedBy>>(&self, by: T) {
+        self.invalidated.lock().unwrap().push(by.into());
     }
 
     /// Under most circumstances: DO NOT USE!
@@ -191,7 +192,7 @@ impl OrgCache {
         &self.path
     }
 
-    pub fn iter<'a>(&self) -> impl Iterator<Item = (&RoamID, &Arc<OrgCacheEntry>)> {
+    pub fn iter<'a>(&self) -> impl Iterator<Item = RefMulti<'_, RoamID, Arc<OrgCacheEntry>>> {
         self.lookup.iter()
     }
 }
@@ -244,9 +245,9 @@ Content 2
         cache.lookup.insert("node-3".into(), cache_arc_v1.clone());
 
         // Verify all nodes point to the same cache entry
-        let entry1_ptr = Arc::as_ptr(cache.lookup.get(&"node-1".into()).unwrap());
-        let entry2_ptr = Arc::as_ptr(cache.lookup.get(&"node-2".into()).unwrap());
-        let entry3_ptr = Arc::as_ptr(cache.lookup.get(&"node-3".into()).unwrap());
+        let entry1_ptr = Arc::as_ptr(&cache.lookup.get(&"node-1".into()).unwrap());
+        let entry2_ptr = Arc::as_ptr(&cache.lookup.get(&"node-2".into()).unwrap());
+        let entry3_ptr = Arc::as_ptr(&cache.lookup.get(&"node-3".into()).unwrap());
         assert_eq!(entry1_ptr, entry2_ptr);
         assert_eq!(entry2_ptr, entry3_ptr);
 
@@ -275,9 +276,9 @@ Content 2 UPDATED
         cache.submit("node-2".into(), &org_file).unwrap();
 
         // Verify ALL nodes now point to the NEW cache entry
-        let new_entry1_ptr = Arc::as_ptr(cache.lookup.get(&"node-1".into()).unwrap());
-        let new_entry2_ptr = Arc::as_ptr(cache.lookup.get(&"node-2".into()).unwrap());
-        let new_entry3_ptr = Arc::as_ptr(cache.lookup.get(&"node-3".into()).unwrap());
+        let new_entry1_ptr = Arc::as_ptr(&cache.lookup.get(&"node-1".into()).unwrap());
+        let new_entry2_ptr = Arc::as_ptr(&cache.lookup.get(&"node-2".into()).unwrap());
+        let new_entry3_ptr = Arc::as_ptr(&cache.lookup.get(&"node-3".into()).unwrap());
 
         // All should point to the same NEW entry
         assert_eq!(new_entry1_ptr, new_entry2_ptr);
@@ -287,11 +288,14 @@ Content 2 UPDATED
         assert_ne!(new_entry1_ptr, entry1_ptr);
 
         // Verify the content was actually updated
-        let updated_content = cache.retrieve(&"node-1".into()).unwrap().content();
+        let binding = cache.retrieve(&"node-1".into()).unwrap();
+        let updated_content = binding.content();
         assert!(updated_content.contains("UPDATED"));
-        let updated_content2 = cache.retrieve(&"node-2".into()).unwrap().content();
+        let binding = cache.retrieve(&"node-2".into()).unwrap();
+        let updated_content2 = binding.content();
         assert!(updated_content2.contains("UPDATED"));
-        let updated_content3 = cache.retrieve(&"node-3".into()).unwrap().content();
+        let binding = cache.retrieve(&"node-3".into()).unwrap();
+        let updated_content3 = binding.content();
         assert!(updated_content3.contains("UPDATED"));
     }
 
@@ -350,11 +354,24 @@ Content 2
         cache.submit("file1-node".into(), &org_file1).unwrap();
         cache.submit("file2-node".into(), &org_file2).unwrap();
 
-        let file1_ptr = Arc::as_ptr(cache.lookup.get(&"file1-node".into()).unwrap());
-        let file2_ptr = Arc::as_ptr(cache.lookup.get(&"file2-node".into()).unwrap());
-
         // Verify they point to different cache entries
-        assert_ne!(file1_ptr, file2_ptr);
+        {
+            let file1_ref = cache.lookup.get(&"file1-node".into()).unwrap();
+            let file2_ref = cache.lookup.get(&"file2-node".into()).unwrap();
+            assert_ne!(file1_ref.content(), file2_ref.content());
+        }
+
+        // Store old content for comparison
+        let file1_old_content = cache
+            .retrieve(&"file1-node".into())
+            .unwrap()
+            .content()
+            .to_string();
+        let file2_old_content = cache
+            .retrieve(&"file2-node".into())
+            .unwrap()
+            .content()
+            .to_string();
 
         // Update file1 content
         let org_content1_updated = r#":PROPERTIES:
@@ -369,18 +386,23 @@ Content 1 UPDATED
         cache.submit("file1-node".into(), &org_file1).unwrap();
 
         // Verify file1 entry changed but file2 entry remained the same
-        let file1_new_ptr = Arc::as_ptr(cache.lookup.get(&"file1-node".into()).unwrap());
-        let file2_same_ptr = Arc::as_ptr(cache.lookup.get(&"file2-node".into()).unwrap());
+        let file1_new_content = cache
+            .retrieve(&"file1-node".into())
+            .unwrap()
+            .content()
+            .to_string();
+        let file2_same_content = cache
+            .retrieve(&"file2-node".into())
+            .unwrap()
+            .content()
+            .to_string();
 
-        assert_ne!(file1_ptr, file1_new_ptr); // file1 changed
-        assert_eq!(file2_ptr, file2_same_ptr); // file2 unchanged
+        assert_ne!(file1_old_content, file1_new_content); // file1 changed
+        assert_eq!(file2_old_content, file2_same_content); // file2 unchanged
 
         // Verify content
-        let file1_content = cache.retrieve(&"file1-node".into()).unwrap().content();
-        let file2_content = cache.retrieve(&"file2-node".into()).unwrap().content();
-
-        assert!(file1_content.contains("UPDATED"));
-        assert!(!file2_content.contains("UPDATED"));
+        assert!(file1_new_content.contains("UPDATED"));
+        assert!(!file2_same_content.contains("UPDATED"));
     }
 
     #[test]
@@ -412,15 +434,16 @@ Content 1 UPDATED
         cache.submit("node-3".into(), &org_file).unwrap();
 
         // All should share the same Arc
-        let ptr1 = Arc::as_ptr(cache.lookup.get(&"node-1".into()).unwrap());
-        let ptr2 = Arc::as_ptr(cache.lookup.get(&"node-2".into()).unwrap());
-        let ptr3 = Arc::as_ptr(cache.lookup.get(&"node-3".into()).unwrap());
+        let ptr1 = cache.lookup.get(&"node-1".into()).unwrap();
+        let ptr2 = cache.lookup.get(&"node-2".into()).unwrap();
+        let ptr3 = cache.lookup.get(&"node-3".into()).unwrap();
 
-        assert_eq!(ptr1, ptr2);
-        assert_eq!(ptr2, ptr3);
+        assert_eq!(ptr1.content(), ptr2.content());
+        assert_eq!(ptr2.content(), ptr3.content());
 
-        // Verify Arc reference count (should be 3 - one for each lookup entry)
-        let arc_strong_count = Arc::strong_count(cache.lookup.get(&"node-1".into()).unwrap());
-        assert_eq!(arc_strong_count, 3);
+        // Verify Arc reference count (should be 3 - one for each lookup entry in the DashMap)
+        // DashMap guards don't increment Arc reference count, they just hold references to the entries
+        let arc_strong_count = Arc::strong_count(ptr1.value());
+        assert_eq!(arc_strong_count, 3); // 3 entries in the map
     }
 }
