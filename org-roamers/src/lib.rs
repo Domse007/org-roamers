@@ -28,6 +28,7 @@ use dashmap::DashMap;
 use std::sync::{atomic::AtomicU64, atomic::Ordering, Arc};
 use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio::time::Instant;
+use tokio_util::sync::CancellationToken;
 
 use crate::cache::OrgCache;
 use crate::client::message::WebSocketMessage;
@@ -104,7 +105,6 @@ pub async fn start(state: ServerState) -> anyhow::Result<()> {
         serde_json::to_string(&state.config)
     );
 
-    let org_roam_db_path = state.cache.path().to_path_buf();
     let use_fs_watcher = state.config.fs_watcher;
 
     let host = &state.config.http_server_config.host;
@@ -113,11 +113,10 @@ pub async fn start(state: ServerState) -> anyhow::Result<()> {
 
     let app_state = Arc::new(state);
 
-    if use_fs_watcher {
-        let app_state_clone = app_state.clone();
-        let watch_path = org_roam_db_path.clone();
+    let cancellation_token = CancellationToken::new();
 
-        watcher::start_watcher_runtime(app_state_clone, watch_path)
+    if use_fs_watcher {
+        watcher::watcher(app_state.clone(), cancellation_token.clone())
             .await
             .unwrap();
 
@@ -132,7 +131,15 @@ pub async fn start(state: ServerState) -> anyhow::Result<()> {
     let end = Instant::now();
     tracing::info!("Startup took {}ms.", (end - start).as_millis());
 
-    axum::serve(listener, app).tcp_nodelay(true).await.unwrap();
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async move {
+            tokio::signal::ctrl_c().await.ok();
+            tracing::info!("Shutdown signal received, stopping server...");
+            cancellation_token.cancel();
+        })
+        .tcp_nodelay(true)
+        .await
+        .unwrap();
 
     Ok(())
 }

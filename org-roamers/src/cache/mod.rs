@@ -7,7 +7,7 @@ use std::{
     hash::{DefaultHasher, Hash, Hasher},
     io,
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
 use dashmap::{mapref::multiple::RefMulti, DashMap};
@@ -76,8 +76,6 @@ pub struct OrgCache {
     /// Path to the root of the org-roamers directory.
     path: PathBuf,
     lookup: DashMap<RoamID, Arc<OrgCacheEntry>>,
-    // TODO: currently not processed. File changes are handled by the watcher.
-    invalidated: Mutex<Vec<InvalidatedBy>>,
 }
 
 impl OrgCache {
@@ -85,7 +83,6 @@ impl OrgCache {
         Self {
             path: root,
             lookup: DashMap::new(),
-            invalidated: Mutex::new(Vec::new()),
         }
     }
 
@@ -150,7 +147,7 @@ impl OrgCache {
         }
     }
 
-    pub fn submit<P: AsRef<Path>>(&mut self, id: RoamID, path: P) -> anyhow::Result<()> {
+    pub fn submit<P: AsRef<Path>>(&self, id: RoamID, path: P) -> anyhow::Result<()> {
         let cache_entry = OrgCacheEntry::new(&self.path, path)?;
         let cache_entry_arc = Arc::new(cache_entry);
 
@@ -183,8 +180,47 @@ impl OrgCache {
         self.lookup.get(id).map(|r| r.value().clone())
     }
 
+    /// Insert a cache entry for a specific node ID
+    pub fn insert(&self, id: RoamID, entry: OrgCacheEntry) {
+        self.lookup.insert(id, Arc::new(entry));
+    }
+
+    /// Insert the same cache entry for multiple node IDs
+    pub fn insert_many(&self, ids: &[RoamID], entry: OrgCacheEntry) {
+        let entry_arc = Arc::new(entry);
+        for id in ids {
+            self.lookup.insert(id.clone(), entry_arc.clone());
+        }
+    }
+
     pub fn invalidate<T: Into<InvalidatedBy>>(&self, by: T) {
-        self.invalidated.lock().unwrap().push(by.into());
+        let by = by.into();
+
+        let keys_to_invalidate: Vec<(RoamID, PathBuf)> = match by {
+            InvalidatedBy::Path(ref path) => {
+                let rel_path = path.strip_prefix(self.path.as_path()).unwrap();
+                self.lookup
+                    .iter()
+                    .filter(|elem| elem.value().path.as_path() == rel_path)
+                    .map(|elem| (elem.key().clone(), path.to_path_buf()))
+                    .collect()
+            }
+            InvalidatedBy::Id(ref id) => {
+                if let Some(entry) = self.lookup.get(id) {
+                    vec![(id.clone(), entry.path().to_path_buf())]
+                } else {
+                    vec![]
+                }
+            }
+        };
+
+        for (key, path) in keys_to_invalidate {
+            tracing::info!("Updating file {path:?} with id {key:?}");
+            self.lookup.remove(&key);
+            if let Err(err) = self.submit(key, path) {
+                tracing::error!("{err}");
+            }
+        }
     }
 
     /// Under most circumstances: DO NOT USE!
