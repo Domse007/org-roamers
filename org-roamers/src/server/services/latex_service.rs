@@ -8,7 +8,7 @@ use crate::latex;
 use crate::transform::export::HtmlExport;
 use crate::ServerState;
 
-pub fn get_latex_svg_by_index(
+pub async fn get_latex_svg_by_index(
     state: &ServerState,
     id: String,
     latex_index: usize,
@@ -60,7 +60,7 @@ pub fn get_latex_svg_by_index(
         latex_content.clone(),
         color,
         content,
-    );
+    ).await;
 
     match svg {
         Ok(svg) => {

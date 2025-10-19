@@ -1,8 +1,7 @@
-use std::io::Read;
-use std::process::Command;
-use std::{fs::File, io::Write};
-
 use anyhow::bail;
+use tokio::fs::File;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::process::Command;
 use tracing::info;
 
 use crate::config::LatexConfig;
@@ -11,17 +10,17 @@ use crate::transform::org;
 
 mod builder;
 
-pub fn get_image_with_ctx(
+pub async fn get_image_with_ctx(
     config: &LatexConfig,
     latex: String,
     color: String,
     org_content: &str,
 ) -> anyhow::Result<Vec<u8>> {
     let headers = org::get_latex_header(org_content)?;
-    get_image(config, latex, color, headers)
+    get_image(config, latex, color, headers).await
 }
 
-pub fn get_image(
+pub async fn get_image(
     config: &LatexConfig,
     latex: String,
     color: String,
@@ -29,9 +28,11 @@ pub fn get_image(
 ) -> anyhow::Result<Vec<u8>> {
     // construct all paths for generated files.
     let (path_tex, path_dvi, path_svg) = LatexPathBuilder::new().build(latex.as_str());
-    if let Ok(file) = File::open(path_svg.as_path()) {
+    if let Ok(mut file) = File::open(path_svg.as_path()).await {
         info!("Found preexisting content.");
-        return Ok(file.bytes().map(Result::unwrap).collect());
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer).await?;
+        return Ok(buffer);
     }
 
     // build latex file
@@ -39,15 +40,17 @@ pub fn get_image(
     latex_builder.headers(&headers);
     latex_builder.body(&[latex.as_str()]);
 
-    let mut file = File::create(path_tex.as_path())?;
-    file.write_all(latex_builder.build(&color).as_bytes())?;
+    let mut file = File::create(path_tex.as_path()).await?;
+    file.write_all(latex_builder.build(&color).as_bytes())
+        .await?;
 
     // step 1: compile .tex file to .dvi
     let output = Command::new(&config.latex_cmd)
         .args(config.latex_opt.as_slice())
         .arg(&path_tex)
         .current_dir(path_tex.parent().unwrap())
-        .output();
+        .output()
+        .await;
 
     match output {
         Ok(output) if !output.status.success() => {
@@ -69,7 +72,8 @@ pub fn get_image(
         .arg("-o")
         .arg(&path_svg)
         .current_dir(path_dvi.parent().unwrap())
-        .output();
+        .output()
+        .await;
 
     match output {
         Ok(output) if !output.status.success() => {
@@ -86,7 +90,9 @@ pub fn get_image(
 
     // extract svg from file
     info!("Trying to read {}", path_svg.display());
-    let file = File::open(path_svg.as_path())?;
+    let mut file = File::open(path_svg.as_path()).await?;
 
-    Ok(file.bytes().map(Result::unwrap).collect())
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer).await?;
+    Ok(buffer)
 }
