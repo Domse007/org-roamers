@@ -21,7 +21,6 @@
       ]
    },
    "root": "./web/dist/",
-   "strict": false,
    "fs_watcher": false,
    "latex_config": {
       "latex_cmd": "latex",
@@ -39,5 +38,6 @@
          "--precision=6",
          "--verbosity=0"
       ]
-   }
+   },
+   "asset_policy": "AllowChildrenOfRoot"
 }

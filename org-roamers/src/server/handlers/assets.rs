@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use axum::{
     extract::{Query as AxumQuery, State},
@@ -15,7 +15,8 @@ pub async fn serve_assets_handler(
     match params.get("file") {
         Some(path) => {
             let org_roam_path = app_state.cache.path();
-            asset_service::serve_assets(org_roam_path, path.clone())
+            let asset_policy = app_state.config.asset_policy;
+            asset_service::serve_assets(org_roam_path, PathBuf::from(path), asset_policy)
         }
         None => StatusCode::NOT_FOUND.into_response(),
     }

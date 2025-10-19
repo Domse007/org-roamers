@@ -49,7 +49,7 @@ pub struct ServerState {
 
 impl ServerState {
     pub async fn new(conf: Config) -> anyhow::Result<ServerState> {
-        let sqlite_con = sqlite::init_db(conf.strict).await?;
+        let sqlite_con = sqlite::init_db().await?;
 
         let mut org_cache = OrgCache::new(conf.org_roamers_root.to_path_buf());
 
@@ -102,7 +102,7 @@ pub async fn start(state: ServerState) -> anyhow::Result<()> {
 
     tracing::info!(
         "Using server configuration: {:?}",
-        serde_json::to_string(&state.config)
+        serde_json::to_string(&state.config).unwrap()
     );
 
     let use_fs_watcher = state.config.fs_watcher;

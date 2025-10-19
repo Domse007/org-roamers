@@ -60,7 +60,8 @@ pub async fn get_latex_svg_by_index(
         latex_content.clone(),
         color,
         content,
-    ).await;
+    )
+    .await;
 
     match svg {
         Ok(svg) => {

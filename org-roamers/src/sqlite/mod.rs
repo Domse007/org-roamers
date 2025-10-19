@@ -5,7 +5,7 @@ pub mod init;
 pub mod olp;
 pub mod rebuild;
 
-pub async fn init_db(_strict: bool) -> anyhow::Result<SqlitePool> {
+pub async fn init_db() -> anyhow::Result<SqlitePool> {
     // Use a named in-memory database that's shared across all connections in the pool
     let pool = SqlitePool::connect("sqlite:file:org-roamers-db?mode=memory&cache=shared").await?;
 

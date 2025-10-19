@@ -60,6 +60,14 @@ impl Default for LatexConfig {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Default, Copy)]
+pub enum AssetPolicy {
+    AllowAll,
+    ForbidAll,
+    #[default]
+    AllowChildrenOfRoot,
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Config {
     /// Path to the root of the org-roamers / org-roam directory.
@@ -70,12 +78,12 @@ pub struct Config {
     pub org_to_html: HtmlExportSettings,
     /// Root path to the website files. e.g. .js / .html / .css
     pub root: PathBuf,
-    /// Use stricter policy like foreign_keys = ON.
-    pub strict: bool,
     /// Use the filesystem watcher
     pub fs_watcher: bool,
     /// LaTeX settings for rendering fragments
     pub latex_config: LatexConfig,
+    /// Settings on asset loading restrictions
+    pub asset_policy: AssetPolicy,
 }
 
 impl Default for Config {
@@ -85,9 +93,9 @@ impl Default for Config {
             http_server_config: HttpServerConfig::default(),
             org_to_html: HtmlExportSettings::default(),
             root: "./web/dist/".into(),
-            strict: true,
             fs_watcher: false,
             latex_config: LatexConfig::default(),
+            asset_policy: AssetPolicy::default(),
         }
     }
 }

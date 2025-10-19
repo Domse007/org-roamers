@@ -8,6 +8,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
+use crate::config::AssetPolicy;
 use crate::server::data::{self, DataLoader};
 use crate::ServerState;
 
@@ -114,10 +115,17 @@ pub fn default_route_content(_db: Arc<ServerState>, root: String, url: Option<St
     (StatusCode::OK, headers, bytes).into_response()
 }
 
-pub fn serve_assets<P: AsRef<Path>>(root: P, file: String) -> Response {
-    let file_path = root.as_ref().join(&file);
+pub fn serve_assets<P: AsRef<Path>>(root: P, file: PathBuf, asset_policy: AssetPolicy) -> Response {
+    let file_path = match asset_policy {
+        AssetPolicy::AllowAll => file.clone(),
+        AssetPolicy::AllowChildrenOfRoot => root.as_ref().join(&file),
+        AssetPolicy::ForbidAll => {
+            tracing::warn!("Cannot serve {file:?} because of access policy restrictions.");
+            return StatusCode::from_u16(403).unwrap().into_response();
+        }
+    };
 
-    let mime = match PathBuf::from(&file).extension() {
+    let mime = match file.extension() {
         Some(extension) => match extension.to_str().unwrap() {
             "jpeg" | "jpg" => "image/jpeg",
             "png" => "image/png",
@@ -160,7 +168,7 @@ pub fn serve_assets<P: AsRef<Path>>(root: P, file: String) -> Response {
         );
         tracing::debug!(
             "Serving asset {} with no-cache headers (development mode)",
-            file
+            file.display()
         );
     } else {
         // Release mode: optimized caching for better performance
@@ -186,7 +194,7 @@ pub fn serve_assets<P: AsRef<Path>>(root: P, file: String) -> Response {
         }
         tracing::debug!(
             "Serving asset {} with optimized caching headers (release mode)",
-            file
+            file.display()
         );
     }
 
