@@ -91,6 +91,11 @@ impl Traverser for HtmlExport<'_> {
             Event::Leave(Container::Document(_)) => self.output += "</div>",
 
             Event::Enter(Container::Headline(headline)) => {
+                if self.settings.respect_noexport && headline.tags().any(|t| t.contains("noexport"))
+                {
+                    ctx.skip();
+                    return;
+                }
                 let level = min(headline.level(), 6);
                 let _ = write!(&mut self.output, "<h{level}>");
                 for elem in headline.title() {
@@ -522,6 +527,139 @@ mod tests {
             "</tbody></table></section></div>"
         );
         let settings = HtmlExportSettings::default();
+        let mut handler = HtmlExport::new(&settings, "".into());
+        Org::parse(org).traverse(&mut handler);
+        assert_eq!(handler.finish().0, exp);
+    }
+
+    #[test]
+    fn test_noexport_single_heading() {
+        let org = concat!(
+            "* Exported heading\n",
+            "This should be exported.\n",
+            "\n",
+            "* Hidden heading :noexport:\n",
+            "This should not be exported.\n",
+            "\n",
+            "* Another exported heading\n",
+            "This should be exported too.\n"
+        );
+        let exp = concat!(
+            "<div>",
+            "<h1>Exported heading</h1>",
+            "<section><p>This should be exported.\n</p></section>",
+            "<h1>Another exported heading</h1>",
+            "<section><p>This should be exported too.\n</p></section></div>"
+        );
+        let mut settings = HtmlExportSettings::default();
+        settings.respect_noexport = true;
+        let mut handler = HtmlExport::new(&settings, "".into());
+        Org::parse(org).traverse(&mut handler);
+        assert_eq!(handler.finish().0, exp);
+    }
+
+    #[test]
+    fn test_noexport_with_subtree() {
+        let org = concat!(
+            "* Parent heading :noexport:\n",
+            "Parent content.\n",
+            "\n",
+            "** Child heading\n",
+            "Child content should also be excluded.\n",
+            "\n",
+            "*** Grandchild heading\n",
+            "Grandchild content should also be excluded.\n",
+            "\n",
+            "* Exported heading\n",
+            "This should be visible.\n"
+        );
+        let exp = concat!(
+            "<div>",
+            "<h1>Exported heading</h1>",
+            "<section><p>This should be visible.\n</p></section></div>"
+        );
+        let mut settings = HtmlExportSettings::default();
+        settings.respect_noexport = true;
+        let mut handler = HtmlExport::new(&settings, "".into());
+        Org::parse(org).traverse(&mut handler);
+        assert_eq!(handler.finish().0, exp);
+    }
+
+    #[test]
+    fn test_noexport_with_multiple_tags() {
+        let org = concat!(
+            "* Heading with multiple tags :tag1:noexport:tag2:\n",
+            "This should not be exported.\n",
+            "\n",
+            "* Normal heading :tag1:tag2:\n",
+            "This should be exported.\n"
+        );
+        let exp = concat!(
+            "<div>",
+            "<h1>Normal heading </h1>",
+            "<section><p>This should be exported.\n</p></section></div>"
+        );
+        let mut settings = HtmlExportSettings::default();
+        settings.respect_noexport = true;
+        let mut handler = HtmlExport::new(&settings, "".into());
+        Org::parse(org).traverse(&mut handler);
+        assert_eq!(handler.finish().0, exp);
+    }
+
+    #[test]
+    fn test_noexport_disabled() {
+        let org = concat!(
+            "* Normal heading\n",
+            "Exported.\n",
+            "\n",
+            "* Hidden heading :noexport:\n",
+            "This SHOULD be exported when respect_noexport is false.\n"
+        );
+        let exp = concat!(
+            "<div>",
+            "<h1>Normal heading</h1>",
+            "<section><p>Exported.\n</p></section>",
+            "<h1>Hidden heading </h1>",
+            "<section><p>This SHOULD be exported when respect<sub>noexport</sub> is false.\n</p></section></div>"
+        );
+        let mut settings = HtmlExportSettings::default();
+        settings.respect_noexport = false;
+        let mut handler = HtmlExport::new(&settings, "".into());
+        Org::parse(org).traverse(&mut handler);
+        assert_eq!(handler.finish().0, exp);
+    }
+
+    #[test]
+    fn test_noexport_with_complex_content() {
+        let org = concat!(
+            "* Visible section\n",
+            "Some text.\n",
+            "\n",
+            "* Secret section :noexport:\n",
+            "** Contains subsections\n",
+            "- With lists\n",
+            "- And items\n",
+            "\n",
+            "#+BEGIN_SRC python\n",
+            "print('hidden code')\n",
+            "#+END_SRC\n",
+            "\n",
+            "| Table | Data |\n",
+            "|-------+------|\n",
+            "| 1     | 2    |\n",
+            "\n",
+            "* Back to visible\n",
+            "Final content.\n"
+        );
+        let exp = concat!(
+            "<div>",
+            "<h1>Visible section</h1>",
+            "<section><p>Some text.\n</p></section>",
+            "<h1>Back to visible</h1>",
+            "<section><p>Final content.\n</p></section></div>"
+        );
+        let mut settings = HtmlExportSettings::default();
+        settings.respect_noexport = true;
         let mut handler = HtmlExport::new(&settings, "".into());
         Org::parse(org).traverse(&mut handler);
         assert_eq!(handler.finish().0, exp);

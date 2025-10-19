@@ -30,6 +30,7 @@ pub struct EnvAdvice {
 
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct HtmlExportSettings {
+    pub respect_noexport: bool,
     pub env_advices: Vec<EnvAdvice>,
 }
 

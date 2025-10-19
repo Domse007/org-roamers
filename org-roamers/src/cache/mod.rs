@@ -248,7 +248,7 @@ mod tests {
     #[test]
     fn test_submit_updates_all_nodes_from_same_file() {
         let temp_dir = TempDir::new().unwrap();
-        let mut cache = OrgCache::new(temp_dir.path().to_path_buf());
+        let cache = OrgCache::new(temp_dir.path().to_path_buf());
 
         // Create an org file with multiple nodes
         let org_content_v1 = r#":PROPERTIES:
@@ -338,7 +338,7 @@ Content 2 UPDATED
     #[test]
     fn test_submit_with_new_node_id() {
         let temp_dir = TempDir::new().unwrap();
-        let mut cache = OrgCache::new(temp_dir.path().to_path_buf());
+        let cache = OrgCache::new(temp_dir.path().to_path_buf());
 
         let org_content = r#":PROPERTIES:
 :ID: existing-node
@@ -364,7 +364,7 @@ Content here.
     #[test]
     fn test_submit_different_files_dont_interfere() {
         let temp_dir = TempDir::new().unwrap();
-        let mut cache = OrgCache::new(temp_dir.path().to_path_buf());
+        let cache = OrgCache::new(temp_dir.path().to_path_buf());
 
         // Create two different org files
         let org_content1 = r#":PROPERTIES:
@@ -444,7 +444,7 @@ Content 1 UPDATED
     #[test]
     fn test_submit_preserves_arc_sharing() {
         let temp_dir = TempDir::new().unwrap();
-        let mut cache = OrgCache::new(temp_dir.path().to_path_buf());
+        let cache = OrgCache::new(temp_dir.path().to_path_buf());
 
         let org_content = r#":PROPERTIES:
 :ID: node-1
