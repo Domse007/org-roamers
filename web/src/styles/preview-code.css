@@ -1,0 +1,96 @@
+/* Code Blocks and Syntax Highlighting Styles */
+
+.org-preview-content pre {
+  background: linear-gradient(
+    135deg,
+    var(--base),
+    color-mix(in srgb, var(--base) 95%, var(--surface))
+  );
+  border: 1px solid color-mix(in srgb, var(--highlight) 20%, transparent);
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 1em 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.org-preview-content pre.program-output {
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+  font-size: 0.9em;
+  line-height: 1.4;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--base) 90%, black),
+    var(--base)
+  );
+  border-color: color-mix(in srgb, var(--overlay) 40%, transparent);
+  color: color-mix(in srgb, var(--text) 95%, white);
+  position: relative;
+  padding-top: 32px;
+}
+
+.org-preview-content pre.program-output::before {
+  content: "Output";
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-size: 0.75em;
+  font-weight: 600;
+  color: var(--overlay);
+  background: color-mix(in srgb, var(--base) 80%, black);
+  padding: 3px 8px;
+  border-radius: 3px;
+  border: 1px solid color-mix(in srgb, var(--overlay) 30%, transparent);
+  font-family: var(--font);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.org-preview-content .src {
+  background: linear-gradient(
+    135deg,
+    var(--base),
+    color-mix(in srgb, var(--base) 95%, var(--surface))
+  ) !important;
+  border: 1px solid color-mix(in srgb, var(--highlight) 20%, transparent) !important;
+  padding: 8px 12px !important;
+  border-radius: 4px !important;
+  margin: 0.5em 0 !important;
+  display: inline-block !important;
+}
+
+/* Syntax highlighting improvements */
+.org-preview-content .hljs-keyword {
+  color: var(--keyword) !important;
+  font-weight: 600;
+}
+
+.org-preview-content .hljs-string {
+  color: var(--string) !important;
+}
+
+.org-preview-content .hljs-section,
+.org-preview-content .hljs-selector-class,
+.org-preview-content .hljs-template-variable,
+.org-preview-content .hljs-deletion {
+  color: #ff6b6b !important;
+}
+
+.org-preview-content .hljs-variable {
+  color: var(--ident) !important;
+}
+
+.org-preview-content .hljs-title {
+  color: var(--ident) !important;
+  font-weight: 600;
+}
+
+.org-preview-content .hljs-comment {
+  color: var(--comment) !important;
+  font-style: italic;
+}
+
+.org-preview-content .hljs-type {
+  color: var(--type) !important;
+  font-weight: 500;
+}

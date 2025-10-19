@@ -1,0 +1,70 @@
+/* Responsive Design and Media Queries for Preview Frame */
+
+/* Mobile responsive design */
+@media (max-width: 768px) {
+  .org-preview-outerframe {
+    width: calc(100vw - 24px) !important; /* Full width with 12px margin on each side */
+    right: 12px;
+    left: 12px;
+    top: 56px; /* Below the search bar */
+    bottom: 12px;
+  }
+
+  /* Hide the floating and attached toggle buttons on mobile */
+  .preview-toggle-button-floating,
+  .preview-toggle-button-attached {
+    display: none;
+  }
+
+  /* Show the close button in the header on mobile */
+  .preview-close-button-mobile {
+    display: flex;
+  }
+
+  .preview-header {
+    padding: 8px 12px 6px 12px;
+  }
+
+  .preview-title {
+    font-size: 13px;
+  }
+
+  .preview-control-button {
+    width: 26px;
+    height: 26px;
+  }
+
+  .org-preview-content {
+    padding: 12px;
+  }
+
+  /* Disable resize on mobile */
+  .resize-handle {
+    display: none;
+  }
+}
+
+/* Dark theme enhancements */
+@media (prefers-color-scheme: dark) {
+  .org-preview-outerframe {
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  }
+
+  .preview-toggle-button {
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+  }
+
+  .preview-toggle-button:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .preview-toggle-button-floating,
+  .preview-toggle-button-attached,
+  .preview-control-button,
+  .resize-handle {
+    transition: none;
+  }
+}

@@ -1,0 +1,132 @@
+/* Org Preview Content Typography and General Styling */
+
+.org-preview-content a {
+  color: var(--clickable);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--clickable) 40%, transparent);
+  transition: all 0.15s ease;
+}
+
+.org-preview-content a:hover {
+  color: color-mix(in srgb, var(--clickable) 110%, white);
+  border-bottom-color: var(--clickable);
+}
+
+.org-preview-content h1,
+.org-preview-content h2,
+.org-preview-content h3,
+.org-preview-content h4,
+.org-preview-content h5,
+.org-preview-content h6 {
+  color: var(--highlight-2);
+  border-bottom: 1px solid color-mix(in srgb, var(--highlight-2) 40%, transparent);
+  padding-bottom: 4px;
+  margin-top: 1.5em;
+  margin-bottom: 0.75em;
+}
+
+.org-preview-content h1 {
+  font-size: 1.5em;
+  border-bottom-width: 2px;
+}
+
+.org-preview-content h1:first-of-type {
+  font-size: 1.8em;
+  font-weight: 700;
+  text-align: center;
+  margin-top: 0.5em;
+  margin-bottom: 1.2em;
+  padding: 0.8em 1em;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--highlight-2) 15%, transparent),
+    color-mix(in srgb, var(--highlight-2) 8%, transparent)
+  );
+  border: none;
+  border-radius: 6px;
+  border-left: 4px solid var(--highlight-2);
+  border-right: 4px solid var(--highlight-2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  color: var(--highlight);
+}
+
+.org-preview-content h2 {
+  font-size: 1.3em;
+}
+
+.org-preview-content h3 {
+  font-size: 1.1em;
+}
+
+.org-preview-content hr {
+  border: none;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--highlight) 60%, transparent),
+    transparent
+  );
+  margin: 1.5em 0;
+}
+
+.org-preview-content .center {
+  text-align: center;
+}
+
+.org-preview-content .quote {
+  margin: 1em 0;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--base) 95%, var(--surface)),
+    var(--base)
+  );
+  border-left: 3px solid var(--highlight);
+  border-radius: 0 4px 4px 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.org-preview-content .quote > p {
+  margin: 0;
+  padding: 12px 16px;
+}
+
+.org-preview-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.org-preview-content td,
+.org-preview-content th {
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--highlight) 25%, transparent);
+  background: color-mix(in srgb, var(--surface) 95%, var(--base));
+}
+
+.org-preview-content th {
+  background: linear-gradient(
+    135deg,
+    var(--base),
+    color-mix(in srgb, var(--base) 90%, var(--highlight))
+  );
+  font-weight: 600;
+  color: var(--highlight);
+}
+
+/* Clickable org links */
+.org-preview-content .org-preview-id-link {
+  cursor: pointer;
+  color: var(--clickable) !important;
+  text-decoration: none !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--clickable) 40%, transparent) !important;
+  transition: all 0.15s ease !important;
+}
+
+.org-preview-content .org-preview-id-link:hover {
+  color: color-mix(in srgb, var(--clickable) 110%, white) !important;
+  border-bottom-color: var(--clickable) !important;
+}

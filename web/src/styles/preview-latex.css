@@ -1,0 +1,134 @@
+/* LaTeX/KaTeX and Math Rendering Styles */
+
+.org-preview-content .katex-display {
+  margin: 1.5em 0 !important;
+  text-align: center !important;
+  display: block !important;
+  visibility: visible !important;
+}
+
+.org-preview-content .katex-display-wrapper {
+  margin: 1.5em 0 !important;
+  text-align: center !important;
+  overflow-x: auto !important;
+  display: block !important;
+  visibility: visible !important;
+  padding: 8px 0;
+}
+
+.org-preview-content .katex {
+  font-size: 1.1em !important;
+  color: var(--text) !important;
+  display: inline !important;
+  visibility: visible !important;
+  background: none !important;
+  border: none !important;
+}
+
+.org-preview-content .katex-display .katex {
+  display: block !important;
+}
+
+.org-preview-content .katex .base {
+  color: var(--text) !important;
+}
+
+.org-preview-content .katex .mord,
+.org-preview-content .katex .mop,
+.org-preview-content .katex .mbin,
+.org-preview-content .katex .mrel,
+.org-preview-content .katex .mopen,
+.org-preview-content .katex .mclose,
+.org-preview-content .katex .mpunct,
+.org-preview-content .katex .mspace,
+.org-preview-content .katex .minner {
+  color: var(--text) !important;
+}
+
+.org-preview-content .katex * {
+  color: var(--text) !important;
+  visibility: visible !important;
+}
+
+/* Hide conflicting math elements */
+.org-preview-content .MathJax,
+.org-preview-content .MathJax_Display,
+.org-preview-content .math-tex {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+.org-preview-content .katex-mathml {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+.org-preview-content .katex-html {
+  display: inline !important;
+  visibility: visible !important;
+}
+
+/* SVG styling for LaTeX and general content */
+.org-preview-content svg {
+  fill: var(--text);
+  max-width: 100%;
+  height: auto;
+}
+
+.org-preview-content svg.org-latex-rendered {
+  fill: var(--text) !important;
+  color: var(--text) !important;
+  max-width: 100%;
+  height: auto;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.org-preview-content svg.org-latex-rendered * {
+  fill: var(--text) !important;
+  color: var(--text) !important;
+}
+
+/* Org-mode specific classes */
+.org-preview-content .org-latex {
+  color: var(--text);
+}
+
+.org-preview-content .org-latex-block {
+  margin: 1.5em 0;
+  text-align: center;
+}
+
+/* Error and placeholder styling */
+.org-preview-content .katex-error,
+.org-preview-content .latex-error {
+  color: #ff6b6b !important;
+  border: 1px solid #ff6b6b;
+  background: color-mix(in srgb, #ff6b6b 10%, var(--surface));
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.9em;
+}
+
+.org-preview-content .org-latex-placeholder,
+.org-preview-content .org-latex-block-placeholder {
+  color: var(--comment);
+  font-style: italic;
+  background: color-mix(in srgb, var(--base) 80%, var(--surface));
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: 1px dashed color-mix(in srgb, var(--comment) 60%, transparent);
+}
+
+/* Responsive LaTeX */
+@media (max-width: 768px) {
+  .org-preview-content .katex {
+    font-size: 1em !important;
+  }
+
+  .org-preview-content .katex-display-wrapper {
+    margin: 1em 0 !important;
+    padding: 4px 0;
+  }
+}
