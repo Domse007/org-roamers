@@ -1,9 +1,23 @@
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, thread};
 
 use org_roamers::{ServerState, config::Config};
-use tokio::{runtime::Runtime, task::JoinHandle};
+use tokio::runtime::Runtime;
 
 use crate::{OrgRoamersGUI, settings::Settings};
+
+pub struct ServerHandle {
+    handle: Option<thread::JoinHandle<anyhow::Result<()>>>,
+}
+
+impl ServerHandle {
+    pub fn abort(&mut self) {
+        if let Some(handle) = self.handle.take() {
+            // We can't gracefully abort a thread, so we'll need to implement
+            // proper shutdown signaling in the future
+            drop(handle);
+        }
+    }
+}
 
 #[cfg(not(target_os = "windows"))]
 pub fn config_path() -> PathBuf {
@@ -17,20 +31,25 @@ pub fn config_path() -> PathBuf {
 
 fn server_conf_path() -> PathBuf {
     let mut path = config_path();
-    path.push("server_conf.json");
+    path.push("conf.json");
     if !path.exists() {
-        PathBuf::from("./server_conf.json")
+        PathBuf::from("./conf.json")
     } else {
         path
     }
 }
 
-pub fn start(ctx: &OrgRoamersGUI) -> JoinHandle<anyhow::Result<()>> {
-    let rt = Runtime::new().unwrap();
-
+pub fn start(ctx: &OrgRoamersGUI) -> ServerHandle {
     let settings = ctx.settings.clone();
 
-    rt.spawn(async move { start_server(settings).await })
+    let handle = thread::spawn(move || {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async move { start_server(settings).await })
+    });
+
+    ServerHandle {
+        handle: Some(handle),
+    }
 }
 
 pub async fn start_server(ctx: Settings) -> anyhow::Result<()> {

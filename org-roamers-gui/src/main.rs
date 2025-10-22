@@ -7,7 +7,7 @@ use egui::{Button, IconData};
 use logger::LogBuffer;
 use rfd::FileDialog;
 use settings::Settings;
-use tokio::task::JoinHandle;
+use start::ServerHandle;
 
 mod logger;
 mod settings;
@@ -74,7 +74,7 @@ fn settings_file() -> PathBuf {
 struct OrgRoamersGUI {
     settings: Settings,
     logs: LogBuffer<LOG_ENTRIES>,
-    handle: Option<JoinHandle<anyhow::Result<()>>>,
+    handle: Option<ServerHandle>,
 }
 
 impl OrgRoamersGUI {
@@ -151,7 +151,7 @@ impl eframe::App for OrgRoamersGUI {
                 .add_sized([button_width, 1.], Button::new(button_label))
                 .clicked()
             {
-                match &self.handle {
+                match &mut self.handle {
                     Some(handle) => {
                         handle.abort();
                         self.handle = None;
