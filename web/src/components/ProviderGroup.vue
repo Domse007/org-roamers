@@ -84,35 +84,126 @@ const isResultSelected = (index: number): boolean => {
   <div class="provider-group">
     <div class="provider-header">
       <div class="provider-header-left" @click="cycleDisplayMode">
-        <svg v-if="displayMode !== 'collapsed'" class="provider-toggle-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
-          <path d="M12 10L8 6L4 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <svg
+          v-if="displayMode !== 'collapsed'"
+          class="provider-toggle-icon"
+          width="14"
+          height="14"
+          viewBox="0 0 16 16"
+          fill="none"
+        >
+          <path
+            d="M12 10L8 6L4 10"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
         </svg>
-        <svg v-else class="provider-toggle-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
-          <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <svg
+          v-else
+          class="provider-toggle-icon"
+          width="14"
+          height="14"
+          viewBox="0 0 16 16"
+          fill="none"
+        >
+          <path
+            d="M4 6L8 10L12 6"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
         </svg>
         <span class="provider-name">{{ providerName }}</span>
         <span class="provider-count">({{ results.length }})</span>
       </div>
       <div class="provider-controls">
-        <button class="provider-control-btn" :class="{ active: displayMode === 'top10' }" @click="showTop10" title="Show top 10 results">
-          <svg class="control-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
-            <path d="M1 8C1 8 3.5 3 8 3C12.5 3 15 8 15 8C15 8 12.5 13 8 13C3.5 13 1 8 1 8Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.5"/>
+        <button
+          class="provider-control-btn"
+          :class="{ active: displayMode === 'top10' }"
+          @click="showTop10"
+          title="Show top 10 results"
+        >
+          <svg
+            class="control-icon"
+            width="14"
+            height="14"
+            viewBox="0 0 16 16"
+            fill="none"
+          >
+            <path
+              d="M1 8C1 8 3.5 3 8 3C12.5 3 15 8 15 8C15 8 12.5 13 8 13C3.5 13 1 8 1 8Z"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <circle
+              cx="8"
+              cy="8"
+              r="2"
+              stroke="currentColor"
+              stroke-width="1.5"
+            />
           </svg>
         </button>
-        <button class="provider-control-btn" :class="{ active: displayMode === 'all' }" @click="showAll" title="Show all results">
-          <svg class="control-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
-            <path d="M5 4H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            <path d="M5 8H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            <path d="M5 12H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            <circle cx="2.5" cy="4" r="0.5" fill="currentColor"/>
-            <circle cx="2.5" cy="8" r="0.5" fill="currentColor"/>
-            <circle cx="2.5" cy="12" r="0.5" fill="currentColor"/>
+        <button
+          class="provider-control-btn"
+          :class="{ active: displayMode === 'all' }"
+          @click="showAll"
+          title="Show all results"
+        >
+          <svg
+            class="control-icon"
+            width="14"
+            height="14"
+            viewBox="0 0 16 16"
+            fill="none"
+          >
+            <path
+              d="M5 4H14"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+            />
+            <path
+              d="M5 8H14"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+            />
+            <path
+              d="M5 12H14"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+            />
+            <circle cx="2.5" cy="4" r="0.5" fill="currentColor" />
+            <circle cx="2.5" cy="8" r="0.5" fill="currentColor" />
+            <circle cx="2.5" cy="12" r="0.5" fill="currentColor" />
           </svg>
         </button>
-        <button class="provider-control-btn" :class="{ active: displayMode === 'collapsed' }" @click="collapse" title="Collapse">
-          <svg class="control-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
-            <path d="M3 8H13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <button
+          class="provider-control-btn"
+          :class="{ active: displayMode === 'collapsed' }"
+          @click="collapse"
+          title="Collapse"
+        >
+          <svg
+            class="control-icon"
+            width="14"
+            height="14"
+            viewBox="0 0 16 16"
+            fill="none"
+          >
+            <path
+              d="M3 8H13"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+            />
           </svg>
         </button>
       </div>
@@ -129,7 +220,11 @@ const isResultSelected = (index: number): boolean => {
         @click="emit('click', result.id)"
         @mouseenter="emit('hover', startIndex + index)"
       />
-      <div v-if="displayMode === 'top10' && results.length > 10" class="provider-show-more" @click="showAll">
+      <div
+        v-if="displayMode === 'top10' && results.length > 10"
+        class="provider-show-more"
+        @click="showAll"
+      >
         Show {{ results.length - 10 }} more results...
       </div>
     </div>

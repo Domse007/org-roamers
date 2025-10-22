@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import hljs from "highlight.js";
-import { nextTick, useTemplateRef, watch } from "vue";
+import { nextTick, onMounted, onUnmounted, useTemplateRef, watch } from "vue";
 import LinksSection from "./LinksSection.vue";
 import { processLatexPlaceholders } from "../latex-utils.ts";
 import { usePreviewResize } from "../composables/usePreviewResize";
 import { usePreviewContent } from "../composables/usePreviewContent";
+import { getRouter } from "../router";
 import "../styles/preview-frame.css";
 import "../styles/preview-content.css";
 import "../styles/preview-code.css";
@@ -30,10 +31,20 @@ const {
   getLatexBlocks,
 } = usePreviewContent();
 
+const router = getRouter();
+
 // Wrapper function to handle emits
-const preview = (id: string) => {
+const preview = (id: string, updateRouter: boolean = true) => {
   emit("previewSwitch", id);
-  previewContent(id, (errorMsg) => emit("error", errorMsg));
+  previewContent(id, (errorMsg) => emit("error", errorMsg), updateRouter);
+};
+
+// Handle back button navigation without updating router
+const previewFromHistory = (id: string | null) => {
+  if (id) {
+    // Don't update router since this is from internal history
+    preview(id, false);
+  }
 };
 
 const resize = togglePreview;
@@ -48,7 +59,30 @@ const configureIDLinks = (_class: string) => {
   );
 };
 
-watch(props, () => preview(props.id));
+// Set up router navigation listener
+let unregisterRouter: (() => void) | null = null;
+
+onMounted(() => {
+  // Register router navigation handler
+  unregisterRouter = router.onNavigate((nodeId) => {
+    console.log("Router navigation to:", nodeId);
+    // Preview without updating router (avoid infinite loop)
+    preview(nodeId, false);
+  });
+});
+
+onUnmounted(() => {
+  // Clean up router listener
+  if (unregisterRouter) {
+    unregisterRouter();
+  }
+});
+
+watch(props, () => {
+  if (props.id) {
+    preview(props.id);
+  }
+});
 watch(rendered, async () => {
   await nextTick();
 
@@ -60,16 +94,9 @@ watch(rendered, async () => {
   const latexBlocks = getLatexBlocks();
   if (preview_ref.value && currentId && latexBlocks.length > 0) {
     try {
-      console.log(
-        "Processing LaTeX placeholders:",
-        latexBlocks.length,
-      );
+      console.log("Processing LaTeX placeholders:", latexBlocks.length);
 
-      await processLatexPlaceholders(
-        preview_ref.value,
-        currentId,
-        latexBlocks,
-      );
+      await processLatexPlaceholders(preview_ref.value, currentId, latexBlocks);
 
       console.log("LaTeX processing completed");
     } catch (error) {
@@ -162,7 +189,7 @@ watch(rendered, async () => {
           <button
             class="preview-control-button"
             :class="{ 'preview-control-hidden': !history.canGoBack() }"
-            @click="preview(history.back()!)"
+            @click="previewFromHistory(history.back())"
             title="Go back"
             :disabled="!history.canGoBack()"
           >
@@ -180,7 +207,7 @@ watch(rendered, async () => {
           <button
             class="preview-control-button"
             :class="{ 'preview-control-hidden': !history.canGoForward() }"
-            @click="preview(history.forward()!)"
+            @click="previewFromHistory(history.forward())"
             title="Go forward"
             :disabled="!history.canGoForward()"
           >

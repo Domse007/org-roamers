@@ -177,7 +177,8 @@ const sortedProviderGroups = computed(() => {
     if (results.length > 0) {
       groups.push({
         providerId,
-        providerName: providerConfig.value.get(providerId) || `Provider ${providerId}`,
+        providerName:
+          providerConfig.value.get(providerId) || `Provider ${providerId}`,
         results,
         startIndex: currentIndex,
       });
@@ -218,7 +219,7 @@ const handleInput = () => {
 const handleFocus = () => {
   // Request configuration on every focus to ensure we have latest providers
   initializeSearchConfig();
-  
+
   if (searchterm.value.trim()) {
     showSuggestions.value = true;
   }
@@ -360,7 +361,11 @@ defineExpose<SearchBarMethods>({
 </script>
 
 <template>
-  <div class="search-wrapper" @mousedown="handleSearchMouseDown" @mouseup="handleSearchMouseUp">
+  <div
+    class="search-wrapper"
+    @mousedown="handleSearchMouseDown"
+    @mouseup="handleSearchMouseUp"
+  >
     <div class="search-input-container">
       <svg
         class="search-icon"
@@ -411,14 +416,8 @@ defineExpose<SearchBarMethods>({
       </button>
     </div>
 
-    <div
-      v-if="showSuggestions && searchterm.trim()"
-      class="search-suggestions"
-    >
-      <div
-        v-if="totalResultsCount === 0"
-        class="search-no-results"
-      >
+    <div v-if="showSuggestions && searchterm.trim()" class="search-suggestions">
+      <div v-if="totalResultsCount === 0" class="search-no-results">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path
             d="M7 12C9.76142 12 12 9.76142 12 7C12 4.23858 9.76142 2 7 2C4.23858 2 2 4.23858 2 7C2 9.76142 4.23858 12 7 12Z"

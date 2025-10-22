@@ -4,8 +4,11 @@ import GraphView from "./components/GraphView.vue";
 import SearchBar, { type SearchBarMethods } from "./components/SearchBar.vue";
 import SettingsPane from "./components/Settings/SettingsPane.vue";
 import ErrorDialog from "./components/ErrorDialog.vue";
-import { onMounted, onUnmounted, type Ref, ref, provide } from "vue";
+import { onMounted, onUnmounted, type Ref, ref, provide, watch } from "vue";
 import { type RoamLink, type RoamNode } from "./types.ts";
+import { getRouter } from "./router";
+
+const router = getRouter();
 
 const connectionStatus: Ref<"connecting" | "connected" | "disconnected"> =
   ref("connecting");
@@ -225,6 +228,26 @@ const connectWebSocket = () => {
 
 onMounted(() => {
   console.log("Component mounted, initializing WebSocket connection");
+
+  // Initialize router first
+  router.initialize();
+
+  // If there's an initial node from the URL, set it
+  const initialNodeId = router.getCurrentNodeId();
+  if (initialNodeId) {
+    console.log("Setting initial preview ID from URL:", initialNodeId);
+    previewID.value = initialNodeId;
+  }
+
+  // Sync router changes with previewID
+  router.onNavigate((nodeId) => {
+    console.log(
+      "App: Router navigation detected, updating preview ID to:",
+      nodeId,
+    );
+    previewID.value = nodeId;
+  });
+
   connectWebSocket();
 
   // Add periodic connection health check

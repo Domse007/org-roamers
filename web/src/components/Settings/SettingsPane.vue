@@ -50,13 +50,7 @@ const props = defineProps<{
     title="Settings"
   >
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-      <circle
-        cx="12"
-        cy="12"
-        r="3"
-        stroke="currentColor"
-        stroke-width="1.5"
-      />
+      <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5" />
       <path
         d="M10.5 4.5H13.5L14 7C14.6 7.2 15.2 7.5 15.7 7.9L18 7L19.5 9.5L17.5 11C17.6 11.7 17.6 12.3 17.5 13L19.5 14.5L18 17L15.7 16.1C15.2 16.5 14.6 16.8 14 17L13.5 19.5H10.5L10 17C9.4 16.8 8.8 16.5 8.3 16.1L6 17L4.5 14.5L6.5 13C6.4 12.3 6.4 11.7 6.5 11L4.5 9.5L6 7L8.3 7.9C8.8 7.5 9.4 7.2 10 7L10.5 4.5Z"
         stroke="currentColor"

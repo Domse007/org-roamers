@@ -2,6 +2,7 @@ import { ref, type Ref } from "vue";
 import { getScope } from "../settings";
 import { type OrgAsHTMLResponse } from "../types";
 import { History } from "../history";
+import { getRouter } from "../router";
 
 /**
  * Composable for handling preview content fetching and management
@@ -11,20 +12,22 @@ export function usePreviewContent() {
   const links: Ref<{ display: string; id: string }[]> = ref([]);
   const incomingLinks: Ref<{ display: string; id: string }[]> = ref([]);
   const rendered = ref("");
-  
+
   let current_id: string = "";
   let current_latex_blocks: string[] = [];
-  
+
   const history = new History<string>();
+  const router = getRouter();
 
   const preview = (
     id: string,
-    onError?: (message: string) => void
+    onError?: (message: string) => void,
+    updateRouter: boolean = true,
   ): Promise<void> => {
     current_id = id;
     console.log(`Previewing ${id}`);
     const scope: "file" | "node" = getScope();
-    
+
     return fetch(`/org?id=${id}&scope=${scope}`)
       .then((response) => {
         console.log("Org response status:", response.status);
@@ -45,8 +48,14 @@ export function usePreviewContent() {
         incomingLinks.value = resp.incoming_links || [];
         current_latex_blocks = resp.latex_blocks || [];
         console.log(
-          `Loaded content with ${current_latex_blocks.length} LaTeX blocks`
+          `Loaded content with ${current_latex_blocks.length} LaTeX blocks`,
         );
+
+        // Update browser history via router
+        if (updateRouter) {
+          router.push(id);
+        }
+
         expand();
       })
       .catch((error) => {
@@ -55,11 +64,11 @@ export function usePreviewContent() {
           error.name === "TypeError" && error.message.includes("fetch")
             ? "Server is not responding. Please check if the server is running."
             : `Failed to load content: ${error.message}`;
-        
+
         if (onError) {
           onError(errorMsg);
         }
-        
+
         rendered.value = `<div class="error">${errorMsg}</div>`;
         expand();
       });
@@ -94,7 +103,7 @@ export function usePreviewContent() {
     incomingLinks,
     rendered,
     history,
-    
+
     // Methods
     preview,
     expand,

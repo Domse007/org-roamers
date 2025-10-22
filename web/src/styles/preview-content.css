@@ -19,7 +19,8 @@
 .org-preview-content h5,
 .org-preview-content h6 {
   color: var(--highlight-2);
-  border-bottom: 1px solid color-mix(in srgb, var(--highlight-2) 40%, transparent);
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--highlight-2) 40%, transparent);
   padding-bottom: 4px;
   margin-top: 1.5em;
   margin-bottom: 0.75em;

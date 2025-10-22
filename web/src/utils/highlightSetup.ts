@@ -30,75 +30,81 @@ export function setupSyntaxHighlighting() {
           hljs.registerAliases("elisp", { languageName: "lisp" });
           hljs.registerAliases("emacs-lisp", { languageName: "lisp" });
           console.log(
-            "Registered elisp and emacs-lisp aliases for existing lisp"
+            "Registered elisp and emacs-lisp aliases for existing lisp",
           );
         }
       } catch (aliasError) {
-        console.warn("Failed to register lisp aliases as fallback:", aliasError);
+        console.warn(
+          "Failed to register lisp aliases as fallback:",
+          aliasError,
+        );
       }
     });
 
   // Register JCL syntax highlighting
   // https://amyfare.ca/files/jcl.min.js
-  hljs.registerLanguage("jcl", function () {
-    "use strict";
+  hljs.registerLanguage(
+    "jcl",
+    (function () {
+      "use strict";
 
-    return function (e: any) {
-      return {
-        aliases: ["jcl"],
-        case_insensitive: false,
+      return function (e: any) {
+        return {
+          aliases: ["jcl"],
+          case_insensitive: false,
 
-        contains: [
-          e.COMMENT(/^\/\/\*/, /$/),
-          {
-            begin: /^(?=\/\/)/,
-            end: /$/,
+          contains: [
+            e.COMMENT(/^\/\/\*/, /$/),
+            {
+              begin: /^(?=\/\/)/,
+              end: /$/,
 
-            keywords: {
-              $pattern: /(?<= )\w+(?= )/,
-              keyword:
-                "COMMAND CNTL DD ENDCNTL EXEC IF THEN ELSE ENDIF INCLUDE JCLLIB " +
-                "JOB OUTPUT PEND PROC SET XMIT",
+              keywords: {
+                $pattern: /(?<= )\w+(?= )/,
+                keyword:
+                  "COMMAND CNTL DD ENDCNTL EXEC IF THEN ELSE ENDIF INCLUDE JCLLIB " +
+                  "JOB OUTPUT PEND PROC SET XMIT",
+              },
+
+              contains: [
+                {
+                  scope: "symbol",
+                  match: /\/\/(\w+\.?)*/,
+                },
+                {
+                  scope: "parameter",
+                  match: /(?<=[ ,])\w+(?=\=)/,
+                },
+                {
+                  scope: "operator",
+                  match: "[=|<>]",
+                },
+                {
+                  scope: "punctuation",
+                  match: "[()]",
+                },
+                {
+                  scope: "variable",
+                  match: /(?<!&)&\w+/,
+                },
+
+                e.APOS_STRING_MODE,
+                e.NUMBER_MODE,
+              ],
             },
-
-            contains: [
-              {
-                scope: "symbol",
-                match: /\/\/(\w+\.?)*/,
-              },
-              {
-                scope: "parameter",
-                match: /(?<=[ ,])\w+(?=\=)/,
-              },
-              {
-                scope: "operator",
-                match: "[=|<>]",
-              },
-              {
-                scope: "punctuation",
-                match: "[()]",
-              },
-              {
-                scope: "variable",
-                match: /(?<!&)&\w+/,
-              },
-
-              e.APOS_STRING_MODE,
-              e.NUMBER_MODE,
-            ],
-          },
-          {
-            scope: "meta",
-            begin: /^\/\*/,
-            end: /$/,
-          },
-          {
-            scope: "literal",
-          },
-        ],
+            {
+              scope: "meta",
+              begin: /^\/\*/,
+              end: /$/,
+            },
+            {
+              scope: "literal",
+            },
+          ],
+        };
       };
-    };
-  }());
+    })(),
+  );
 
   // Update the selector from 'pre code' to 'code' to autodetect inline src
   // like src_java[:exports code]{ void main() } which has no <pre></pre>.
