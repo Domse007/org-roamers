@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use orgize::{
-    ast::{Document, Keyword, Link},
+    ast::{Keyword, Link},
     export::{Container, Event, Traverser},
     Org, SyntaxElement,
 };
@@ -315,23 +315,6 @@ fn get_tags_from_keywords(iter: impl Iterator<Item = Keyword>) -> Vec<String> {
         .collect()
 }
 
-pub fn get_latex_header(content: &str) -> anyhow::Result<Vec<String>> {
-    let org = Org::parse(content);
-    get_latex_header_from_document(org.document())
-}
-
-pub fn get_latex_header_from_document(document: Document) -> anyhow::Result<Vec<String>> {
-    let mut headers = vec![];
-
-    for keyword in document.keywords() {
-        if keyword.key().to_lowercase() == "latex_header" {
-            headers.push(keyword.value().trim().to_string());
-        }
-    }
-
-    Ok(headers)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -531,34 +514,6 @@ some text
                     file: "test.org".to_string(),
                     ..Default::default()
                 }
-            ]
-        );
-    }
-
-    #[test]
-    fn test_get_latex_header() {
-        const ORG: &str = "
-#+title: Test
-#+subtitle: test
-#+author: Joakim Brodén
-#+filetags: :test2:test1:
-#+options: date:nil author:t num:nil toc:nil
-#+latex_header: \\usepackage{mathtools}
-#+latex_header: \\setlength\\parindent{0pt}
-#+latex_header: \\setlength{\\abovedisplayskip}{0pt}
-#+latex_header: \\usepackage{parskip}
-#+latex_header: \\usepackage[margin=3cm]{geometry}";
-        let org = Org::parse(ORG);
-        let document = org.document();
-        let res = get_latex_header_from_document(document);
-        assert_eq!(
-            res.unwrap(),
-            vec![
-                "\\usepackage{mathtools}",
-                "\\setlength\\parindent{0pt}",
-                "\\setlength{\\abovedisplayskip}{0pt}",
-                "\\usepackage{parskip}",
-                "\\usepackage[margin=3cm]{geometry}"
             ]
         );
     }

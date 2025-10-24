@@ -6,19 +6,8 @@ use tracing::info;
 
 use crate::config::LatexConfig;
 use crate::latex::builder::{LatexBuilder, LatexPathBuilder};
-use crate::transform::org;
 
 mod builder;
-
-pub async fn get_image_with_ctx(
-    config: &LatexConfig,
-    latex: String,
-    color: String,
-    org_content: &str,
-) -> anyhow::Result<Vec<u8>> {
-    let headers = org::get_latex_header(org_content)?;
-    get_image(config, latex, color, headers).await
-}
 
 pub async fn get_image(
     config: &LatexConfig,
@@ -54,8 +43,8 @@ pub async fn get_image(
 
     match output {
         Ok(output) if !output.status.success() => {
+            tracing::error!("Could not compile: {latex}");
             tracing::error!("STDOUT :: {}", String::from_utf8_lossy(&output.stdout));
-            tracing::error!("STDERR :: {}", String::from_utf8_lossy(&output.stderr));
             bail!("Failed to execute latex");
         }
         Err(err) => {

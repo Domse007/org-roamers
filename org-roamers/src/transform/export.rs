@@ -468,7 +468,6 @@ impl Traverser for HtmlExport<'_> {
                 self.latex_counter += 1;
             }
 
-            // ignores keyword
             Event::Enter(Container::Keyword(_)) => ctx.skip(),
 
             Event::Entity(entity) => self.output += entity.html(),
@@ -960,8 +959,16 @@ mod tests {
         let footnote = &result[footdef_start..=footdef_end];
 
         // Verify there are NO <p> tags inside the footnote
-        assert!(!footnote.contains("<p>"), "Footnote should not contain <p> tags, but got: {}", footnote);
-        assert!(!footnote.contains("</p>"), "Footnote should not contain </p> tags, but got: {}", footnote);
+        assert!(
+            !footnote.contains("<p>"),
+            "Footnote should not contain <p> tags, but got: {}",
+            footnote
+        );
+        assert!(
+            !footnote.contains("</p>"),
+            "Footnote should not contain </p> tags, but got: {}",
+            footnote
+        );
 
         // Verify the content is still there
         assert!(footnote.contains("First line"));

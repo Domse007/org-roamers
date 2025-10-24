@@ -7,9 +7,11 @@
 //! - [`subtree`]: Get a subtree of an org file.
 //! - [`title`]: Strip all syntax from the org input and return a string that
 //!   can be displayed in contexts without org support.
+//! - [`keywords`]: Collect all keywords from a given org document.
 //!
 //! All of these parsers use the [`orgize`] parsers.
 pub mod export;
+pub mod keywords;
 pub mod org;
 pub mod subtree;
 pub mod title;

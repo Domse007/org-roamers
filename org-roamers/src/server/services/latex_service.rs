@@ -4,9 +4,9 @@ use axum::{
 };
 use orgize::Org;
 
-use crate::latex;
 use crate::transform::export::HtmlExport;
 use crate::ServerState;
+use crate::{latex, transform::keywords::KeywordCollector};
 
 pub async fn get_latex_svg_by_index(
     state: &ServerState,
@@ -30,6 +30,7 @@ pub async fn get_latex_svg_by_index(
     Org::parse(content).traverse(&mut handler);
 
     let (_, _, latex_blocks) = handler.finish();
+    let latex_headers = KeywordCollector::new("LATEX_HEADER").perform(content);
 
     tracing::info!("Found {} LaTeX blocks in content", latex_blocks.len());
 
@@ -55,11 +56,11 @@ pub async fn get_latex_svg_by_index(
     };
 
     // Render the LaTeX
-    let svg = latex::get_image_with_ctx(
+    let svg = latex::get_image(
         &state.config.latex_config,
         latex_content.clone(),
         color,
-        content,
+        latex_headers,
     )
     .await;
 
