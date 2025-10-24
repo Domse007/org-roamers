@@ -16,3 +16,16 @@ sqlx = { version = "0.8.6", features = ["runtime-tokio"] }
 [features]
 default = []
 static_assets = ["org-roamers/static_assets"]
+
+[package.metadata.deb]
+maintainer = "Dominik Keller <github@dominik-keller.com>"
+copyright = "2025, Dominik Keller <github@dominik-keller.com>"
+depends = "$auto"
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/org-roamers-cli", "usr/bin/", "755"],
+]
+
+[package.metadata.deb.variants.static]
+features = ["static_assets"]

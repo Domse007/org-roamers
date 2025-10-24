@@ -1,0 +1,39 @@
+name: Release with Debian Package
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build-and-attach-deb:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install cargo-deb
+      run: cargo install cargo-deb
+
+    - name: Build website
+      run: make website
+
+    - name: Build Debian package
+      run: cargo deb -p org-roamers-cli --variant static
+
+    - name: Get package filename
+      id: package
+      run: echo "filename=$(ls target/debian/*.deb | head -n 1)" >> $GITHUB_OUTPUT
+
+    - name: Upload to release
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ${{ steps.package.outputs.filename }}
+        asset_name: org-roamers-cli_${{ github.event.release.tag_name }}_amd64.deb
+        asset_content_type: application/vnd.debian.binary-package
