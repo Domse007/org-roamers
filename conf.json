@@ -5,6 +5,7 @@
       "port": 5000
    },
    "org_to_html": {
+      "respect_noexport": false,
       "env_advices": [
 	  {
 	      "on": "important",
