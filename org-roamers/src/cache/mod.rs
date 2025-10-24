@@ -157,12 +157,16 @@ impl OrgCache {
         let file_path = cache_entry_arc.path();
         let mut ids_to_update = Vec::new();
 
-        let mut iter = self.lookup.iter_mut();
-        while let Some(mut ref_tuple) = iter.next() {
-            let (existing_id, existing_entry) = ref_tuple.pair_mut();
-            if existing_entry.path() == file_path {
-                ids_to_update.push(existing_id.clone());
+        // Collect IDs to update - use iter() instead of iter_mut() since we're not mutating
+        {
+            let iter = self.lookup.iter();
+            for ref_tuple in iter {
+                let (existing_id, existing_entry) = ref_tuple.pair();
+                if existing_entry.path() == file_path {
+                    ids_to_update.push(existing_id.clone());
+                }
             }
+            // Iterator is dropped here, releasing any locks
         }
 
         // Update all entries for this file
