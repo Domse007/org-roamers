@@ -4,7 +4,7 @@ use axum::{
 };
 use orgize::Org;
 
-use crate::transform::export::HtmlExport;
+use crate::transform::html::HtmlExport;
 use crate::ServerState;
 use crate::{latex, transform::keywords::KeywordCollector};
 

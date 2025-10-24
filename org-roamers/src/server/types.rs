@@ -1,7 +1,7 @@
 use axum::response::{IntoResponse, Json, Response};
 use serde::{Deserialize, Serialize};
 
-use crate::transform::org::NodeFromOrg;
+use crate::transform::node_builder::OrgNode;
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialOrd, Ord)]
 pub struct RoamID(String);
@@ -76,8 +76,8 @@ pub struct RoamNode {
     pub num_links: usize,
 }
 
-impl From<NodeFromOrg> for RoamNode {
-    fn from(value: NodeFromOrg) -> Self {
+impl From<OrgNode> for RoamNode {
+    fn from(value: OrgNode) -> Self {
         Self {
             title: value.title.into(),
             id: value.uuid.into(),

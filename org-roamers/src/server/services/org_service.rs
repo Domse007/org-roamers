@@ -3,7 +3,7 @@ use std::sync::Arc;
 use orgize::Org;
 
 use crate::server::types::{IncomingLink, OrgAsHTMLResponse, OutgoingLink, RoamID, RoamTitle};
-use crate::transform::export::HtmlExport;
+use crate::transform::html::HtmlExport;
 use crate::transform::subtree::Subtree;
 use crate::ServerState;
 

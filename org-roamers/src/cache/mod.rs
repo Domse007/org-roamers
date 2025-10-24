@@ -17,7 +17,7 @@ use crate::{
     cache::{file::OrgFile, fileiter::FileIter},
     server::types::RoamID,
     sqlite::files::insert_file,
-    transform::org,
+    transform::node_builder,
 };
 
 mod file;
@@ -111,7 +111,7 @@ impl OrgCache {
             }
 
             let file_path = cache_entry.path().to_string_lossy().to_string();
-            let nodes = org::get_nodes(cache_entry.content(), &file_path);
+            let nodes = node_builder::get_nodes(cache_entry.content(), &file_path);
 
             let cache_entry = Arc::new(cache_entry);
             for node in &nodes {
@@ -119,7 +119,7 @@ impl OrgCache {
                     .insert(node.uuid.clone().into(), cache_entry.clone());
             }
 
-            org::insert_nodes(con, nodes).await;
+            node_builder::insert_nodes(con, nodes).await;
         }
 
         Ok(())

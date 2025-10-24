@@ -7,7 +7,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     cache::OrgCacheEntry, client::message::WebSocketMessage, server::types::RoamID,
-    sqlite::files::insert_file, transform::org, ServerState,
+    sqlite::files::insert_file, transform::node_builder, ServerState,
 };
 
 pub async fn watcher(
@@ -108,7 +108,7 @@ async fn update_file(state: &ServerState, path: &PathBuf) -> anyhow::Result<()> 
 
     // Parse org content to extract nodes
     let file_path_str = cache_entry.path().to_string_lossy().to_string();
-    let nodes = org::get_nodes(cache_entry.content(), &file_path_str);
+    let nodes = node_builder::get_nodes(cache_entry.content(), &file_path_str);
 
     // Collect node IDs
     let node_ids: Vec<RoamID> = nodes.iter().map(|n| n.uuid.clone().into()).collect();
@@ -117,7 +117,7 @@ async fn update_file(state: &ServerState, path: &PathBuf) -> anyhow::Result<()> 
     state.cache.insert_many(&node_ids, cache_entry);
 
     // Update nodes in database
-    org::insert_nodes(&state.sqlite, nodes).await;
+    node_builder::insert_nodes(&state.sqlite, nodes).await;
 
     tracing::info!("Updated file {:?} in cache and database", file_path_str);
     Ok(())

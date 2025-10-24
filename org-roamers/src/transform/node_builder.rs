@@ -10,7 +10,7 @@ use sqlx::SqlitePool;
 use crate::sqlite::rebuild;
 
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct NodeFromOrg {
+pub struct OrgNode {
     pub(crate) uuid: String,
     pub(crate) title: String,
     pub(crate) content: String,
@@ -26,7 +26,7 @@ pub struct NodeFromOrg {
     pub(crate) file: String,
 }
 
-impl NodeFromOrg {
+impl OrgNode {
     #[rustfmt::skip]
     pub async fn insert_node(&self, con: &SqlitePool) -> anyhow::Result<()> {
         // this does not insert olp, tags, etc. -- why?
@@ -58,7 +58,7 @@ impl NodeFromOrg {
     }
 }
 
-pub async fn insert_nodes(con: &SqlitePool, nodes: Vec<NodeFromOrg>) {
+pub async fn insert_nodes(con: &SqlitePool, nodes: Vec<OrgNode>) {
     for node in nodes.iter() {
         // Only insert tags, aliases, and links if the node was successfully inserted
         match node.insert_node(con).await {
@@ -84,17 +84,17 @@ pub async fn insert_nodes(con: &SqlitePool, nodes: Vec<NodeFromOrg>) {
     }
 }
 
-pub fn get_nodes(content: &str, file: &str) -> Vec<NodeFromOrg> {
+pub fn get_nodes(content: &str, file: &str) -> Vec<OrgNode> {
     let org = Org::parse(content);
 
-    let mut traverser = RoamersTraverser::new(file);
+    let mut traverser = NodesBuilder::new(file);
     org.traverse(&mut traverser);
     traverser.nodes
 }
 
 #[derive(Default)]
-pub struct RoamersTraverser {
-    nodes: Vec<NodeFromOrg>,
+pub struct NodesBuilder {
+    nodes: Vec<OrgNode>,
     id_stack: Vec<(String, String)>,
     tags_stack: Vec<Vec<String>>,
     olp: Vec<String>,
@@ -102,7 +102,7 @@ pub struct RoamersTraverser {
     file: String,
 }
 
-impl RoamersTraverser {
+impl NodesBuilder {
     pub fn new(file: &str) -> Self {
         Self {
             file: file.to_string(),
@@ -132,7 +132,7 @@ impl RoamersTraverser {
     }
 }
 
-impl Traverser for RoamersTraverser {
+impl Traverser for NodesBuilder {
     fn event(&mut self, event: orgize::export::Event, _ctx: &mut orgize::export::TraversalContext) {
         match event {
             Event::Enter(Container::Document(document)) => {
@@ -147,7 +147,7 @@ impl Traverser for RoamersTraverser {
                             .map(parse_aliases)
                             .unwrap_or_default();
 
-                        let node = NodeFromOrg {
+                        let node = OrgNode {
                             title: title.clone(),
                             uuid: id.clone(),
                             content,
@@ -218,7 +218,7 @@ impl Traverser for RoamersTraverser {
                         // additional queries when computing inherited tags.
                         self.tags_stack.push(tags);
 
-                        let node = NodeFromOrg {
+                        let node = OrgNode {
                             title,
                             uuid: id,
                             content,
@@ -336,7 +336,7 @@ some text
         assert_eq!(
             res,
             vec![
-                NodeFromOrg {
+                OrgNode {
                     title: "Hello World".to_string(),
                     parent: None,
                     uuid: "e655725f-97db-4eec-925a-b80d66ad97e8".to_string(),
@@ -345,7 +345,7 @@ some text
                     file: "test.org".to_string(),
                     ..Default::default()
                 },
-                NodeFromOrg {
+                OrgNode {
                     title: "testing".to_string(),
                     parent: Some("e655725f-97db-4eec-925a-b80d66ad97e8".to_string()),
                     uuid: "e6557233-97db-4eec-925a-b80d66ad97e8".to_string(),
@@ -383,7 +383,7 @@ some text
         assert_eq!(
             res,
             vec![
-                NodeFromOrg {
+                OrgNode {
                     title: "Hello World".to_string(),
                     uuid: "e655725f-97db-4eec-925a-b80d66ad97e8".to_string(),
                     parent: None,
@@ -392,7 +392,7 @@ some text
                     file: "test.org".to_string(),
                     ..Default::default()
                 },
-                NodeFromOrg {
+                OrgNode {
                     title: "Hello".to_string(),
                     parent: Some("e655725f-97db-4eec-925a-b80d66ad97e8".to_string()),
                     uuid: "e655725d-97db-4eec-925a-b80d66ad97e8".to_string(),
@@ -403,7 +403,7 @@ some text
                     file: "test.org".to_string(),
                     ..Default::default()
                 },
-                NodeFromOrg {
+                OrgNode {
                     title: "testing".to_string(),
                     parent: None,
                     uuid: "e6557233-97db-4eec-925a-b80d66ad97e8".to_string(),
@@ -439,7 +439,7 @@ some text
         assert_eq!(
             res,
             vec![
-                NodeFromOrg {
+                OrgNode {
                     title: "Hello World".to_string(),
                     parent: None,
                     uuid: "e655725f-97db-4eec-925a-b80d66ad97e8".to_string(),
@@ -448,7 +448,7 @@ some text
                     file: "test.org".to_string(),
                     ..Default::default()
                 },
-                NodeFromOrg {
+                OrgNode {
                     title: "Hello".to_string(),
                     parent: Some("e655725f-97db-4eec-925a-b80d66ad97e8".to_string()),
                     uuid: "e655725d-97db-4eec-925a-b80d66ad97e8".to_string(),
@@ -459,7 +459,7 @@ some text
                     file: "test.org".to_string(),
                     ..Default::default()
                 },
-                NodeFromOrg {
+                OrgNode {
                     title: "testing".to_string(),
                     parent: Some("e655725d-97db-4eec-925a-b80d66ad97e8".to_string()),
                     uuid: "e6557233-97db-4eec-925a-b80d66ad97e8".to_string(),
@@ -494,7 +494,7 @@ some text
         assert_eq!(
             res,
             vec![
-                NodeFromOrg {
+                OrgNode {
                     title: "Hello World".to_string(),
                     parent: None,
                     uuid: "e655725f-97db-4eec-925a-b80d66ad97e8".to_string(),
@@ -503,7 +503,7 @@ some text
                     file: "test.org".to_string(),
                     ..Default::default()
                 },
-                NodeFromOrg {
+                OrgNode {
                     title: "testing".to_string(),
                     parent: Some("e655725f-97db-4eec-925a-b80d66ad97e8".to_string()),
                     uuid: "e6557233-97db-4eec-925a-b80d66ad97e8".to_string(),
@@ -533,7 +533,7 @@ some text
         assert_eq!(
             res,
             vec![
-                NodeFromOrg {
+                OrgNode {
                     uuid: "e655725f-97db-4eec-925a-b80d66ad97e8".to_string(),
                     title: "Test".to_string(),
                     content: ORG.to_string(),
@@ -547,7 +547,7 @@ some text
                     file: "test.org".to_string(),
                     ..Default::default()
                 },
-                NodeFromOrg {
+                OrgNode {
                     uuid: "e655725f-97db-4eec-925a-b80d66ad97e9".to_string(),
                     title: "other".to_string(),
                     content: String::new(),
