@@ -38,6 +38,7 @@ pub struct HtmlExport<'a> {
     latex_blocks: Vec<String>,
     latex_counter: usize,
     table_hints: OrgTableHints,
+    footnote_open: bool,
 }
 
 impl<'a> HtmlExport<'a> {
@@ -53,6 +54,45 @@ impl<'a> HtmlExport<'a> {
             latex_blocks: vec![],
             latex_counter: 0,
             table_hints: OrgTableHints::default(),
+            footnote_open: false,
+        }
+    }
+
+    /// Extract label from footnote syntax like "[fn:1]" or "[fn:label]"
+    fn extract_footnote_label(raw: &str) -> String {
+        if let Some(start) = raw.find("[fn:") {
+            let after_prefix = &raw[start + 4..];
+            if let Some(end) = after_prefix.find(']') {
+                return after_prefix[..end].to_string();
+            }
+        }
+        "unknown".to_string()
+    }
+
+    /// Parse org-mode content and extract inner HTML (without wrapper tags)
+    fn parse_org_content_to_html(content: &str) -> String {
+        use orgize::Org;
+        let parsed = Org::parse(content);
+        let mut exporter = orgize::export::HtmlExport::default();
+        parsed.traverse(&mut exporter);
+        let rendered = exporter.finish();
+
+        // Strip wrapper tags: <main><section><p>...</p></section></main>
+        let mut html = rendered.trim();
+        html = html.strip_prefix("<main>").unwrap_or(html);
+        html = html.strip_suffix("</main>").unwrap_or(html);
+        html = html.strip_prefix("<section>").unwrap_or(html);
+        html = html.strip_suffix("</section>").unwrap_or(html);
+        html = html.strip_prefix("<p>").unwrap_or(html);
+        html = html.strip_suffix("</p>").unwrap_or(html);
+        html.trim().to_string()
+    }
+
+    /// Close an open footnote if there is one
+    fn close_footnote_if_needed(&mut self) {
+        if self.footnote_open {
+            self.output += "</div></div>";
+            self.footnote_open = false;
         }
     }
 }
@@ -144,18 +184,21 @@ impl Traverser for HtmlExport<'_> {
             }
 
             Event::Enter(Container::Paragraph(_)) => {
-                if !self.in_special_block {
+                if !self.in_special_block && !self.footnote_open {
                     self.output += "<p>"
                 }
             }
             Event::Leave(Container::Paragraph(_)) => {
-                if !self.in_special_block {
+                if !self.in_special_block && !self.footnote_open {
                     self.output += "</p>";
                 }
             }
 
             Event::Enter(Container::Section(_)) => self.output += "<section>",
-            Event::Leave(Container::Section(_)) => self.output += "</section>",
+            Event::Leave(Container::Section(_)) => {
+                self.close_footnote_if_needed();
+                self.output += "</section>";
+            }
 
             Event::Enter(Container::Italic(_)) => self.output += "<i>",
             Event::Leave(Container::Italic(_)) => self.output += "</i>",
@@ -440,6 +483,59 @@ impl Traverser for HtmlExport<'_> {
                 );
             }
 
+            Event::Enter(Container::FnRef(fnref)) => {
+                // Extract label from the raw text like "[fn:1]" or "[fn:label]"
+                let raw = fnref.raw();
+                let label = raw.trim_start_matches("[fn:").trim_end_matches(']');
+                let _ = write!(
+                    &mut self.output,
+                    "<sup><a id=\"fnr.{}\" class=\"footref\" href=\"#fn.{}\">{}</a></sup>",
+                    HtmlEscape(label),
+                    HtmlEscape(label),
+                    HtmlEscape(label)
+                );
+                ctx.skip();
+            }
+            Event::Leave(Container::FnRef(_)) => {}
+
+            Event::Enter(Container::FnDef(fndef)) => {
+                // Close any previously open footnote before starting a new one
+                self.close_footnote_if_needed();
+
+                // Extract label and content from the raw text
+                let raw = fndef.raw();
+                let label = Self::extract_footnote_label(&raw);
+
+                // Extract content (first line only - continuation lines come as separate paragraphs)
+                let content = if let Some(start) = raw.find(']') {
+                    &raw[start + 1..].trim_start()
+                } else {
+                    ""
+                };
+
+                // Write footnote header
+                let _ = write!(
+                    &mut self.output,
+                    "<div class=\"footdef\"><sup><a id=\"fn.{}\" class=\"footnum\" href=\"#fnr.{}\">{}</a></sup> <div class=\"footpara\">",
+                    HtmlEscape(&label),
+                    HtmlEscape(&label),
+                    HtmlEscape(&label)
+                );
+
+                // Parse and render the footnote content with inline markup support
+                let inner_html = Self::parse_org_content_to_html(content);
+                self.output += &inner_html;
+
+                // Mark footnote as open so continuation paragraphs can be included
+                self.footnote_open = true;
+
+                // Skip the FnDef's children since we already rendered the first line
+                ctx.skip();
+            }
+            Event::Leave(Container::FnDef(_)) => {
+                // Footnote stays open for continuation paragraphs
+            }
+
             _ => {}
         }
     }
@@ -663,5 +759,213 @@ mod tests {
         let mut handler = HtmlExport::new(&settings, "".into());
         Org::parse(org).traverse(&mut handler);
         assert_eq!(handler.finish().0, exp);
+    }
+
+    #[test]
+    fn test_footnote_export() {
+        let org = concat!(
+            "* Test Footnotes\n",
+            "\n",
+            "This is a test[fn:1] with a footnote reference.\n",
+            "\n",
+            "And another one[fn:second].\n",
+            "\n",
+            "* Footnotes\n",
+            "\n",
+            "[fn:1] This is the first footnote definition.\n",
+            "\n",
+            "[fn:second] This is the second footnote.\n"
+        );
+        let settings = HtmlExportSettings::default();
+        let mut handler = HtmlExport::new(&settings, "".into());
+        Org::parse(org).traverse(&mut handler);
+        let result = handler.finish().0;
+        println!("Footnote export result:\n{}", result);
+
+        // Check that footnote references are properly formatted with links
+        assert!(
+            result.contains("<sup><a id=\"fnr.1\" class=\"footref\" href=\"#fn.1\">1</a></sup>")
+        );
+        assert!(result.contains(
+            "<sup><a id=\"fnr.second\" class=\"footref\" href=\"#fn.second\">second</a></sup>"
+        ));
+
+        // Check that footnote definitions are properly formatted
+        assert!(result.contains("<div class=\"footdef\"><sup><a id=\"fn.1\" class=\"footnum\" href=\"#fnr.1\">1</a></sup>"));
+        assert!(result.contains("<div class=\"footdef\"><sup><a id=\"fn.second\" class=\"footnum\" href=\"#fnr.second\">second</a></sup>"));
+
+        // Check that the content is included
+        assert!(result.contains("This is the first footnote definition"));
+        assert!(result.contains("This is the second footnote"));
+
+        // Check that the label is NOT duplicated in the content
+        // Extract just the footpara content
+        let footpara1_start =
+            result.find("<div class=\"footpara\">").unwrap() + "<div class=\"footpara\">".len();
+        let footpara1_end = result[footpara1_start..].find("</div>").unwrap() + footpara1_start;
+        let footpara1_content = &result[footpara1_start..footpara1_end];
+        println!("Footpara 1 content: '{}'", footpara1_content);
+
+        // The label "1" should NOT appear at the start of the content
+        // It should start with "This is the first footnote"
+        assert!(!footpara1_content.trim().starts_with("1 This"));
+        assert!(footpara1_content.contains("This is the first footnote definition"));
+    }
+
+    #[test]
+    fn test_footnote_with_inline_markup() {
+        let org = concat!(
+            "Text with footnote[fn:1].\n",
+            "\n",
+            "[fn:1] Footnote with *bold* and /italic/ and =code= text.\n"
+        );
+        let settings = HtmlExportSettings::default();
+        let mut handler = HtmlExport::new(&settings, "".into());
+        Org::parse(org).traverse(&mut handler);
+        let result = handler.finish().0;
+
+        assert!(result.contains("class=\"footdef\""));
+
+        // Markup should be properly processed
+        assert!(result.contains("<b>bold</b>"));
+        assert!(result.contains("<i>italic</i>"));
+        assert!(result.contains("<code>code</code>"));
+
+        // Literal markup should NOT appear
+        assert!(!result.contains("*bold*"));
+        assert!(!result.contains("/italic/"));
+        assert!(!result.contains("=code="));
+    }
+
+    #[test]
+    fn test_multiline_footnote_no_indent() {
+        let org = concat!(
+            "Text with footnote[fn:1].\n",
+            "\n",
+            "[fn:1] This is the first line of the footnote.\n",
+            "This is the second line of the same footnote.\n",
+            "And this is the third line.\n"
+        );
+        let settings = HtmlExportSettings::default();
+        let mut handler = HtmlExport::new(&settings, "".into());
+        Org::parse(org).traverse(&mut handler);
+        let result = handler.finish().0;
+
+        // Check that the footnote definition exists
+        assert!(result.contains("class=\"footdef\""));
+
+        // Verify all lines are included within the footnote
+        assert!(result.contains("first line"));
+        assert!(result.contains("second line"));
+        assert!(result.contains("third line"));
+
+        // Ensure the closing tags are in the right order (content is inside footpara)
+        let footdef_start = result.find("<div class=\"footdef\">").unwrap();
+        let footdef_end = result[footdef_start..].find("</div></div>").unwrap() + footdef_start;
+        let footnote_section = &result[footdef_start..footdef_end];
+
+        assert!(footnote_section.contains("first line"));
+        assert!(footnote_section.contains("second line"));
+        assert!(footnote_section.contains("third line"));
+    }
+
+    #[test]
+    fn test_multiline_footnote_with_indent() {
+        // In org-mode, continuation lines can be indented
+        let org = concat!(
+            "Text with footnote[fn:1].\n",
+            "\n",
+            "[fn:1] This is the first line of the footnote.\n",
+            "       This is the second line of the same footnote.\n",
+            "       And this is the third line.\n"
+        );
+        let settings = HtmlExportSettings::default();
+        let mut handler = HtmlExport::new(&settings, "".into());
+        Org::parse(org).traverse(&mut handler);
+        let result = handler.finish().0;
+
+        // Check that the footnote definition exists
+        assert!(result.contains("class=\"footdef\""));
+
+        // Check that all lines are included in the footnote
+        assert!(result.contains("first line"));
+        assert!(result.contains("second line"));
+        assert!(result.contains("third line"));
+
+        // Ensure all content is within the footdef
+        let footdef_start = result.find("<div class=\"footdef\">").unwrap();
+        let footdef_end = result[footdef_start..].find("</div></div>").unwrap() + footdef_start;
+        let footnote_section = &result[footdef_start..footdef_end];
+
+        assert!(footnote_section.contains("first line"));
+        assert!(footnote_section.contains("second line"));
+        assert!(footnote_section.contains("third line"));
+    }
+
+    #[test]
+    fn test_multiple_footnotes() {
+        let org = concat!(
+            "Text with first[fn:1] and second[fn:2] footnote.\n",
+            "\n",
+            "[fn:1] First footnote content.\n",
+            "More content for first footnote.\n",
+            "\n",
+            "[fn:2] Second footnote content.\n",
+            "More content for second footnote.\n"
+        );
+        let settings = HtmlExportSettings::default();
+        let mut handler = HtmlExport::new(&settings, "".into());
+        Org::parse(org).traverse(&mut handler);
+        let result = handler.finish().0;
+
+        // Check both footnote references exist
+        assert!(result.contains("href=\"#fn.1\""));
+        assert!(result.contains("href=\"#fn.2\""));
+
+        // Check both footnote definitions exist
+        assert!(result.contains("id=\"fn.1\""));
+        assert!(result.contains("id=\"fn.2\""));
+
+        // Verify first footnote contains all its content
+        let first_fn_start = result.find("id=\"fn.1\"").unwrap();
+        let second_fn_start = result.find("id=\"fn.2\"").unwrap();
+        let first_footnote = &result[first_fn_start..second_fn_start];
+        assert!(first_footnote.contains("First footnote content"));
+        assert!(first_footnote.contains("More content for first footnote"));
+
+        // Verify second footnote contains all its content
+        let second_footnote = &result[second_fn_start..];
+        assert!(second_footnote.contains("Second footnote content"));
+        assert!(second_footnote.contains("More content for second footnote"));
+    }
+
+    #[test]
+    fn test_footnote_no_paragraph_tags() {
+        // Verify that continuation lines in footnotes don't create <p> tags
+        let org = concat!(
+            "Text with footnote[fn:1].\n",
+            "\n",
+            "[fn:1] First line.\n",
+            "Second line.\n",
+            "Third line.\n"
+        );
+        let settings = HtmlExportSettings::default();
+        let mut handler = HtmlExport::new(&settings, "".into());
+        Org::parse(org).traverse(&mut handler);
+        let result = handler.finish().0;
+
+        // Extract just the footnote definition section
+        let footdef_start = result.find("<div class=\"footdef\">").unwrap();
+        let footdef_end = result[footdef_start..].find("</div></div>").unwrap() + footdef_start;
+        let footnote = &result[footdef_start..=footdef_end];
+
+        // Verify there are NO <p> tags inside the footnote
+        assert!(!footnote.contains("<p>"), "Footnote should not contain <p> tags, but got: {}", footnote);
+        assert!(!footnote.contains("</p>"), "Footnote should not contain </p> tags, but got: {}", footnote);
+
+        // Verify the content is still there
+        assert!(footnote.contains("First line"));
+        assert!(footnote.contains("Second line"));
+        assert!(footnote.contains("Third line"));
     }
 }

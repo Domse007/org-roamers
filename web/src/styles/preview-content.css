@@ -131,3 +131,77 @@
   color: color-mix(in srgb, var(--clickable) 110%, white) !important;
   border-bottom-color: var(--clickable) !important;
 }
+
+/* Footnote References */
+.org-preview-content .footref {
+  color: var(--highlight-2);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.85em;
+  vertical-align: super;
+  line-height: 0;
+  padding: 0 2px;
+  transition: all 0.2s ease;
+  border-bottom: none !important;
+}
+
+.org-preview-content .footref:hover {
+  color: color-mix(in srgb, var(--highlight-2) 120%, white);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--highlight-2) 40%, transparent);
+}
+
+/* Footnote Definitions Section */
+.org-preview-content .footdef {
+  margin: 1.2em 0;
+  padding: 0.8em 1em;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--base) 90%, var(--surface)),
+    color-mix(in srgb, var(--base) 95%, var(--surface))
+  );
+  border-left: 3px solid var(--highlight-2);
+  border-radius: 0 6px 6px 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+}
+
+.org-preview-content .footdef:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  border-left-color: color-mix(in srgb, var(--highlight-2) 120%, white);
+}
+
+/* Footnote Number/Label */
+.org-preview-content .footnum {
+  color: var(--highlight-2);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.9em;
+  margin-right: 0.5em;
+  padding: 2px 6px;
+  background: color-mix(in srgb, var(--highlight-2) 15%, transparent);
+  border-radius: 3px;
+  transition: all 0.2s ease;
+  border-bottom: none !important;
+  display: inline-block;
+}
+
+.org-preview-content .footnum:hover {
+  background: color-mix(in srgb, var(--highlight-2) 25%, transparent);
+  color: color-mix(in srgb, var(--highlight-2) 130%, white);
+  transform: translateY(-1px);
+}
+
+/* Footnote Content */
+.org-preview-content .footpara {
+  display: inline;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.org-preview-content .footpara code {
+  background: color-mix(in srgb, var(--surface) 80%, var(--base));
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-size: 0.9em;
+  border: 1px solid color-mix(in srgb, var(--highlight) 20%, transparent);
+}
