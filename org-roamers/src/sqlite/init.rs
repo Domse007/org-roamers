@@ -51,8 +51,11 @@ pub async fn init_tags(con: &SqlitePool) -> anyhow::Result<()> {
         "FOREIGN KEY (node_id) REFERENCES nodes (id) ON DELETE CASCADE);"
     );
     let stmnt_index: &'static str = concat!("CREATE INDEX tags_node_id ON tags (node_id);");
+    let stmnt_tag_index: &'static str =
+        concat!("CREATE INDEX tags_tag_node ON tags (tag, node_id);");
     con.execute(stmnt_tags).await?;
     con.execute(stmnt_index).await?;
+    con.execute(stmnt_tag_index).await?;
     Ok(())
 }
 

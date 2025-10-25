@@ -32,12 +32,13 @@ const switchSettingsPage = (page: MouseEvent) => {
   }
 };
 
-// Props for connection status
 const props = defineProps<{
   connectionStatus?: "connecting" | "connected" | "disconnected";
   pendingChanges?: boolean;
   websocketState?: number | null;
   websocketUrl?: string;
+  filterTags?: string[];
+  excludeTags?: string[];
 }>();
 </script>
 
@@ -177,7 +178,12 @@ const props = defineProps<{
           :websocketState="props.websocketState"
           :websocketUrl="props.websocketUrl"
         />
-        <SettingsFilter v-if="activePage === 'Filter'" />
+        <SettingsFilter
+          v-if="activePage === 'Filter'"
+          @filter-change="$emit('filterChange', $event)"
+          :filter-tags="props.filterTags"
+          :exclude-tags="props.excludeTags"
+        />
       </div>
     </div>
   </div>

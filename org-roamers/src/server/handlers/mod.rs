@@ -4,4 +4,5 @@ pub mod graph;
 pub mod health;
 pub mod latex;
 pub mod org;
+pub mod tags;
 pub mod websocket;

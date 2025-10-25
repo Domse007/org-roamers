@@ -8,7 +8,7 @@ use axum::{
 use tower_http::cors::CorsLayer;
 
 use crate::ServerState;
-use handlers::{assets, emacs as emacs_handler, graph, health, latex, org, websocket};
+use handlers::{assets, emacs as emacs_handler, graph, health, latex, org, tags, websocket};
 
 mod data;
 mod emacs;
@@ -21,6 +21,7 @@ pub async fn build_server(app_state: Arc<ServerState>) -> Router {
         .route("/", get(health::default_route))
         .route("/org", get(org::get_org_as_html_handler))
         .route("/graph", get(graph::get_graph_data_handler))
+        .route("/tags", get(tags::get_tags_handler))
         .route("/latex", get(latex::get_latex_svg_handler))
         .route("/ws", get(websocket::websocket_handler))
         .route("/emacs", post(emacs_handler::emacs_handler))

@@ -30,6 +30,14 @@ const redrawGraph = () => {
   graphUpdateCount.value++;
 };
 
+const filterTags: Ref<string[]> = ref([]);
+const excludeTags: Ref<string[]> = ref([]);
+const handleFilterChange = (data: { include: string[]; exclude: string[] }) => {
+  filterTags.value = data.include;
+  excludeTags.value = data.exclude;
+  redrawGraph();
+};
+
 const clearGraphUpdates = () => {
   console.log("Clearing graph updates to ensure reactivity");
   graphUpdatesRef.value = null;
@@ -308,6 +316,8 @@ const handleError = (error: string) => {
       :toggle-layouter="toggleLayouterRef"
       :zoom-node="previewID"
       :updates="graphUpdatesRef"
+      :filter-tags="filterTags"
+      :exclude-tags="excludeTags"
     ></GraphView>
     <PreviewFrame
       :id="previewID"
@@ -317,10 +327,13 @@ const handleError = (error: string) => {
     <SettingsPane
       @redraw-graph="redrawGraph"
       @toggle-layouter="toggleLayouter"
+      @filter-change="handleFilterChange"
       :connectionStatus="connectionStatus"
       :pendingChanges="pendingChanges"
       :websocketState="websocket?.readyState"
       :websocketUrl="websocket?.url"
+      :filter-tags="filterTags"
+      :exclude-tags="excludeTags"
     ></SettingsPane>
   </main>
 </template>

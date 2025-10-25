@@ -22,7 +22,16 @@ const updateGraph = () => {
   const edgeColor = style.getPropertyValue("--overlay").trim();
   const nodeBorderColor = style.getPropertyValue("--node-border").trim();
 
-  fetch(`/graph`)
+  const params = new URLSearchParams();
+  if (prop.filterTags && prop.filterTags.length > 0) {
+    params.append("tags", prop.filterTags.join(","));
+  }
+  if (prop.excludeTags && prop.excludeTags.length > 0) {
+    params.append("exclude", prop.excludeTags.join(","));
+  }
+  const url = params.toString() ? `/graph?${params.toString()}` : `/graph`;
+
+  fetch(url)
     .then((resp) => resp.json())
     .then((json: GraphData) => {
       json.nodes.forEach(
@@ -86,7 +95,6 @@ function setupGraph() {
     settings: settings,
   });
 
-  // Graph coloring
   const c = (v: string) =>
     getComputedStyle(document.documentElement).getPropertyValue(v).trim();
   const colors = [
@@ -102,14 +110,18 @@ function setupGraph() {
     c("--comment"),
     c("--type"),
   ];
-  const communities = louvain(graph);
-  Object.entries(communities).forEach(([node, communityId]) => {
-    const color = colors[communityId % colors.length];
-    graph.mergeNodeAttributes(node, {
-      community: communityId,
-      color,
+  try {
+    const communities = louvain(graph);
+    Object.entries(communities).forEach(([node, communityId]) => {
+      const color = colors[communityId % colors.length];
+      graph.mergeNodeAttributes(node, {
+        community: communityId,
+        color,
+      });
     });
-  });
+  } catch (e) {
+    console.log("Community detection skipped:", e);
+  }
 
   // Graph layouting
   layout.start();
@@ -318,7 +330,6 @@ const incrementalGraphUpdate = (updates: {
       );
       console.log(`Graph now has ${graph.order} nodes and ${graph.size} edges`);
 
-      // Re-run community detection for proper coloring
       if (graph.order > 0) {
         console.log("Running community detection for updated graph");
         const c = (v: string) =>
@@ -337,15 +348,19 @@ const incrementalGraphUpdate = (updates: {
           c("--type"),
         ];
 
-        const communities = louvain(graph);
-        Object.entries(communities).forEach(([node, communityId]) => {
-          const color = colors[communityId % colors.length];
-          graph.mergeNodeAttributes(node, {
-            community: communityId,
-            color,
+        try {
+          const communities = louvain(graph);
+          Object.entries(communities).forEach(([node, communityId]) => {
+            const color = colors[communityId % colors.length];
+            graph.mergeNodeAttributes(node, {
+              community: communityId,
+              color,
+            });
           });
-        });
-        console.log("Community detection completed");
+          console.log("Community detection completed");
+        } catch (e) {
+          console.log("Community detection skipped:", e);
+        }
       }
 
       if (sigma) {
@@ -414,6 +429,8 @@ const prop = defineProps<{
     removedNodes?: string[];
     removedLinks?: RoamLink[];
   } | null;
+  filterTags?: string[];
+  excludeTags?: string[];
 }>();
 
 let old_count = 0;
