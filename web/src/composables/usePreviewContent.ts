@@ -11,6 +11,7 @@ export function usePreviewContent() {
   const shown: Ref<"none" | "flex"> = ref("none");
   const links: Ref<{ display: string; id: string }[]> = ref([]);
   const incomingLinks: Ref<{ display: string; id: string }[]> = ref([]);
+  const tags: Ref<string[]> = ref([]);
   const rendered = ref("");
 
   let current_id: string = "";
@@ -46,6 +47,7 @@ export function usePreviewContent() {
         rendered.value = resp.org;
         links.value = resp.outgoing_links;
         incomingLinks.value = resp.incoming_links || [];
+        tags.value = resp.tags || [];
         current_latex_blocks = resp.latex_blocks || [];
         console.log(
           `Loaded content with ${current_latex_blocks.length} LaTeX blocks`,
@@ -101,6 +103,7 @@ export function usePreviewContent() {
     shown,
     links,
     incomingLinks,
+    tags,
     rendered,
     history,
 

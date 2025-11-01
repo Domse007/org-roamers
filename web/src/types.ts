@@ -28,6 +28,7 @@ export interface SearchResponse {
 
 export interface OrgAsHTMLResponse {
   org: string;
+  tags: string[];
   outgoing_links: {
     display: string;
     id: string;

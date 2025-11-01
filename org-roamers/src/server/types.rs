@@ -142,6 +142,7 @@ pub struct IncomingLink {
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct OrgAsHTMLResponse {
     pub org: String,
+    pub tags: Vec<String>,
     pub outgoing_links: Vec<OutgoingLink>,
     pub incoming_links: Vec<IncomingLink>,
     pub latex_blocks: Vec<String>,
@@ -222,12 +223,13 @@ mod tests {
                 display: "t".into(),
                 id: "id".into(),
             }],
+            tags: vec![],
             incoming_links: vec![],
             latex_blocks: vec![],
         };
         let expected = concat!(
-            "{\"org\":\"<h1>title</h1>\",\"outgoing_links\":",
-            "[{\"display\":\"t\",\"id\":\"id\"}],",
+            "{\"org\":\"<h1>title</h1>\",\"tags\":[],",
+            "\"outgoing_links\":[{\"display\":\"t\",\"id\":\"id\"}],",
             "\"incoming_links\":[],\"latex_blocks\":[]}"
         );
         assert_eq!(serde_json::to_string(&resp).unwrap(), expected);

@@ -23,6 +23,7 @@ const {
   shown,
   links,
   incomingLinks,
+  tags,
   rendered,
   history,
   preview: previewContent,
@@ -48,6 +49,27 @@ const previewFromHistory = (id: string | null) => {
 };
 
 const resize = togglePreview;
+
+// Generate a consistent color for a tag based on its name using theme colors
+const getTagColor = (tag: string): string => {
+  // Define theme-based color palette
+  const themeColors = [
+    "var(--clickable)",
+    "color-mix(in srgb, var(--clickable) 70%, var(--highlight))",
+    "color-mix(in srgb, var(--highlight) 80%, var(--clickable))",
+    "color-mix(in srgb, var(--clickable) 60%, var(--text))",
+    "color-mix(in srgb, var(--highlight) 90%, var(--text))",
+    "color-mix(in srgb, var(--clickable) 85%, var(--base))",
+  ];
+
+  // Hash the tag name to get consistent color selection
+  let hash = 0;
+  for (let i = 0; i < tag.length; i++) {
+    hash = tag.charCodeAt(i) + ((hash << 5) - hash);
+  }
+
+  return themeColors[Math.abs(hash) % themeColors.length];
+};
 
 const configureIDLinks = (_class: string) => {
   Array.from(document.getElementsByClassName(_class)).forEach((elem: Element) =>
@@ -274,6 +296,18 @@ watch(rendered, async () => {
             </svg>
           </button>
         </div>
+      </div>
+
+      <!-- Tags Section -->
+      <div v-if="tags.length > 0" class="tags-container">
+        <span
+          v-for="tag in tags"
+          :key="tag"
+          class="tag"
+          :style="{ backgroundColor: getTagColor(tag) }"
+        >
+          {{ tag }}
+        </span>
       </div>
 
       <div

@@ -127,8 +127,15 @@ pub async fn get_org_as_html(
         })
         .unwrap();
 
+    let tags = sqlx::query_scalar::<_, String>("SELECT DISTINCT tag FROM tags WHERE node_id = ?")
+        .bind(id.id())
+        .fetch_all(sqlite)
+        .await
+        .unwrap();
+
     OrgAsHTMLResponse {
         org,
+        tags,
         outgoing_links,
         incoming_links,
         latex_blocks,
