@@ -77,7 +77,8 @@ impl WebSocketMessage {
                 if let Err(err) = sender
                     .send(Message::Text(
                         serde_json::to_string(&Self::SearchConfigurationResponse { config })
-                            .unwrap(),
+                            .unwrap()
+                            .into(),
                     ))
                     .await
                 {
@@ -97,7 +98,9 @@ impl WebSocketMessage {
         tracing::info!("Received ping from client {}, sending pong", client_id);
         if let Err(e) = sender
             .send(Message::Text(
-                serde_json::to_string(&WebSocketMessage::Pong).unwrap(),
+                serde_json::to_string(&WebSocketMessage::Pong)
+                    .unwrap()
+                    .into(),
             ))
             .await
         {

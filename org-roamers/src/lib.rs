@@ -14,6 +14,7 @@
 mod cache;
 mod latex;
 
+mod auth;
 mod client;
 pub mod config;
 mod search;
@@ -30,6 +31,7 @@ use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 
+use crate::auth::{build_user_store, UserStore};
 use crate::cache::OrgCache;
 use crate::client::message::WebSocketMessage;
 use crate::config::Config;
@@ -45,6 +47,8 @@ pub struct ServerState {
     pub websocket_connections: DashMap<u64, UnboundedSender<WebSocketMessage>>,
     /// Atomic counter for connection IDs
     pub next_connection_id: AtomicU64,
+    /// User authentication store (None if auth disabled)
+    pub user_store: Option<UserStore>,
 }
 
 impl ServerState {
@@ -55,12 +59,15 @@ impl ServerState {
 
         org_cache.rebuild(&sqlite_con).await?;
 
+        let user_store = build_user_store(&conf)?;
+
         Ok(ServerState {
             sqlite: sqlite_con,
             cache: org_cache,
             config: conf,
             websocket_connections: DashMap::new(),
             next_connection_id: AtomicU64::new(1),
+            user_store,
         })
     }
 
@@ -137,7 +144,6 @@ pub async fn start(state: ServerState) -> anyhow::Result<()> {
             tracing::info!("Shutdown signal received, stopping server...");
             cancellation_token.cancel();
         })
-        .tcp_nodelay(true)
         .await
         .unwrap();
 

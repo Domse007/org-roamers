@@ -86,7 +86,9 @@ async function renderLatexBlock(
   const url = `/latex?id=${encodeURIComponent(nodeId)}&index=${latexIndex}&color=${colorEncoded}&scope=file`;
   debugLog("Requesting:", url);
 
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    credentials: "include", // Include cookies for authentication
+  });
 
   if (!response.ok) {
     const errorText = await response.text();

@@ -66,7 +66,9 @@ impl WebSocketClient {
         // Send initial ping
         if let Err(e) = sender
             .send(Message::Text(
-                serde_json::to_string(&WebSocketMessage::Ping).unwrap(),
+                serde_json::to_string(&WebSocketMessage::Ping)
+                    .unwrap()
+                    .into(),
             ))
             .await
         {
@@ -113,7 +115,7 @@ impl WebSocketClient {
                     match msg {
                         Some(message) => {
                             if let Err(e) = sender.send(Message::Text(
-                                serde_json::to_string(&message).unwrap()
+                                serde_json::to_string(&message).unwrap().into()
                             )).await {
                                 error!("Failed to send server message to client {}: {}", client_id, e);
                                 break;
@@ -129,7 +131,7 @@ impl WebSocketClient {
                 // Send periodic pings
                 _ = ping_interval.tick() => {
                     if let Err(e) = sender.send(Message::Text(
-                        serde_json::to_string(&WebSocketMessage::Ping).unwrap()
+                        serde_json::to_string(&WebSocketMessage::Ping).unwrap().into()
                     )).await {
                         error!("Failed to send ping to client {}: {}", client_id, e);
                         break;
@@ -153,7 +155,7 @@ impl WebSocketClient {
                             results: result,
                         };
                         if let Err(e) = sender.send(Message::Text(
-                            serde_json::to_string(&response).unwrap()
+                            serde_json::to_string(&response).unwrap().into()
                         )).await {
                             error!("Failed to send search result to client {}: {}", client_id, e);
                             break;

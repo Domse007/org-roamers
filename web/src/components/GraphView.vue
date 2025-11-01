@@ -31,7 +31,9 @@ const updateGraph = () => {
   }
   const url = params.toString() ? `/graph?${params.toString()}` : `/graph`;
 
-  fetch(url)
+  fetch(url, {
+    credentials: "include", // Include cookies for authentication
+  })
     .then((resp) => resp.json())
     .then((json: GraphData) => {
       json.nodes.forEach(

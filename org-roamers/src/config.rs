@@ -70,6 +70,76 @@ pub enum AssetPolicy {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
+pub struct AuthConfig {
+    /// Enable authentication system
+    pub enabled: bool,
+
+    /// List of authorized users with plaintext passwords
+    /// WARNING: Ensure config file has restricted permissions (chmod 600)
+    pub users: Vec<User>,
+
+    /// Session configuration
+    #[serde(default)]
+    pub session: SessionConfig,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct User {
+    /// Username for login
+    pub username: String,
+
+    /// Plaintext password (hashed on server startup)
+    /// WARNING: Keep config file secure
+    pub password: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct SessionConfig {
+    /// Session expiry mode: "OnInactivity" or "BrowserSession"
+    pub expiry_mode: SessionExpiryMode,
+
+    /// Duration in hours before session expires (for OnInactivity mode)
+    pub expiry_duration_hours: u64,
+
+    /// Enable secure cookie flag (requires HTTPS in production)
+    pub secure_cookie: bool,
+
+    /// Interval in minutes to run cleanup of expired sessions
+    pub cleanup_interval_minutes: u64,
+}
+
+impl Default for SessionConfig {
+    fn default() -> Self {
+        Self {
+            expiry_mode: SessionExpiryMode::default(),
+            expiry_duration_hours: 24,
+            secure_cookie: bool::default(),
+            cleanup_interval_minutes: 60,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "PascalCase")]
+pub enum SessionExpiryMode {
+    /// Session expires after period of inactivity
+    #[default]
+    OnInactivity,
+    /// Session expires on browser close or after 2 weeks
+    BrowserSession,
+}
+
+impl Default for AuthConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            users: Vec::new(),
+            session: SessionConfig::default(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Config {
     /// Path to the root of the org-roamers / org-roam directory.
     pub org_roamers_root: PathBuf,
@@ -85,6 +155,9 @@ pub struct Config {
     pub latex_config: LatexConfig,
     /// Settings on asset loading restrictions
     pub asset_policy: AssetPolicy,
+    /// Authentication configuration (optional - defaults to disabled)
+    #[serde(default)]
+    pub authentication: Option<AuthConfig>,
 }
 
 impl Default for Config {
@@ -97,6 +170,7 @@ impl Default for Config {
             fs_watcher: false,
             latex_config: LatexConfig::default(),
             asset_policy: AssetPolicy::default(),
+            authentication: None,
         }
     }
 }

@@ -4,11 +4,15 @@ import GraphView from "./components/GraphView.vue";
 import SearchBar, { type SearchBarMethods } from "./components/SearchBar.vue";
 import SettingsPane from "./components/Settings/SettingsPane.vue";
 import ErrorDialog from "./components/ErrorDialog.vue";
+import LoginForm from "./components/LoginForm.vue";
 import { onMounted, onUnmounted, type Ref, ref, provide, watch } from "vue";
 import { type RoamLink, type RoamNode } from "./types.ts";
 import { getRouter } from "./router";
+import { useAuth } from "./composables/useAuth";
 
 const router = getRouter();
+const { isAuthenticated, checkSession, logout } = useAuth();
+const showLoginForm = ref(false);
 
 const connectionStatus: Ref<"connecting" | "connected" | "disconnected"> =
   ref("connecting");
@@ -214,6 +218,14 @@ const connectWebSocket = () => {
     });
     connectionStatus.value = "disconnected";
 
+    // Check for authentication failure (policy violation)
+    if (event.code === 1008) {
+      console.warn("WebSocket closed due to authentication failure");
+      showLoginForm.value = true;
+      isAuthenticated.value = false;
+      return;
+    }
+
     // Different reconnection strategy based on close code
     let reconnectDelay = 3000;
     if (event.code === 1006) {
@@ -234,8 +246,27 @@ const connectWebSocket = () => {
   };
 };
 
-onMounted(() => {
-  console.log("Component mounted, initializing WebSocket connection");
+onMounted(async () => {
+  console.log("Component mounted, checking authentication");
+
+  // Check if authentication is enabled by trying to access session endpoint
+  const authenticated = await checkSession();
+
+  if (!authenticated) {
+    // Try to access a protected endpoint to see if auth is required
+    try {
+      const response = await fetch("/graph", { credentials: "include" });
+      if (response.status === 401) {
+        console.log("Authentication required, showing login form");
+        showLoginForm.value = true;
+        return;
+      }
+    } catch (err) {
+      console.log("Could not check auth status, proceeding without auth");
+    }
+  }
+
+  console.log("Authentication check passed, initializing application");
 
   // Initialize router first
   router.initialize();
@@ -296,45 +327,82 @@ const handleError = (error: string) => {
   console.error("Application error:", error);
   errorMessage.value = error;
 };
+
+// Handle successful login
+const handleLoginSuccess = () => {
+  console.log("Login successful, initializing application");
+  showLoginForm.value = false;
+
+  // Initialize router
+  router.initialize();
+
+  // If there's an initial node from the URL, set it
+  const initialNodeId = router.getCurrentNodeId();
+  if (initialNodeId) {
+    console.log("Setting initial preview ID from URL:", initialNodeId);
+    previewID.value = initialNodeId;
+  }
+
+  // Sync router changes with previewID
+  router.onNavigate((nodeId) => {
+    console.log(
+      "App: Router navigation detected, updating preview ID to:",
+      nodeId,
+    );
+    previewID.value = nodeId;
+  });
+
+  // Reset error message because it might contain resolved errors.
+  errorMessage.value = null;
+
+  // Connect WebSocket
+  connectWebSocket();
+};
 </script>
 
 <template>
   <main>
-    <ErrorDialog v-if="errorMessage != null" @dialog-close="closeError">{{
-      errorMessage
-    }}</ErrorDialog>
-    <SearchBar
-      ref="searchBarRef"
-      @open-node="updatePreviewID"
-      @error="handleError"
-    ></SearchBar>
-    <GraphView
-      @open-node="updatePreviewID"
-      @updates-processed="clearGraphUpdates"
-      @error="handleError"
-      :count="graphUpdateCount"
-      :toggle-layouter="toggleLayouterRef"
-      :zoom-node="previewID"
-      :updates="graphUpdatesRef"
-      :filter-tags="filterTags"
-      :exclude-tags="excludeTags"
-    ></GraphView>
-    <PreviewFrame
-      :id="previewID"
-      @preview-switch="updatePreviewID"
-      @error="handleError"
-    ></PreviewFrame>
-    <SettingsPane
-      @redraw-graph="redrawGraph"
-      @toggle-layouter="toggleLayouter"
-      @filter-change="handleFilterChange"
-      :connectionStatus="connectionStatus"
-      :pendingChanges="pendingChanges"
-      :websocketState="websocket?.readyState"
-      :websocketUrl="websocket?.url"
-      :filter-tags="filterTags"
-      :exclude-tags="excludeTags"
-    ></SettingsPane>
+    <!-- Show login form if authentication is required -->
+    <LoginForm v-if="showLoginForm" @login-success="handleLoginSuccess" />
+
+    <!-- Show main application if authenticated or auth not required -->
+    <template v-else>
+      <ErrorDialog v-if="errorMessage != null" @dialog-close="closeError">{{
+        errorMessage
+      }}</ErrorDialog>
+      <SearchBar
+        ref="searchBarRef"
+        @open-node="updatePreviewID"
+        @error="handleError"
+      ></SearchBar>
+      <GraphView
+        @open-node="updatePreviewID"
+        @updates-processed="clearGraphUpdates"
+        @error="handleError"
+        :count="graphUpdateCount"
+        :toggle-layouter="toggleLayouterRef"
+        :zoom-node="previewID"
+        :updates="graphUpdatesRef"
+        :filter-tags="filterTags"
+        :exclude-tags="excludeTags"
+      ></GraphView>
+      <PreviewFrame
+        :id="previewID"
+        @preview-switch="updatePreviewID"
+        @error="handleError"
+      ></PreviewFrame>
+      <SettingsPane
+        @redraw-graph="redrawGraph"
+        @toggle-layouter="toggleLayouter"
+        @filter-change="handleFilterChange"
+        :connectionStatus="connectionStatus"
+        :pendingChanges="pendingChanges"
+        :websocketState="websocket?.readyState"
+        :websocketUrl="websocket?.url"
+        :filter-tags="filterTags"
+        :exclude-tags="excludeTags"
+      ></SettingsPane>
+    </template>
   </main>
 </template>
 

@@ -1,4 +1,5 @@
 pub mod assets;
+pub mod auth;
 pub mod emacs;
 pub mod graph;
 pub mod health;

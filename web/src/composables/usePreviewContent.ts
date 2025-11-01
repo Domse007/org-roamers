@@ -29,7 +29,9 @@ export function usePreviewContent() {
     console.log(`Previewing ${id}`);
     const scope: "file" | "node" = getScope();
 
-    return fetch(`/org?id=${id}&scope=${scope}`)
+    return fetch(`/org?id=${id}&scope=${scope}`, {
+      credentials: "include", // Include cookies for authentication
+    })
       .then((response) => {
         console.log("Org response status:", response.status);
         if (!response.ok) {

@@ -13,11 +13,11 @@ chardetng = "0.1.17"
 encoding_rs = "0.8.35"
 notify = "8.0.0"
 orgize = { git = "https://github.com/Domse007/orgize", branch = "table-fix" }
-axum = { version = "0.7", features = ["ws"] }
+axum = { version = "0.8", features = ["ws"] }
 sqlx = { version = "0.8.6", features = ["runtime-tokio", "sqlite"]}
 tokio = { version = "1.0", features = ["full"] }
-tower = "0.4"
-tower-http = { version = "0.5", features = ["fs", "cors"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["fs", "cors"] }
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.138"
 tempfile = "3.14.0"
@@ -30,6 +30,12 @@ tokio-util = "0.7.16"
 fuzzy-matcher = "0.3.7"
 dashmap = "6.1.0"
 notify-debouncer-full = "0.6.0"
+
+# Authentication
+tower-sessions = "0.14"
+tower-sessions-sqlx-store = { version = "0.15", features = ["sqlite"] }
+argon2 = { version = "0.5", features = ["std"] }
+time = "0.3"
 
 [dependencies.include_dir]
 version = "0.7.4"

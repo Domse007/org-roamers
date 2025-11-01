@@ -36,7 +36,9 @@ watch(
 
 onMounted(async () => {
   try {
-    const response = await fetch("/tags");
+    const response = await fetch("/tags", {
+      credentials: "include", // Include cookies for authentication
+    });
     availableTags.value = await response.json();
   } catch (error) {
     console.error("Failed to load tags:", error);
