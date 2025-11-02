@@ -39,8 +39,8 @@ export async function processLatexPlaceholders(
 
   debugLog("Found placeholders:", placeholders.length);
 
-  for (let i = 0; i < placeholders.length; i++) {
-    const placeholder = placeholders[i];
+  // Process all LaTeX blocks in parallel for better performance
+  const renderPromises = Array.from(placeholders).map(async (placeholder, i) => {
     const latexIndex = parseInt(
       placeholder.getAttribute("data-latex-index") || "0",
     );
@@ -49,7 +49,7 @@ export async function processLatexPlaceholders(
 
     if (latexIndex < 0 || latexIndex >= latexBlocks.length) {
       console.warn(`Invalid LaTeX index ${latexIndex}, skipping`);
-      continue;
+      return;
     }
 
     try {
@@ -64,7 +64,10 @@ export async function processLatexPlaceholders(
         </span>
       `;
     }
-  }
+  });
+
+  // Wait for all rendering to complete
+  await Promise.all(renderPromises);
 }
 
 /**
