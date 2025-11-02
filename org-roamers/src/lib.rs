@@ -107,10 +107,8 @@ impl ServerState {
 pub async fn start(state: ServerState) -> anyhow::Result<()> {
     let start = Instant::now();
 
-    tracing::info!(
-        "Using server configuration: {:?}",
-        serde_json::to_string(&state.config).unwrap()
-    );
+    tracing::info!("Using roam-path: {:?}", state.config.org_roamers_root);
+    tracing::info!("Using asset policy: {:?}", state.config.asset_policy);
 
     let use_fs_watcher = state.config.fs_watcher;
 

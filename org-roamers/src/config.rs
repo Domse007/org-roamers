@@ -60,7 +60,7 @@ impl Default for LatexConfig {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Default, Copy)]
+#[derive(Serialize, Deserialize, Clone, Default, Copy, Debug)]
 pub enum AssetPolicy {
     AllowAll,
     ForbidAll,
