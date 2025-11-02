@@ -1,15 +1,15 @@
 #[cfg(not(target_os = "windows"))]
 pub mod config_path {
     use org_roamers::config::ENV_VAR_NAME;
+    use std::env;
+    use std::fs;
     use std::path::PathBuf;
-    use std::{env, fs};
 
-    pub fn paths() -> [Option<PathBuf>; 4] {
+    pub fn paths() -> [Option<PathBuf>; 3] {
         [
             env::var(ENV_VAR_NAME).map(|v| PathBuf::from(v)).ok(),
-            Some(PathBuf::from("./conf.json")),
-            Some(PathBuf::from("~/.config/org-roamers/conf.json")),
-            Some(PathBuf::from("/etc/org-roamers/conf.json")),
+            Some(PathBuf::from("~/.config/org-roamers/config.json")),
+            Some(PathBuf::from("/etc/org-roamers/config.json")),
         ]
     }
 
@@ -18,7 +18,13 @@ pub mod config_path {
             .into_iter()
             .filter(|e| e.is_some())
             .map(|v| v.unwrap())
-            .filter(|p| fs::exists(p).unwrap())
+            .filter(|p| {
+                let p = match fs::canonicalize(p) {
+                    Ok(p) => p,
+                    Err(_) => return false,
+                };
+                fs::exists(p).unwrap()
+            })
             .next()
     }
 }

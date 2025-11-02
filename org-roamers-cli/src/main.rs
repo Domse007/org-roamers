@@ -1,9 +1,37 @@
-use std::{env, panic, process::ExitCode};
+use std::{panic, path::PathBuf, process::ExitCode};
 
+use clap::{Parser, Subcommand};
 use org_roamers::start;
 
 mod conf;
 mod entry;
+
+#[derive(Parser)]
+#[command(about = "The cli interface for org-roamers.")]
+struct Cli {
+    /// The subcommand to run
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Command for server
+    Server {
+        #[arg(long)]
+        config: Option<PathBuf>,
+    },
+    /// Command for get-config
+    GetConfig {
+        #[arg(long)]
+        with_auth: bool,
+    },
+    /// Dump the DB after initialisation
+    DumpConfig {
+        #[arg(long)]
+        config: Option<PathBuf>,
+    },
+}
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -20,46 +48,37 @@ async fn main() -> ExitCode {
         tracing::error!("Server paniced with {info}")
     }));
 
-    let mut args = env::args().skip(1);
+    let cli = Cli::parse();
 
-    if let Some(cmd) = args.next() {
-        match cmd.as_str() {
-            "--server" => {
-                let state = match entry::init_state().await {
-                    Ok(state) => state,
-                    Err(err) => {
-                        tracing::error!("{err}");
-                        return ExitCode::FAILURE;
-                    }
-                };
-                start(state).await.unwrap();
-                tracing::info!("Starting CLI...");
-                tracing::info!("Successfully shut down runtime.");
-            }
-            "--dump-db" => {
-                let state = match entry::init_state().await {
-                    Ok(state) => state,
-                    Err(err) => {
-                        tracing::error!("{err}");
-                        return ExitCode::FAILURE;
-                    }
-                };
-                if let Err(err) = entry::dump_db(state) {
+    match cli.command {
+        Commands::Server { config } => {
+            let state = match entry::init_state(config).await {
+                Ok(state) => state,
+                Err(err) => {
                     tracing::error!("{err}");
                     return ExitCode::FAILURE;
                 }
-            }
-            "--get-config" => {
-                entry::print_config();
-            }
-            _ => {
-                eprintln!("Unsupported command: {cmd}");
+            };
+            start(state).await.unwrap();
+            tracing::info!("Starting CLI...");
+            tracing::info!("Successfully shut down runtime.");
+        }
+        Commands::DumpConfig { config } => {
+            let state = match entry::init_state(config).await {
+                Ok(state) => state,
+                Err(err) => {
+                    tracing::error!("{err}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            if let Err(err) = entry::dump_db(state) {
+                tracing::error!("{err}");
                 return ExitCode::FAILURE;
             }
         }
-    } else {
-        eprintln!("No command provided. Use --server, --get-config or --dump-db");
-        return ExitCode::FAILURE;
+        Commands::GetConfig { with_auth } => {
+            entry::print_config(with_auth);
+        }
     }
 
     ExitCode::SUCCESS

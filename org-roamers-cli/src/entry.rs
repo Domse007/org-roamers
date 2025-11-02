@@ -1,15 +1,15 @@
-use std::fs;
+use std::{fs, path::PathBuf};
 
 use anyhow::Result;
 use org_roamers::{
     ServerState,
-    config::{Config, DEFAULT_CONFIG, ENV_VAR_NAME},
+    config::{Config, ConfigWithAuth, ENV_VAR_NAME},
 };
 use tracing::info;
 
-use crate::conf;
+use crate::conf::{self, config_path};
 
-pub fn print_config() {
+pub fn print_config(with_auth: bool) {
     eprintln!("Install the file by calling");
     eprintln!("    org-roamers-cli --get-config > DEST");
     eprintln!("The supported destinations are:");
@@ -22,13 +22,23 @@ pub fn print_config() {
         "Alternatively you can set the environment variable {}.\n\n",
         ENV_VAR_NAME
     );
-    println!("{}", DEFAULT_CONFIG);
+
+    let config = match with_auth {
+        true => ConfigWithAuth::new(),
+        false => Config::default(),
+    };
+
+    println!("{}", serde_json::to_string_pretty(&config).unwrap());
 }
 
-pub async fn init_state() -> Result<ServerState> {
-    let Some(server_conf_path) = conf::config_path::config_path() else {
-        print_config();
-        anyhow::bail!("org-roamers cannot find a config file.");
+pub async fn init_state(provided_conf: Option<PathBuf>) -> Result<ServerState> {
+    let server_conf_path = match (provided_conf, config_path::config_path()) {
+        (Some(path), _) => path,
+        (None, Some(path)) => path,
+        _ => {
+            print_config(false);
+            anyhow::bail!("org-roamers cannot find a config file.");
+        }
     };
 
     info!("Using config path {server_conf_path:?}");

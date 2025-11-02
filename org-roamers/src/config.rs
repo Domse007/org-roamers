@@ -2,7 +2,6 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-pub const DEFAULT_CONFIG: &str = include_str!("../../conf.json");
 pub const ENV_VAR_NAME: &str = "ROAMERS_DIR";
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -172,5 +171,15 @@ impl Default for Config {
             asset_policy: AssetPolicy::default(),
             authentication: None,
         }
+    }
+}
+
+pub struct ConfigWithAuth;
+
+impl ConfigWithAuth {
+    pub fn new() -> Config {
+        let mut default = Config::default();
+        default.authentication = Some(AuthConfig::default());
+        default
     }
 }
