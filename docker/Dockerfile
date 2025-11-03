@@ -41,6 +41,7 @@ RUN apt-get update && apt-get install -y \
     texlive-latex-base \
     texlive-latex-extra \
     dvisvgm \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
