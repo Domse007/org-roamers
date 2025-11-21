@@ -26,9 +26,10 @@ impl UserStore {
         let mut user_map = HashMap::new();
 
         for user in users {
-            info!("Hashing password for user: {}", user.username);
+            let username = user.username.to_lowercase();
+            info!("Hashing password for user: {}", username);
             let hash = password::hash_password(&user.password)?;
-            user_map.insert(user.username, hash);
+            user_map.insert(username, hash);
         }
 
         info!("Loaded {} user(s) for authentication", user_map.len());
@@ -37,7 +38,7 @@ impl UserStore {
     }
 
     pub fn verify(&self, username: &str, password: &str) -> bool {
-        match self.users.get(username) {
+        match self.users.get(&username.to_lowercase()) {
             Some(hash) => password::verify_password(password, hash).unwrap_or(false),
             None => false,
         }
